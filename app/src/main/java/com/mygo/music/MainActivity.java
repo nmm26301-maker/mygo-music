@@ -30,7 +30,7 @@ public class MainActivity extends Activity {
     private MediaPlayer player;
     private TextView nowPlaying, timeLabel;
     private SeekBar progress, volume;
-    private Button playButton, shuffleButton, repeatButton;
+    private Button playButton, shuffleButton, repeatButton, lyricsButton;
     private int current = -1;
     private boolean shuffle = false, repeat = false;
     private final Handler handler = new Handler();
