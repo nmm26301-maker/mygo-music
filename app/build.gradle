@@ -1,5 +1,5 @@
 plugins { id 'com.android.application' }
 
 android { namespace 'com.mygo.music'; compileSdk 35
-    defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 8; versionName '0.8.0' }
+    defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 9; versionName '0.9.0' }
 }
