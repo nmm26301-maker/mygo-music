@@ -36,6 +36,7 @@ public class MainActivity extends Activity {
     private int current = -1;
     private boolean shuffle = false, repeat = false;
     private final Handler handler = new Handler();
+    private boolean handoff=false; private int handoffPosition=0;
     private final Random random = new Random();
     private SharedPreferences prefs;
 
@@ -118,5 +119,7 @@ public class MainActivity extends Activity {
     private void previous(){if(tracks.isEmpty())return;int i=current<=0?tracks.size()-1:current-1;playIndex(i);}
     private void updateProgress(){handler.postDelayed(()->{if(player!=null&&player.getDuration()>0){progress.setProgress(player.getCurrentPosition()*1000/player.getDuration());timeLabel.setText(fmt(player.getCurrentPosition())+" / "+fmt(player.getDuration()));}updateProgress();},500);}
     private String fmt(int ms){return String.format(Locale.getDefault(),"%02d:%02d",ms/60000,(ms/1000)%60);}
+    @Override protected void onPause(){super.onPause(); if(player!=null&&player.isPlaying()&&!handoff&&current>=0&&current<tracks.size()){handoffPosition=player.getCurrentPosition(); Intent i=new Intent(this,PlaybackService.class).setAction(PlaybackService.ACTION_PLAY).putExtra("uri",tracks.get(current).toString()).putExtra("title",names.get(current)).putExtra("position",handoffPosition); try{if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);handoff=true;player.pause();}catch(Exception ignored){}}}
+    @Override protected void onResume(){super.onResume(); if(handoff){try{stopService(new Intent(this,PlaybackService.class)); if(player!=null){player.seekTo(handoffPosition);player.start();playButton.setText("暂停");}}catch(Exception ignored){} handoff=false;}}
     @Override protected void onDestroy(){if(player!=null)player.release();super.onDestroy();}
 }
