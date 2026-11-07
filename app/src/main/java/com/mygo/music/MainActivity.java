@@ -1,0 +1,60 @@
+package com.mygo.music;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.provider.OpenableColumns;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.*;
+import android.graphics.drawable.GradientDrawable;
+import java.util.ArrayList;
+import java.util.Locale;
+
+public class MainActivity extends Activity {
+    private static final int PICK_AUDIO = 1001;
+    private final ArrayList<Uri> tracks = new ArrayList<>();
+    private final ArrayList<String> names = new ArrayList<>();
+    private ArrayAdapter<String> adapter;
+    private MediaPlayer player;
+    private TextView nowPlaying, timeLabel;
+    private SeekBar progress, volume;
+    private Button playButton;
+    private int current = -1;
+    private final Handler handler = new Handler();
+
+    private int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + .5f); }
+    private TextView text(String s, float size, int color) {
+        TextView t = new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color); t.setGravity(Gravity.CENTER_VERTICAL); return t;
+    }
+    private GradientDrawable bg(int color, float radius) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d; }
+
+    @Override public void onCreate(Bundle b) {
+        super.onCreate(b); getWindow().setStatusBarColor(Color.rgb(14,11,18));
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(20), dp(14), dp(20), dp(12)); root.setBackgroundColor(Color.rgb(14,11,18));
+        TextView title = text("MyGo Music", 28, Color.WHITE); title.setTypeface(null, 1); root.addView(title, new LinearLayout.LayoutParams(-1, dp(48)));
+        TextView subtitle = text("你的音乐，安静地播放", 14, Color.rgb(180,170,190)); root.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(28)));
+        LinearLayout action = new LinearLayout(this); action.setGravity(Gravity.CENTER_VERTICAL); action.setPadding(dp(14),0,dp(8),0); action.setBackground(bg(Color.rgb(31,25,39), 18));
+        TextView search = text("搜索本地音乐", 15, Color.rgb(195,185,205)); action.addView(search, new LinearLayout.LayoutParams(0, dp(48), 1));
+        Button add = new Button(this); add.setText("＋ 添加"); add.setTextColor(Color.rgb(225,196,255)); add.setTextSize(14); add.setAllCaps(false); add.setBackgroundColor(Color.TRANSPARENT); action.addView(add, new LinearLayout.LayoutParams(dp(95), dp(48))); add.setOnClickListener(v -> pickAudio());
+        root.addView(action, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView heading = text("本地歌曲", 18, Color.WHITE); heading.setTypeface(null,1); heading.setPadding(0,dp(18),0,dp(8)); root.addView(heading, new LinearLayout.LayoutParams(-1, dp(52)));
+        ListView list = new ListView(this); list.setDivider(null); list.setPadding(0,0,0,dp(6)); list.setBackgroundColor(Color.TRANSPARENT); adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, names) { @Override public View getView(int pos, View convert, ViewGroup parent) { TextView v=(TextView)super.getView(pos,convert,parent); v.setTextColor(Color.rgb(236,230,240)); v.setTextSize(16); v.setGravity(Gravity.CENTER_VERTICAL); v.setPadding(dp(16),0,dp(10),0); v.setBackground(bg(Color.rgb(28,23,35),16)); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(54)); lp.setMargins(0,dp(4),0,dp(4)); v.setLayoutParams(lp); return v; }}; list.setAdapter(adapter); root.addView(list, new LinearLayout.LayoutParams(-1,0,1)); list.setOnItemClickListener((p,v,pos,id)->play(pos));
+        LinearLayout now = new LinearLayout(this); now.setOrientation(LinearLayout.VERTICAL); now.setPadding(dp(16),dp(12),dp(16),dp(8)); now.setBackground(bg(Color.rgb(33,26,41),22)); nowPlaying=text("尚未选择歌曲",16,Color.WHITE); now.addView(nowPlaying,new LinearLayout.LayoutParams(-1,dp(32))); timeLabel=text("00:00 / 00:00",12,Color.rgb(180,170,190)); now.addView(timeLabel,new LinearLayout.LayoutParams(-1,dp(22))); progress=new SeekBar(this); progress.setMax(1000); now.addView(progress,new LinearLayout.LayoutParams(-1,dp(28))); progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int p,boolean from){if(from&&player!=null&&player.getDuration()>0)player.seekTo(player.getDuration()*p/1000);} public void onStartTrackingTouch(SeekBar s){} public void onStopTrackingTouch(SeekBar s){}});
+        LinearLayout controls=new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL); playButton=new Button(this); playButton.setText("▶"); playButton.setTextSize(22); playButton.setTextColor(Color.WHITE); playButton.setBackground(bg(Color.rgb(147,88,190),30)); controls.addView(playButton,new LinearLayout.LayoutParams(dp(60),dp(52))); playButton.setOnClickListener(v->toggle()); volume=new SeekBar(this); volume.setMax(100); volume.setProgress(80); volume.setContentDescription("音量"); controls.addView(volume,new LinearLayout.LayoutParams(0,dp(45),1)); volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int p,boolean f){if(player!=null)player.setVolume(p/100f,p/100f);}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}}); now.addView(controls,new LinearLayout.LayoutParams(-1,dp(56))); root.addView(now,new LinearLayout.LayoutParams(-1,dp(178))); setContentView(root); updateProgress(); }
+
+    private void pickAudio(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT); i.setType("audio/*"); i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true); i.addCategory(Intent.CATEGORY_OPENABLE); startActivityForResult(i,PICK_AUDIO); }
+    @Override protected void onActivityResult(int r,int c,Intent d){super.onActivityResult(r,c,d);if(r!=PICK_AUDIO||c!=RESULT_OK||d==null)return; if(d.getClipData()!=null){for(int i=0;i<d.getClipData().getItemCount();i++)add(d.getClipData().getItemAt(i).getUri());} else if(d.getData()!=null)add(d.getData()); adapter.notifyDataSetChanged();}
+    private void add(Uri u){if(tracks.contains(u))return;tracks.add(u);String n=null;try{android.database.Cursor c=getContentResolver().query(u,null,null,null,null);if(c!=null&&c.moveToFirst()){int x=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(x>=0)n=c.getString(x);c.close();}}catch(Exception ignored){} names.add(n==null?u.getLastPathSegment():n);}
+    private void play(int i){try{if(player!=null)player.release();player=new MediaPlayer();player.setAudioStreamType(AudioManager.STREAM_MUSIC);player.setDataSource(this,tracks.get(i));player.setOnPreparedListener(mp->{mp.start();current=i;nowPlaying.setText(names.get(i));playButton.setText("Ⅱ");});player.setOnCompletionListener(mp->{playButton.setText("▶");});player.prepareAsync();}catch(Exception e){Toast.makeText(this,"无法播放此文件",Toast.LENGTH_SHORT).show();}}
+    private void toggle(){if(player==null){if(!tracks.isEmpty())play(0);return;}if(player.isPlaying()){player.pause();playButton.setText("▶");}else{player.start();playButton.setText("Ⅱ");}}
+    private void updateProgress(){handler.postDelayed(()->{if(player!=null&&player.getDuration()>0){progress.setProgress(player.getCurrentPosition()*1000/player.getDuration());timeLabel.setText(fmt(player.getCurrentPosition())+" / "+fmt(player.getDuration()));}updateProgress();},500);}
+    private String fmt(int ms){return String.format(Locale.getDefault(),"%02d:%02d",ms/60000,(ms/1000)%60);}
+    @Override protected void onDestroy(){if(player!=null)player.release();super.onDestroy();}
+}
