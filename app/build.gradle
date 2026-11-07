@@ -1,5 +1,1 @@
-plugins { id 'com.android.application' }
-
-android { namespace 'com.mygo.music'; compileSdk 35
-    defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 4; versionName '0.4.0' }
-}
+cat: app/build.gradle: No such file or directory
