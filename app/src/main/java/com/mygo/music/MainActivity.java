@@ -1,6 +1,7 @@
 package com.mygo.music;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.*;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -16,6 +17,10 @@ import android.view.ViewGroup;
 import android.widget.*;
 import android.text.*;
 import java.util.*;
+import java.net.*;
+import java.io.*;
+import org.json.*;
+import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
     private static final int PICK_AUDIO = 1001;
@@ -47,7 +52,7 @@ public class MainActivity extends Activity {
         TextView subtitle = text("你的音乐，安静地播放",14,Color.rgb(180,170,190)); root.addView(subtitle,new LinearLayout.LayoutParams(-1,dp(28)));
         LinearLayout action = new LinearLayout(this); action.setGravity(Gravity.CENTER_VERTICAL); action.setPadding(dp(14),0,dp(8),0); action.setBackground(bg(Color.rgb(31,25,39),18));
         EditText search = new EditText(this); search.setSingleLine(true); search.setTextSize(15); search.setTextColor(Color.rgb(235,225,240)); search.setHintTextColor(Color.rgb(150,140,160)); search.setHint("搜索本地音乐"); search.setPadding(0,0,0,0); action.addView(search,new LinearLayout.LayoutParams(0,dp(48),1));
-        Button add = new Button(this); add.setText("＋ 添加"); add.setTextColor(Color.rgb(225,196,255)); add.setTextSize(14); add.setAllCaps(false); add.setBackgroundColor(Color.TRANSPARENT); action.addView(add,new LinearLayout.LayoutParams(dp(95),dp(48))); add.setOnClickListener(v->pickAudio()); root.addView(action,new LinearLayout.LayoutParams(-1,dp(52)));
+        Button add = new Button(this); add.setText("＋ 添加"); add.setTextColor(Color.rgb(225,196,255)); add.setTextSize(14); add.setAllCaps(false); add.setBackgroundColor(Color.TRANSPARENT); action.addView(add,new LinearLayout.LayoutParams(dp(80),dp(48))); add.setOnClickListener(v->pickAudio()); Button online = new Button(this); online.setText("在线"); online.setTextColor(Color.rgb(225,196,255)); online.setTextSize(14); online.setAllCaps(false); online.setBackgroundColor(Color.TRANSPARENT); action.addView(online,new LinearLayout.LayoutParams(dp(62),dp(48))); online.setOnClickListener(v->onlineSearch()); root.addView(action,new LinearLayout.LayoutParams(-1,dp(52)));
         TextView heading = text("本地歌曲  ·  "+names.size(),18,Color.WHITE); heading.setTypeface(null,1); heading.setPadding(0,dp(18),0,dp(8)); root.addView(heading,new LinearLayout.LayoutParams(-1,dp(52)));
         ListView list = new ListView(this); list.setDivider(null); list.setPadding(0,0,0,dp(6)); list.setBackgroundColor(Color.TRANSPARENT);
         adapter = new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,names){ @Override public View getView(int pos,View convert,ViewGroup parent){ TextView v=(TextView)super.getView(pos,convert,parent); v.setTextColor(Color.rgb(236,230,240)); v.setTextSize(16); v.setGravity(Gravity.CENTER_VERTICAL); v.setPadding(dp(16),0,dp(10),0); v.setBackground(bg(Color.rgb(28,23,35),16)); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(54)); lp.setMargins(0,dp(4),0,dp(4)); v.setLayoutParams(lp); return v; }};
@@ -66,7 +71,23 @@ public class MainActivity extends Activity {
     private void loadLibrary(){StringJoiner us=new StringJoiner("\n");String raw=prefs.getString("uris","");String ns=prefs.getString("names","");if(raw.isEmpty())return;String[] a=raw.split("\\n",-1),b=ns.split("\\n",-1);for(int i=0;i<a.length;i++)try{tracks.add(Uri.parse(a[i]));names.add(i<b.length?b[i]:a[i]);}catch(Exception ignored){}}
     private void saveLibrary(){StringJoiner u=new StringJoiner("\n"),n=new StringJoiner("\n");for(Uri x:tracks)u.add(x.toString());for(String x:names)n.add(x);prefs.edit().putString("uris",u.toString()).putString("names",n.toString()).apply();}
     private void removeTrack(int i){if(i<0||i>=tracks.size())return; if(current==i){if(player!=null){player.stop();player.release();player=null;}current=-1;nowPlaying.setText("尚未选择歌曲");playButton.setText("播放");} tracks.remove(i); names.remove(i); saveLibrary(); adapter.notifyDataSetChanged(); Toast.makeText(this,"已移除歌曲",Toast.LENGTH_SHORT).show();}
+    private void addNamed(Uri u,String name){runOnUiThread(()->{if(tracks.contains(u))return;tracks.add(u);names.add(name);saveLibrary();adapter.notifyDataSetChanged();});}
     private void add(Uri u){if(tracks.contains(u))return;tracks.add(u);String n=null;try{android.database.Cursor c=getContentResolver().query(u,null,null,null,null);if(c!=null&&c.moveToFirst()){int x=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(x>=0)n=c.getString(x);c.close();}}catch(Exception ignored){}names.add(n==null?u.getLastPathSegment():n);saveLibrary();}
+    private void onlineSearch(){
+        final EditText input=new EditText(this); input.setSingleLine(true); input.setHint("输入歌名或歌手"); input.setTextColor(Color.WHITE); input.setHintTextColor(Color.GRAY);
+        new AlertDialog.Builder(this).setTitle("在线搜索").setView(input).setNegativeButton("取消",null).setPositiveButton("搜索",(d,w)->searchOnline(input.getText().toString().trim())).show();
+    }
+    private void searchOnline(String q){
+        if(q.isEmpty())return; Toast.makeText(this,"正在搜索…",Toast.LENGTH_SHORT).show();
+        Executors.newSingleThreadExecutor().execute(()->{try{
+            String url="https://music.163.com/api/search/get/web?csrf_token=&s="+URLEncoder.encode(q,"UTF-8")+"&type=1&offset=0&total=true&limit=20";
+            HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection(); c.setConnectTimeout(10000); c.setReadTimeout(10000); c.setRequestProperty("User-Agent","Mozilla/5.0");
+            BufferedReader br=new BufferedReader(new InputStreamReader(c.getInputStream())); StringBuilder out=new StringBuilder(); String line; while((line=br.readLine())!=null)out.append(line); br.close();
+            JSONArray songs=new JSONObject(out.toString()).optJSONObject("result").optJSONArray("songs"); int count= songs==null?0:songs.length();
+            for(int i=0;i<count;i++){JSONObject song=songs.getJSONObject(i); long id=song.optLong("id"); String name=song.optString("name"); JSONArray ar=song.optJSONArray("artists"); String artist=""; if(ar!=null&&ar.length()>0)artist=ar.getJSONObject(0).optString("name"); String label=name+(artist.isEmpty()?"":"  ·  "+artist); addNamed(Uri.parse("https://music.163.com/song/media/outer/url?id="+id+".mp3"),label);}
+            runOnUiThread(()->Toast.makeText(this,count==0?"没有找到歌曲":"已添加 "+count+" 首在线歌曲",Toast.LENGTH_SHORT).show());
+        }catch(Exception e){runOnUiThread(()->Toast.makeText(this,"在线搜索失败，请检查网络",Toast.LENGTH_SHORT).show());}});
+    }
     private void playIndex(int i){if(i<0||i>=tracks.size())return;try{if(player!=null)player.release();player=new MediaPlayer();player.setAudioStreamType(AudioManager.STREAM_MUSIC);player.setDataSource(this,tracks.get(i));player.setOnPreparedListener(mp->{mp.setVolume(volume.getProgress()/100f,volume.getProgress()/100f);mp.start();current=i;nowPlaying.setText(names.get(i));playButton.setText("暂停");});player.setOnCompletionListener(mp->{if(repeat)playIndex(current);else next();});player.prepareAsync();}catch(Exception e){Toast.makeText(this,"无法播放此文件",Toast.LENGTH_SHORT).show();}}
     private void toggle(){if(player==null){if(!tracks.isEmpty())playIndex(0);return;}if(player.isPlaying()){player.pause();playButton.setText("播放");}else{player.start();playButton.setText("暂停");}}
     private void next(){if(tracks.isEmpty())return;int i=shuffle?random.nextInt(tracks.size()):(current+1)%tracks.size();playIndex(i);}
