@@ -107,7 +107,39 @@ public class MainActivity extends Activity {
     private void writeBackup(Uri u){try{OutputStream out=getContentResolver().openOutputStream(u);out.write(backupJson().getBytes("UTF-8"));out.close();Toast.makeText(this,"备份已导出",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"导出失败",Toast.LENGTH_SHORT).show();}}
     private void readBackup(Uri u){try{InputStream in=getContentResolver().openInputStream(u);ByteArrayOutputStream buf=new ByteArrayOutputStream();byte[] b=new byte[4096];int n;while((n=in.read(b))>0)buf.write(b,0,n);in.close();JSONObject o=new JSONObject(new String(buf.toByteArray(),"UTF-8"));SharedPreferences.Editor e=prefs.edit();for(String k:new String[]{"uris","names","liked","playlists","recent","comments","account_name","local_lyrics"})if(o.has(k))e.putString(k,o.optString(k,""));e.apply();Toast.makeText(this,"备份已导入，正在刷新",Toast.LENGTH_SHORT).show();recreate();}catch(Exception e){Toast.makeText(this,"导入失败，文件格式不正确",Toast.LENGTH_SHORT).show();}}
     private void showNowPlaying(){if(current<0||current>=names.size()){Toast.makeText(this,"请先播放一首歌曲",Toast.LENGTH_SHORT).show();return;} LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(12),dp(20),dp(8));ImageView image=new ImageView(this);image.setImageDrawable(coverArt.getDrawable());image.setScaleType(ImageView.ScaleType.CENTER_CROP);box.addView(image,new LinearLayout.LayoutParams(-1,dp(260)));TextView title=text(names.get(current),19,Color.WHITE);title.setPadding(0,dp(14),0,dp(8));box.addView(title,new LinearLayout.LayoutParams(-1,dp(48)));TextView hint=text("正在播放",13,Color.rgb(180,170,190));box.addView(hint,new LinearLayout.LayoutParams(-1,dp(28)));new AlertDialog.Builder(this).setTitle("正在播放").setView(box).setPositiveButton("歌词",(d,w)->showLyrics()).setNeutralButton("评论",(d,w)->showComments()).setNegativeButton("关闭",null).show();}
-    private void showPlugins(){ArrayList<PluginManager.PluginInfo> infos=pluginManager.list();ArrayList<String> rows=new ArrayList<>();for(PluginManager.PluginInfo p:infos)rows.add((p.enabled?"已启用  ":"已停用  ")+p.summary());if(rows.isEmpty())rows.add("暂无插件");ListView lv=new ListView(this);lv.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,rows));AlertDialog d=new AlertDialog.Builder(this).setTitle("插件").setView(lv).setPositiveButton("安装 GitHub 插件",null).setNegativeButton("关闭",null).create();lv.setOnItemClickListener((p,v,pos,id)->{if(pos>=infos.size())return;PluginManager.PluginInfo item=infos.get(pos);pluginManager.setEnabled(item,!item.enabled);Toast.makeText(this,(item.enabled?"已启用：":"已停用：")+item.name,Toast.LENGTH_SHORT).show();d.dismiss();showPlugins();});d.setOnShowListener(x->d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{final EditText input=new EditText(this);input.setSingleLine(true);input.setHint("owner/repo 或 GitHub 地址");new AlertDialog.Builder(this).setTitle("安装插件").setView(input).setNegativeButton("取消",null).setPositiveButton("安装",(a,b)->{Toast.makeText(this,"正在安装插件…",Toast.LENGTH_SHORT).show();pluginManager.installFromGitHub(input.getText().toString(),(ok,msg)->runOnUiThread(()->{Toast.makeText(this,msg,Toast.LENGTH_LONG).show();if(ok)showPlugins();}));}).show();});d.show();}
+    private void showPlugins(){
+        ArrayList<PluginManager.PluginInfo> infos=pluginManager.list();
+        ArrayList<String> rows=new ArrayList<>();
+        for(PluginManager.PluginInfo p:infos) rows.add((p.enabled?"已启用  ":"已停用  ")+p.summary());
+        if(rows.isEmpty()) rows.add("暂无插件");
+        ListView lv=new ListView(this);
+        lv.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,rows));
+        AlertDialog d=new AlertDialog.Builder(this).setTitle("插件").setView(lv).setPositiveButton("安装 GitHub 插件",null).setNegativeButton("关闭",null).create();
+        lv.setOnItemClickListener((parent,v,pos,id)->{
+            if(pos>=infos.size()) return;
+            PluginManager.PluginInfo item=infos.get(pos);
+            pluginManager.setEnabled(item,!item.enabled);
+            Toast.makeText(this,(item.enabled?"已启用：":"已停用：")+item.name,Toast.LENGTH_SHORT).show();
+            d.dismiss();
+            showPlugins();
+        });
+        d.setOnShowListener(x->{
+            d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                final EditText input=new EditText(this);
+                input.setSingleLine(true);
+                input.setHint("owner/repo 或 GitHub 地址");
+                AlertDialog install=new AlertDialog.Builder(this).setTitle("安装插件").setView(input).setNegativeButton("取消",null).setPositiveButton("安装",(a,b)->{
+                    Toast.makeText(this,"正在安装插件…",Toast.LENGTH_SHORT).show();
+                    pluginManager.installFromGitHub(input.getText().toString(),(ok,msg)->runOnUiThread(()->{
+                        Toast.makeText(this,msg,Toast.LENGTH_LONG).show();
+                        if(ok) showPlugins();
+                    }));
+                }).create();
+                install.show();
+            });
+        });
+        d.show();
+    }
     private void showMore(){new AlertDialog.Builder(this).setTitle("内容浏览").setItems(new String[]{"推荐","评论","歌手","专辑","播客","最近播放","插件","账号与设置","备份与恢复"},(d,w)->{if(w==0)showRecommendations();else if(w==1)showComments();else if(w==2)showArtists();else if(w==3)showAlbums();else if(w==4)showPodcast();else if(w==5)showRecent();else if(w==6)showPlugins();else if(w==7)showAccountSettings();else showBackup();}).setNegativeButton("关闭",null).show();}
     private void loadCovers(){try{JSONObject o=new JSONObject(prefs.getString("covers","{}"));java.util.Iterator<String> it=o.keys();while(it.hasNext()){String k=it.next();covers.put(k,o.optString(k,""));}}catch(Exception ignored){}}
     private void saveCovers(){try{JSONObject o=new JSONObject();for(String k:covers.keySet())o.put(k,covers.get(k));prefs.edit().putString("covers",o.toString()).apply();}catch(Exception ignored){}}
