@@ -9,6 +9,8 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import android.os.Handler;
+import android.os.Looper;
 
 /** Android side of the MyGo Music plugin directory protocol. */
 public final class PluginManager {
@@ -20,13 +22,20 @@ public final class PluginManager {
         public String summary(){return name+(version==null||version.isEmpty()?"":"  ·  "+version);}
     }
 
+    public static final class PluginTrack {
+        public String id="", name="", artist="", url="", pic="";
+    }
+
+    public interface SearchCallback { void done(ArrayList<PluginTrack> tracks); }
+
     public interface Callback { void done(boolean ok, String message); }
     private final Context context;
     private final File root;
     private final android.content.SharedPreferences prefs;
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
+    private final HashMap<String,PluginRuntime> runtimes=new HashMap<>();
 
-    public PluginManager(Context c){context=c.getApplicationContext();root=new File(context.getFilesDir(),"plugins");if(!root.exists())root.mkdirs();prefs=context.getSharedPreferences("library",Context.MODE_PRIVATE);}
+    public PluginManager(Context c){context=c;root=new File(context.getFilesDir(),"plugins");if(!root.exists())root.mkdirs();prefs=context.getSharedPreferences("library",Context.MODE_PRIVATE);}
 
     public ArrayList<PluginInfo> list(){ArrayList<PluginInfo> out=new ArrayList<>();File[] dirs=root.listFiles();if(dirs==null)return out;for(File d:dirs){if(!d.isDirectory())continue;try{PluginInfo p=parse(new File(d,"plugin.json"));if(p!=null){p.directory=d.getAbsolutePath();p.enabled=prefs.getBoolean("plugin_enabled_"+p.id,true);out.add(p);}}catch(Exception ignored){}}Collections.sort(out,(a,b)->a.name.compareToIgnoreCase(b.name));return out;}
 
@@ -35,7 +44,12 @@ public final class PluginManager {
     public void setEnabled(PluginInfo p,boolean enabled){if(p==null)return;p.enabled=enabled;prefs.edit().putBoolean("plugin_enabled_"+p.id,enabled).apply();}
     public void remove(PluginInfo p){if(p==null||p.directory==null)return;delete(new File(p.directory));prefs.edit().remove("plugin_enabled_"+p.id).apply();}
 
-    public void installFromGitHub(String input,Callback cb){final String repo=normalizeRepo(input);if(repo==null){cb.done(false,"请输入 owner/repo 或 GitHub 仓库地址");return;}executor.execute(()->{try{String base="https://api.github.com/repos/"+repo+"/contents/";JSONObject mf=new JSONObject(get(base+"plugin.json"));String id=mf.optString("id");if(id.isEmpty())throw new IOException("plugin.json 缺少 id");if(!id.matches("[A-Za-z0-9][A-Za-z0-9_.-]*"))throw new IOException("插件 id 不合法");String main=mf.optString("main","index.js");JSONObject mainFile=new JSONObject(get(base+main));String manifestText=mf.toString(2);String mainText=decodeContent(mainFile.optString("content"));if(mainText.isEmpty()){String download=mainFile.optString("download_url");if(download.isEmpty())throw new IOException("无法读取插件入口脚本");mainText=get(download);}File target=new File(root,id);if(target.exists())delete(target);if(!target.mkdirs())throw new IOException("无法创建插件目录");write(new File(target,"plugin.json"),manifestText);write(new File(target,main),mainText);String repoText=new JSONObject().put("repo",repo).put("installedAt",System.currentTimeMillis()).toString();write(new File(target,".origin.json"),repoText);cb.done(true,"插件已安装："+mf.optString("name",id));}catch(Exception e){cb.done(false,"插件安装失败："+e.getMessage());}});}
+    public void search(String query,SearchCallback callback){new Handler(Looper.getMainLooper()).post(()->{ArrayList<PluginInfo> all=list();ArrayList<PluginInfo> enabled=new ArrayList<>();for(PluginInfo p:all)if(p.enabled)enabled.add(p);searchPlugin(enabled,0,query,new ArrayList<>(),callback);});}
+    private void searchPlugin(ArrayList<PluginInfo> plugins,int index,String query,ArrayList<PluginTrack> out,SearchCallback callback){if(index>=plugins.size()){callback.done(out);return;}PluginInfo p=plugins.get(index);PluginRuntime rt=runtimes.get(p.id);if(rt==null){rt=new PluginRuntime(context,new File(p.directory));runtimes.put(p.id,rt);}try{JSONObject args=new JSONObject().put("query",query).put("kind","tracks").put("offset",0);rt.call("search",args,(ok,value)->{if(!ok){searchPlugin(plugins,index+1,query,out,callback);return;}ArrayList<PluginTrack> found=parseTracks(value);resolveStreams(rt,found,0,out,()->searchPlugin(plugins,index+1,query,out,callback));});}catch(Exception e){searchPlugin(plugins,index+1,query,out,callback);}}
+    private void resolveStreams(PluginRuntime rt,ArrayList<PluginTrack> found,int index,ArrayList<PluginTrack> out,Runnable next){if(index>=found.size()){next.run();return;}PluginTrack t=found.get(index);if(!t.url.isEmpty()){out.add(t);resolveStreams(rt,found,index+1,out,next);return;}try{JSONObject a=new JSONObject().put("id",t.id);rt.call("stream",a,(ok,value)->{if(ok){try{JSONObject o=new JSONObject(value);t.url=o.optString("url","");t.pic=o.optString("imageUrl",t.pic);}catch(Exception ignored){}}if(!t.url.isEmpty())out.add(t);resolveStreams(rt,found,index+1,out,next);});}catch(Exception e){resolveStreams(rt,found,index+1,out,next);}}
+    private ArrayList<PluginTrack> parseTracks(String raw){ArrayList<PluginTrack> out=new ArrayList<>();try{JSONObject root=new JSONObject(raw);JSONArray a=root.optJSONArray("tracks");if(a==null)return out;for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;PluginTrack t=new PluginTrack();t.id=o.optString("id","");t.name=o.optString("name",o.optString("title",""));t.url=o.optString("url","");t.pic=o.optString("imageUrl",o.optString("pic",""));JSONArray artists=o.optJSONArray("artists");if(artists!=null&&artists.length()>0&&artists.optJSONObject(0)!=null)t.artist=artists.optJSONObject(0).optString("name","");if(t.artist.isEmpty())t.artist=o.optString("artist","");if(!t.name.isEmpty())out.add(t);}}catch(Exception ignored){}return out;}
+
+    public void installFromGitHub(String input,Callback cb){final String repo=normalizeRepo(input);if(repo==null){cb.done(false,"请输入 owner/repo 或 GitHub 仓库地址");return;}executor.execute(()->{try{String base="https://api.github.com/repos/"+repo+"/contents/";JSONObject mfFile=new JSONObject(get(base+"plugin.json"));String manifestText=decodeContent(mfFile.optString("content"));if(manifestText.isEmpty())throw new IOException("无法读取 plugin.json");JSONObject mf=new JSONObject(manifestText);String id=mf.optString("id");if(id.isEmpty())throw new IOException("plugin.json 缺少 id");if(!id.matches("[A-Za-z0-9][A-Za-z0-9_.-]*"))throw new IOException("插件 id 不合法");String main=mf.optString("main","index.js");JSONObject mainFile=new JSONObject(get(base+main));String mainText=decodeContent(mainFile.optString("content"));if(mainText.isEmpty()){String download=mainFile.optString("download_url");if(download.isEmpty())throw new IOException("无法读取插件入口脚本");mainText=get(download);}File target=new File(root,id);if(target.exists())delete(target);if(!target.mkdirs())throw new IOException("无法创建插件目录");write(new File(target,"plugin.json"),manifestText);write(new File(target,main),mainText);String repoText=new JSONObject().put("repo",repo).put("installedAt",System.currentTimeMillis()).toString();write(new File(target,".origin.json"),repoText);cb.done(true,"插件已安装："+mf.optString("name",id));}catch(Exception e){cb.done(false,"插件安装失败："+e.getMessage());}});}
 
     private String normalizeRepo(String s){if(s==null)return null;s=s.trim();s=s.replace("https://github.com/","").replace("http://github.com/","").replace("www.github.com/","");int q=s.indexOf('?');if(q>=0)s=s.substring(0,q);int h=s.indexOf('#');if(h>=0)s=s.substring(0,h);s=s.replaceAll("/tree/.*$","/").replaceAll("/blob/.*$","/");s=s.replaceAll("/+$","");if(s.endsWith(".git"))s=s.substring(0,s.length()-4);if(!s.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))return null;return s;}
     private String get(String address)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(address).openConnection();c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestProperty("User-Agent","MyGoMusic-Android");int code=c.getResponseCode();InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();String s=read(in);c.disconnect();if(code<200||code>=300)throw new IOException("GitHub 返回 "+code);return s;}
