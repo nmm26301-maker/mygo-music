@@ -19,6 +19,7 @@ public final class PluginManager {
         public String directory;
         public boolean enabled;
         public final ArrayList<String> navigation = new ArrayList<>();
+        public final LinkedHashMap<String,String> navigationPages = new LinkedHashMap<>();
         public String summary(){return name+(version==null||version.isEmpty()?"":"  ·  "+version);}
     }
 
@@ -39,7 +40,7 @@ public final class PluginManager {
 
     public ArrayList<PluginInfo> list(){ArrayList<PluginInfo> out=new ArrayList<>();File[] dirs=root.listFiles();if(dirs==null)return out;for(File d:dirs){if(!d.isDirectory())continue;try{PluginInfo p=parse(new File(d,"plugin.json"));if(p!=null){p.directory=d.getAbsolutePath();p.enabled=prefs.getBoolean("plugin_enabled_"+p.id,true);out.add(p);}}catch(Exception ignored){}}Collections.sort(out,(a,b)->a.name.compareToIgnoreCase(b.name));return out;}
 
-    private PluginInfo parse(File manifest)throws Exception{if(!manifest.isFile())return null;JSONObject o=new JSONObject(read(manifest));PluginInfo p=new PluginInfo();p.id=o.optString("id",manifest.getParentFile().getName());p.name=o.optString("name",p.id);p.version=o.optString("version","");p.main=o.optString("main","index.js");p.playback=o.optString("playback","stream");JSONArray nav=o.optJSONArray("navigation");if(nav!=null)for(int i=0;i<nav.length();i++){JSONObject n=nav.optJSONObject(i);if(n!=null)p.navigation.add(n.optString("title",n.optString("builtin","")));}return p;}
+    private PluginInfo parse(File manifest)throws Exception{if(!manifest.isFile())return null;JSONObject o=new JSONObject(read(manifest));PluginInfo p=new PluginInfo();p.id=o.optString("id",manifest.getParentFile().getName());p.name=o.optString("name",p.id);p.version=o.optString("version","");p.main=o.optString("main","index.js");p.playback=o.optString("playback","stream");JSONArray nav=o.optJSONArray("navigation");if(nav!=null)for(int i=0;i<nav.length();i++){JSONObject n=nav.optJSONObject(i);if(n!=null){String label=n.optString("title",n.optString("builtin",""));String target=n.optString("page",n.optString("builtin",""));if(!label.isEmpty()){p.navigation.add(label);p.navigationPages.put(label,target);}}}return p;}
 
     public void setEnabled(PluginInfo p,boolean enabled){if(p==null)return;p.enabled=enabled;prefs.edit().putBoolean("plugin_enabled_"+p.id,enabled).apply();}
     public void remove(PluginInfo p){if(p==null||p.directory==null)return;delete(new File(p.directory));prefs.edit().remove("plugin_enabled_"+p.id).apply();}
