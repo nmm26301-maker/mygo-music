@@ -2,6 +2,6 @@ plugins { id 'com.android.application' }
 
 android { namespace 'com.mygo.music'; compileSdk 35
     defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 37; versionName '3.7.0' }
-    signingConfigs { release { storeFile file('../signing/mygo-release.keystore'); storePassword 'mygo-store-2026'; keyAlias 'mygo'; keyPassword 'mygo-key-2026' } }
+    signingConfigs { release { storeFile file('../signing/mygo-release.keystore'); storePassword 'mygo-store-2026'; keyAlias 'mygo'; keyPassword 'mygo-store-2026' } }
     buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } }
 }
