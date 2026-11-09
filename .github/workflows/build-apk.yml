@@ -17,13 +17,27 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Decode stable release signing key
-        run: echo "$(cat signing/mygo-release.keystore.b64)" | base64 -d > signing/mygo-release.keystore
+        run: |
+          test -s signing/mygo-release.keystore.b64
+          base64 -d signing/mygo-release.keystore.b64 > signing/mygo-release.keystore
       - name: Build signed release APK
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           gradle --no-daemon assembleRelease
+      - name: Verify APK integrity and stable signature
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
+          keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
+      - name: Prepare direct install files
+        run: |
+          VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)
+          mkdir -p app/build/outputs/release
+          cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/release/mygo-music-v${VERSION}.apk"
+          (cd app/build/outputs/apk/release && zip -j "../../../release/mygo-music-android-v${VERSION}-install.zip" app-release.apk)
       - uses: actions/upload-artifact@v4
         with:
           name: mygo-music-android-release
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/release/*
