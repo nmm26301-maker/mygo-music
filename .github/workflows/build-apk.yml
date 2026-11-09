@@ -36,7 +36,7 @@ jobs:
           VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)
           mkdir -p app/build/outputs/release
           cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/release/mygo-music-v${VERSION}.apk"
-          (cd app/build/outputs/apk/release && zip -j "../../../release/mygo-music-android-v${VERSION}-install.zip" app-release.apk)
+          (cd app/build/outputs/apk/release && zip -j "../../release/mygo-music-android-v${VERSION}-install.zip" app-release.apk)
       - uses: actions/upload-artifact@v4
         with:
           name: mygo-music-android-release
