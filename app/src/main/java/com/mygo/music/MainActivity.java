@@ -243,7 +243,8 @@ public class MainActivity extends Activity {
     private void startPluginSignIn(PluginManager.PluginInfo plugin,Runnable retry){Toast.makeText(this,"正在准备插件登录",Toast.LENGTH_SHORT).show();pluginManager.export(plugin.id,"signIn",new JSONObject(),(ok,raw)->runOnUiThread(()->{if(isFinishing()||isDestroyed())return;if(ok){Toast.makeText(this,"登录成功",Toast.LENGTH_LONG).show();if(retry!=null)retry.run();else showPluginAccount(plugin);}else if(!"插件已关闭".equals(raw)&&!"已取消登录".equals(raw))showPluginError(raw);}));}
 
     private PluginManager.PluginInfo sourceInfo(String id){for(PluginManager.PluginInfo source:pluginManager.list())if(source.enabled&&source.id.equals(id))return source;return null;}
-    private void showSourcePlaybackError(String source,String raw,Runnable retry){PluginManager.PluginInfo plugin=sourceInfo(source);if(plugin==null){showPluginError(raw);return;}String message=raw==null?"插件播放失败":raw;String prefix="@mygo:signIn:"+source+"\n";if(message.startsWith("@mygo:setup:")){showPluginError(message);return;}if(message.startsWith(prefix))message=message.substring(prefix.length());final String detail=message;AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle(plugin.name+" · 播放失败").setMessage(detail).setNegativeButton("关闭",null).setNeutralButton("重试",(dialog,which)->retry.run());if(plugin.supports("signIn"))builder.setPositiveButton("登录后重试",(dialog,which)->startPluginSignIn(plugin,retry));builder.show();}
+    private void showSourcePlaybackError(String source,String raw,Runnable retry){showSourceError(source,raw,"播放失败",retry);}
+    private void showSourceError(String source,String raw,String operation,Runnable retry){PluginManager.PluginInfo plugin=sourceInfo(source);if(plugin==null){showPluginError(raw);return;}String message=raw==null?"插件播放失败":raw;String prefix="@mygo:signIn:"+source+"\n";if(message.startsWith("@mygo:setup:")){showPluginError(message);return;}if(message.startsWith(prefix))message=message.substring(prefix.length());final String detail=message;AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle(plugin.name+" · "+operation).setMessage(detail).setNegativeButton("关闭",null).setNeutralButton("重试",(dialog,which)->retry.run());if(plugin.supports("signIn"))builder.setPositiveButton("登录后重试",(dialog,which)->startPluginSignIn(plugin,retry));builder.show();}
     private void showPluginAccount(PluginManager.PluginInfo p){
         if(!p.supports("account")&&!p.supports("signIn")){Toast.makeText(this,"这个音乐源不需要账号登录",Toast.LENGTH_LONG).show();return;}
         pluginManager.export(p.id,"account",new JSONObject(),(ok,value)->runOnUiThread(()->showPluginAccountDialog(p,ok,value)));
@@ -353,7 +354,7 @@ public class MainActivity extends Activity {
             if(!lyricsRequestCurrent(uri,request))return;
             if(ok){applyStageLyrics(uri,value,request,true);return;}
             lyricsStage.setMessage("歌词获取失败，可在设置中重试或导入");
-            showSourcePlaybackError(parts[0],value,()->{if(lyricsStage!=null&&lyricsStage.trackUri.equals(uri))loadStageLyrics(true);});
+            showSourceError(parts[0],value,"歌词获取失败",()->{if(lyricsStage!=null&&lyricsStage.trackUri.equals(uri))loadStageLyrics(true);});
         }));return;}
         lyricsExecutor.execute(()->{try{
             String result="";if(uri.contains("type=url&id=")){String id=uri.substring(uri.indexOf("id=")+3);int amp=id.indexOf('&');if(amp>=0)id=id.substring(0,amp);result=readLyricsUrl("https://api.qijieya.cn/meting/?server=netease&type=lrc&id="+URLEncoder.encode(id,"UTF-8"));}

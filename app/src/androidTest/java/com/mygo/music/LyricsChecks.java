@@ -47,6 +47,28 @@ final class LyricsChecks {
             String longText="让声音陪着我们慢慢向前走在安静的路上每一个字都随着时间亮起";String wrapped=new JSONObject().put("lines",new JSONArray().put(new JSONObject().put("start",0).put("end",8000).put("words",new JSONArray().put(new JSONObject().put("text",longText).put("start",1000).put("end",7000))))).toString();view.setTimeline(LyricsTimeline.parse(wrapped));view.layout(0,0,500,650);clock.position=2200;early=draw(view);clock.position=5800;late=draw(view);check(bright(late)>bright(early)*2,"wrapped word clipping stopped at the first visual row");early.recycle();late.recycle();
         }catch(Exception error){throw new RuntimeException(error);}});
     }
+    private void sourceRefresh(MainActivity activity,LyricsStageDialog page,String uri)throws Exception{
+        String id="lyrics-export-fixture";PluginManager manager=(PluginManager)field(activity,"pluginManager");
+        ByteArrayOutputStream data=new ByteArrayOutputStream();
+        String source="export function lyrics(){return "+fixture()+";}";
+        try(java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(data)){
+            zip.putNextEntry(new java.util.zip.ZipEntry("plugin.json"));zip.write(("{\"id\":\""+id+"\",\"main\":\"index.js\"}").getBytes("UTF-8"));zip.closeEntry();
+            zip.putNextEntry(new java.util.zip.ZipEntry("index.js"));zip.write(source.getBytes("UTF-8"));zip.closeEntry();
+        }
+        java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);boolean[] installed={false};manager.installZipStream(new ByteArrayInputStream(data.toByteArray()),(ok,raw)->{installed[0]=ok;done.countDown();});
+        check(done.await(30,java.util.concurrent.TimeUnit.SECONDS)&&installed[0],"lyric export fixture failed to install");
+        try{
+            test.runOnMainSync(()->{try{
+                ((Map<String,String>)field(activity,"pluginTrackRefs")).put(uri,id+"\nfixture");
+                ((Map<String,String>)field(activity,"localLyrics")).put(uri,"[00:00]旧版逐行缓存\n[00:05]第二行");
+                Method load=MainActivity.class.getDeclaredMethod("loadStageLyrics",boolean.class);load.setAccessible(true);load.invoke(activity,false);
+            }catch(Exception error){throw new RuntimeException(error);}});
+            await(()->page.stage.timeline().estimatedWordTiming,"cached LRC did not use the original approximate word fallback");
+            test.runOnMainSync(()->{try{Method refresh=MainActivity.class.getDeclaredMethod("loadStageLyrics",boolean.class);refresh.setAccessible(true);refresh.invoke(activity,true);}catch(Exception error){throw new RuntimeException(error);}});
+            await(()->page.stage.timeline().wordTimed&&!page.stage.timeline().estimatedWordTiming&&page.stage.timeline().lines.get(0).text.equals("让音乐慢慢亮起"),"real plugin lyric export did not replace cached line-only lyrics");
+            test.runOnMainSync(()->{try{String saved=((Map<String,String>)field(activity,"localLyrics")).get(uri);check(new JSONObject(saved).getJSONArray("lines").getJSONObject(0).getJSONArray("words").getJSONObject(0).getLong("end")==5000,"plugin word timing was flattened when saving lyrics");}catch(Exception error){throw new RuntimeException(error);}});
+        }finally{PluginArchive.delete(new File(context.getFilesDir(),"plugins/"+id));}
+    }
     @SuppressWarnings("unchecked") private void servicePage()throws Exception{
         File first=new File(context.getCacheDir(),"lyrics-stage-a.wav"),second=new File(context.getCacheDir(),"lyrics-stage-b.wav");try(FileOutputStream output=new FileOutputStream(first)){output.write(BackgroundPlaybackChecks.wav(20000));}try(FileOutputStream output=new FileOutputStream(second)){output.write(BackgroundPlaybackChecks.wav(20000));}
         MainActivity activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PlaybackService[] service={null};await(()->{service[0]=(PlaybackService)field(activity,"playbackService");return service[0]!=null;},"lyrics page did not bind to audio service");
@@ -61,6 +83,7 @@ final class LyricsChecks {
             await(()->Math.abs(service[0].snapshot().position-8000)<600&&page[0].stage.activeLine()==1,"full-screen lyric progress control did not seek actual audio");
             test.runOnMainSync(()->{service[0].seek(3000);page[0].stage.follow();});await(()->page[0].stage.activeLine()==0,"backwards seek left the next line active");
             SystemClock.sleep(350);test.runOnMainSync(()->{try{File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();Bitmap image=draw(page[0].getWindow().getDecorView());try(FileOutputStream out=new FileOutputStream(new File(qa,"lyrics-stage.png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();}catch(Exception error){throw new RuntimeException(error);}});
+            sourceRefresh(activity,page[0],firstUri);
             test.runOnMainSync(service[0]::next);await(()->page[0].trackUri.equals(secondUri)&&page[0].stage.timeline().lines.size()==2&&page[0].stage.timeline().lines.get(0).text.equals("新的歌曲歌词"),"track change left the previous song's lyric timeline visible");
             test.runOnMainSync(()->{page[0].dismiss();check(service[0].snapshot().playing,"closing the lyric page paused the song");});
         }finally{test.runOnMainSync(()->{try{LyricsStageDialog page=(LyricsStageDialog)field(activity,"lyricsStage");if(page!=null)page.dismiss();}catch(Exception ignored){}service[0].stopPlayback();activity.finish();});context.getSharedPreferences("library",0).edit().putString("local_lyrics",original).commit();first.delete();second.delete();}
