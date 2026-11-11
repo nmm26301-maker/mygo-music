@@ -9,6 +9,8 @@ import java.util.*;
 final class PluginResources {
     static final String ORIGIN="https://plugin.invalid", PREFIX="/plugin/";
     private final File root;
+    private volatile String document="";
+    void document(String html){document=html;}
     PluginResources(File root){this.root=root;}
     String moduleURL(String main)throws IOException {file(Uri.parse(ORIGIN+PREFIX+main));return ORIGIN+PREFIX+main;}
     boolean owns(Uri uri){return "https".equals(uri.getScheme())&&"plugin.invalid".equals(uri.getHost())&&uri.getPort()==-1;}
@@ -19,5 +21,5 @@ final class PluginResources {
         if(!file.isFile())throw new FileNotFoundException("插件文件不存在："+path);return file;
     }
     String mime(File file){String name=file.getName().toLowerCase(Locale.ROOT);if(name.endsWith(".js")||name.endsWith(".mjs"))return "application/javascript";if(name.endsWith(".json"))return "application/json";if(name.endsWith(".wasm"))return "application/wasm";if(name.endsWith(".svg"))return "image/svg+xml";if(name.endsWith(".png"))return "image/png";if(name.endsWith(".jpg")||name.endsWith(".jpeg"))return "image/jpeg";return "application/octet-stream";}
-    WebResourceResponse intercept(Uri uri){try{File file=file(uri);Map<String,String> headers=new HashMap<>();headers.put("Cache-Control","no-store");headers.put("Access-Control-Allow-Origin",ORIGIN);headers.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime(file),"UTF-8",200,"OK",headers,new FileInputStream(file));}catch(IOException e){return new WebResourceResponse("text/plain","UTF-8",404,"Not Found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));}}
+    WebResourceResponse intercept(Uri uri){try{if(owns(uri)&&"/".equals(uri.getPath()))return new WebResourceResponse("text/html","UTF-8",200,"OK",Collections.singletonMap("Cache-Control","no-store"),new ByteArrayInputStream(document.getBytes("UTF-8")));File file=file(uri);Map<String,String> headers=new HashMap<>();headers.put("Cache-Control","no-store");headers.put("Access-Control-Allow-Origin",ORIGIN);headers.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime(file),"UTF-8",200,"OK",headers,new FileInputStream(file));}catch(IOException e){return new WebResourceResponse("text/plain","UTF-8",404,"Not Found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));}}
 }
