@@ -47,6 +47,7 @@ jobs:
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee plugin-test-results.txt
             adb logcat -d > android-logcat.txt
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-stage.png lyrics-stage.png || true
             grep -F MYGO_TESTS_OK plugin-test-results.txt
             adb shell am start -n com.mygo.music/.MainActivity
             adb shell input keyevent 82
@@ -60,6 +61,7 @@ jobs:
             plugin-test-results.txt
             android-logcat.txt
             landscape.png
+            lyrics-stage.png
       - name: Decode stable release signing key
         run: |
           test -s signing/mygo-release.keystore.b64

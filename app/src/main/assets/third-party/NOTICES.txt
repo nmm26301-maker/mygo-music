@@ -2,3 +2,7 @@ MyGo Music Android
 QR code generation: ZXing Core 3.5.3, Apache License 2.0.
 Source: https://github.com/zxing/zxing
 License: ZXing-LICENSE.txt
+
+MyGo Music lyric timing fallback adapted from egoist/mygo-music internal/lyrics/lyrics.go, under GNU AGPL version 3. Source: https://github.com/egoist/mygo-music
+Android port source and corresponding build files: https://github.com/nmm26301-maker/mygo-music
+See AGPL-3.0.txt for license terms.
