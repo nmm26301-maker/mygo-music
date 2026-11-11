@@ -39,6 +39,7 @@ public final class PluginRuntime {
     private String lastQr="";
 
     public PluginRuntime(Context c,File dir){context=c;directory=dir;}
+    public void validate(Callback cb){main.post(()->ensureLoaded(cb));}
     public void call(String function,JSONObject args,Callback callback){main.post(()->ensureLoaded((ok,message)->{
         if(!ok){callback.done(false,message);return;}
         String request=String.valueOf(++sequence);pending.put(request,callback);
@@ -57,7 +58,8 @@ public final class PluginRuntime {
             if(!entry.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("无效插件入口");
             if(entry.getName().endsWith(".ts"))throw new IOException("此插件入口为 TypeScript，需要已编译的 JavaScript 版本");
             String module="data:text/javascript;base64,"+android.util.Base64.encodeToString(read(new FileInputStream(entry)).getBytes("UTF-8"),android.util.Base64.NO_WRAP);
-            JSONObject config=new JSONObject().put("module",module).put("arch",Build.SUPPORTED_ABIS[0]).put("dir",directory.getAbsolutePath());
+            JSONObject locales=new JSONObject();File localeFile=new File(directory,"locales/zh-CN.json");if(localeFile.isFile())locales=new JSONObject(read(new FileInputStream(localeFile)));
+            JSONObject config=new JSONObject().put("translations",locales).put("module",module).put("arch",Build.SUPPORTED_ABIS[0]).put("dir",directory.getAbsolutePath());
             String bridge=read(context.getAssets().open("plugin-host.js"));
             web=new WebView(context);WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
             web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}});

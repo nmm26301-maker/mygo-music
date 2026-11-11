@@ -1,0 +1,909 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Adapted from sogud/mygo-cloudmusic (originally egoist/mygo-cloudmusic).
+// See THIRD_PARTY_NOTICES.md for the source revision and scope of the port.
+// MyGo Music supplies host and fetch; this module has no Node dependencies.
+
+const SITE = "https://music.163.com";
+const EAPI = "https://interfacepc.music.163.com";
+// Protocol key shared by the upstream client, not a user's credential.
+const EAPI_KEY = "e82ckenh8dichen8";
+const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+const EAPI_UA = "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)";
+const PAGE_SIZE = 30;
+const PLAYLIST_LIMIT = 1000;
+const PRIVATE_RADAR = "3136952023";
+const COOKIE_NAMES = ["MUSIC_U", "__csrf", "NMTID"];
+
+// MyGo 0.1.6 loads a module while holding the storage mutex. Host calls must
+// happen inside an exported action, never during module initialization.
+let session = null;
+let epoch = 0;
+let profileCheckedAt = 0;
+let likedCache = null;
+const pendingStreams = new Map();
+let discoveryCovers = null;
+let heartState = null;
+let pendingHeart = null;
+
+function currentSession() {
+  if (!session) session = host.storage.get("session") || { cookies: {}, profile: null };
+  return session;
+}
+
+function fail(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function idOf(value) {
+  const id = String(value);
+  if (!/^\d+$/.test(id) || !Number.isSafeInteger(Number(id)) || Number(id) <= 0) {
+    throw new Error("无效的网易云音乐 ID");
+  }
+  return id;
+}
+
+function pageOffset(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function secureURL(value) {
+  return typeof value === "string" ? value.replace(/^http:\/\//, "https://") : "";
+}
+
+// MyGo Music 0.1.20+ replaces {size} (including URL-encoded braces) with the
+// pixels needed by each view. Ask NetEase's image CDN to resize before the
+// download, instead of fetching and decoding an original for a small row.
+function artworkURL(value) {
+  const picture = secureURL(value);
+  if (!picture) return "";
+  try {
+    const url = new URL(picture);
+    if (url.protocol !== "https:" || !/^p\d+\.music\.126\.net$/.test(url.hostname) ||
+        url.port || url.username || url.password) return picture;
+    // Set just the resize parameter, preserving other query values and the
+    // fragment. Audio and external image services keep their original URLs.
+    url.searchParams.set("param", "{size}y{size}");
+    return url.toString();
+  } catch {
+    return picture;
+  }
+}
+
+function deviceID() {
+  let id = host.storage.get("deviceId");
+  if (!id) {
+    // This is an install identifier, never a credential or encryption key.
+    id = Array.from({ length: 52 }, () => Math.floor(Math.random() * 16).toString(16)).join("").toUpperCase();
+    host.storage.set("deviceId", id);
+  }
+  return id;
+}
+
+function cookieHeader(cookies) {
+  return COOKIE_NAMES.filter((key) => cookies[key]).map((key) => `${key}=${cookies[key]}`).join("; ");
+}
+
+function acceptCookies(response, cookies) {
+  // moejs supplies getSetCookie(): do not split a combined header on commas,
+  // because an Expires attribute itself contains a comma.
+  for (const line of response.headers.getSetCookie()) {
+    const pair = line.split(";", 1)[0];
+    const separator = pair.indexOf("=");
+    const name = pair.slice(0, separator).trim();
+    if (separator < 1 || !COOKIE_NAMES.includes(name)) continue;
+    const value = pair.slice(separator + 1);
+    const maxAge = /;\s*max-age\s*=\s*(-?\d+)/i.exec(line);
+    const expires = /;\s*expires\s*=\s*([^;]+)/i.exec(line);
+    const expired = maxAge ? Number(maxAge[1]) <= 0 : expires && Date.parse(expires[1]) <= Date.now();
+    if (!value || expired) delete cookies[name];
+    else cookies[name] = value;
+  }
+}
+
+function persistSession() {
+  if (session.cookies.MUSIC_U) host.storage.set("session", session);
+  else host.storage.remove("session");
+}
+
+function clearSession() {
+  epoch++;
+  session = { cookies: {}, profile: null };
+  profileCheckedAt = 0;
+  likedCache = null;
+  pendingStreams.clear();
+  heartState = null;
+  pendingHeart = null;
+  host.storage.remove("session");
+}
+
+function acceptResponseCookies(response, activeSession) {
+  const wasSignedIn = !!activeSession.cookies.MUSIC_U;
+  acceptCookies(response, activeSession.cookies);
+  if (activeSession === session) {
+    if (wasSignedIn && !activeSession.cookies.MUSIC_U) {
+      clearSession();
+      throw fail("signIn", "网易云登录状态已失效，请重新登录");
+    }
+    persistSession();
+  }
+}
+
+async function request(path, params = {}, options = {}) {
+  const activeSession = options.session || currentSession();
+  const startedEpoch = epoch;
+  let url;
+  const headers = { "User-Agent": UA, Referer: `${SITE}/` };
+  const init = { headers, redirect: "error" };
+  if (options.eapi) {
+    const now = Date.now();
+    const header = {
+      osver: "Microsoft-Windows-10-Professional-build-19045-64bit",
+      deviceId: deviceID(), os: "pc", appver: "3.1.17.204416",
+      versioncode: "140", mobilename: "", buildver: String(Math.floor(now / 1000)),
+      resolution: "1920x1080", channel: "netease",
+      requestId: `${now}_${String(Math.floor(Math.random() * 1000)).padStart(4, "0")}`,
+      __csrf: "", ...activeSession.cookies,
+    };
+    const text = JSON.stringify({ ...params, header, e_r: false });
+    const digest = host.crypto.md5(`nobody${path}use${text}md5forencrypt`);
+    const encrypted = host.crypto.aesEcbEncrypt(EAPI_KEY, `${path}-36cd479b6b5-${text}-36cd479b6b5-${digest}`);
+    url = EAPI + path.replace(/^\/api\//, "/eapi/");
+    init.method = "POST";
+    init.body = `params=${encrypted.toUpperCase()}`;
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+    headers["User-Agent"] = EAPI_UA;
+    headers.Cookie = Object.keys(header).map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(header[key])}`).join("; ");
+  } else {
+    url = SITE + path;
+    if (options.form !== undefined) {
+      init.method = "POST";
+      init.body = options.form;
+      headers["Content-Type"] = "application/x-www-form-urlencoded";
+    } else {
+      const query = new URLSearchParams(params).toString();
+      if (query) url += `?${query}`;
+    }
+    const cookie = cookieHeader(activeSession.cookies);
+    if (cookie) headers.Cookie = cookie;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  init.signal = controller.signal;
+  let response, body;
+  try {
+    response = await fetch(url, init);
+    if (!response.ok) throw new Error(`网易云请求失败（HTTP ${response.status}）`);
+    body = await response.json();
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("网易云请求超时，请稍后重试");
+    // Never put response bodies, request headers or login cookies in errors.
+    if (response && !response.ok) throw error;
+    throw new Error("无法读取网易云音乐，请检查网络及系统代理后重试");
+  } finally {
+    clearTimeout(timer);
+  }
+  if (startedEpoch !== epoch) throw new Error("账号状态已改变，请重试");
+  if (!body || typeof body !== "object") throw new Error("网易云返回了无效数据");
+  const code = Number(body.code);
+  const allowed = options.codes || [200];
+  if (!allowed.includes(code)) {
+    // Content access can be forbidden while the account is still signed in.
+    if (code === 401 && options.keepSession) {
+      acceptResponseCookies(response, activeSession);
+      throw fail("unavailable", "当前账号无权访问该内容");
+    }
+    if ([301, 302, 401].includes(code)) {
+      if (activeSession === session) clearSession();
+      throw fail("signIn", "请重新登录网易云音乐");
+    }
+    if (code === 460 || code === -460) {
+      // A refused response can still renew NMTID. Keep the server's cookie
+      // update for the same device/account retry, including session expiry.
+      acceptResponseCookies(response, activeSession);
+      const error = new Error(`网易云暂时拒绝了请求（${code}），请稍后重试`);
+      error.neteaseCode = code;
+      throw error;
+    }
+    if (code === 405) throw new Error("网易云暂时限制了请求，请稍后再试");
+    throw new Error(`网易云接口返回错误（${Number.isFinite(code) ? code : "未知"}）`);
+  }
+  acceptResponseCookies(response, activeSession);
+  return body;
+}
+
+const eapi = (path, params, options = {}) => request(path, params, { ...options, eapi: true });
+
+function toArtist(artist = {}) {
+  return { id: String(artist.id || ""), name: artist.name || "", imageUrl: artworkURL(artist.img1v1Url || artist.picUrl) };
+}
+
+function toAlbum(album = {}) {
+  const date = Number(album.publishTime);
+  return {
+    id: String(album.id || ""), name: album.name || "", imageUrl: artworkURL(album.picUrl),
+    artists: (album.artists || (album.artist ? [album.artist] : [])).map(toArtist),
+    released: date > 0 ? new Date(date).toISOString().slice(0, 10) : "",
+  };
+}
+
+function toTrack(track) {
+  const privilege = track.privilege;
+  return {
+    id: String(track.id), name: track.name || "",
+    artists: (track.ar || track.artists || []).map(toArtist),
+    album: toAlbum(track.al || track.album), duration: track.dt || track.duration || 0,
+    url: `${SITE}/song?id=${track.id}`,
+    unavailable: privilege ? privilege.st < 0 || privilege.pl <= 0 : track.fee === 1 || track.fee === 4,
+  };
+}
+
+function toPlaylist(playlist) {
+  return {
+    id: String(playlist.id), name: playlist.name || "",
+    imageUrl: artworkURL(playlist.coverImgUrl || playlist.picUrl),
+    description: playlist.description || "", owner: playlist.creator?.nickname || "",
+    trackCount: playlist.trackCount || 0, saved: !!playlist.subscribed,
+    fixed: Number(playlist.specialType) === 5,
+    mine: !!session?.profile && String(playlist.creator?.userId) === session.profile.id,
+  };
+}
+
+function toShow(show) {
+  return {
+    id: String(show.id), name: show.name || "", imageUrl: artworkURL(show.picUrl),
+    description: show.desc || "", publisher: show.dj?.nickname || "",
+    episodeCount: show.programCount || 0, subscribed: !!show.subed,
+  };
+}
+
+function toEpisode(program, show) {
+  const programID = idOf(program.id);
+  const audioID = program.mainSong?.id ? idOf(program.mainSong.id) : null;
+  const published = new Date(Number(program.createTime));
+  return {
+    // Keep the program ID for comments and the audio ID for playback. Missing
+    // audio stays visible so the host's next offset still counts this episode.
+    id: `program:${programID}${audioID ? ":" + audioID : ""}`,
+    name: program.name || "", showId: String(show.id),
+    artists: show.dj?.nickname ? [{ id: "", name: show.dj.nickname }] : [],
+    album: { id: "", name: show.name || "", imageUrl: artworkURL(program.coverUrl || show.picUrl) },
+    duration: program.duration || program.mainSong?.duration || 0,
+    description: program.description || "",
+    published: published.getTime() > 0 ? published.toISOString().slice(0, 10) : "",
+    url: `${SITE}/program?id=${programID}`, unavailable: !audioID,
+  };
+}
+
+function trackIdentity(value) {
+  const match = /^program:(\d+)(?::(\d+))?$/.exec(String(value));
+  if (match) {
+    const program = idOf(match[1]);
+    return { program, audio: match[2] ? idOf(match[2]) : null, thread: `A_DJ_1_${program}` };
+  }
+  const audio = idOf(value);
+  return { audio, thread: `R_SO_4_${audio}` };
+}
+
+function toComment(comment) {
+  const quote = (comment.beReplied || []).map(reply =>
+    `${reply.user?.nickname || ""}：${reply.content || ""}`).join("\n");
+  return {
+    id: String(comment.commentId), author: comment.user?.nickname || "",
+    avatarUrl: artworkURL(comment.user?.avatarUrl),
+    text: (comment.content || "") + (quote ? `\n\n回复：${quote}` : ""),
+    time: comment.time || 0, likes: comment.likedCount || 0, liked: !!comment.liked,
+  };
+}
+
+async function songDetails(ids, originals = [], options = {}) {
+  if (!ids.length) return [];
+  const batches = [];
+  for (let offset = 0; offset < ids.length; offset += 400) {
+    batches.push(ids.slice(offset, offset + 400));
+  }
+  const results = await Promise.all(batches.map(async (batch) => {
+    const data = await eapi("/api/v3/song/detail", { c: JSON.stringify(batch.map((id) => ({ id: Number(idOf(id)) }))) }, options);
+    const privileges = new Map((data.privileges || []).map((p) => [String(p.id), p]));
+    return (data.songs || []).map((song) => ({ ...song, privilege: privileges.get(String(song.id)) || song.privilege }));
+  }));
+  const byID = new Map(results.flat().map((song) => [String(song.id), song]));
+  const fallback = new Map(originals.map((song) => [String(song.id), song]));
+  // MyGo advances offset by the number of returned tracks. Keep a slot for
+  // every requested ID, including songs removed from the detail response.
+  return ids.map((id) => byID.get(String(id)) || {
+    ...(fallback.get(String(id)) || { id, name: "歌曲暂不可用" }),
+    privilege: { st: -1, pl: 0 },
+  });
+}
+
+async function profileFor(activeSession) {
+  const data = await request("/api/nuser/account/get", {}, { session: activeSession });
+  const profile = activeSession.cookies.MUSIC_U ? data.profile : null;
+  return profile ? { id: String(profile.userId), name: profile.nickname, imageUrl: artworkURL(profile.avatarUrl) } : null;
+}
+
+export async function account() {
+  const activeSession = currentSession();
+  if (!activeSession.cookies.MUSIC_U) return null;
+  if (activeSession.profile && Date.now() - profileCheckedAt < 60000) return activeSession.profile;
+  try {
+    const profile = await profileFor(activeSession);
+    // A QR login can finish without another epoch change. Do not apply the
+    // previous account's profile or sign-out to that newly accepted session.
+    if (activeSession !== session) throw new Error("账号状态已改变，请重试");
+    if (!profile) { clearSession(); return null; }
+    activeSession.profile = profile;
+    profileCheckedAt = Date.now();
+    persistSession();
+    return profile;
+  } catch (error) {
+    if (error.code === "signIn") return null;
+    throw error;
+  }
+}
+
+async function requireAccount() {
+  const profile = await account();
+  if (!profile) throw fail("signIn", "请先扫码登录网易云音乐");
+  return profile;
+}
+
+export async function signIn() {
+  const startedEpoch = ++epoch;
+  const pending = { cookies: {}, profile: null };
+  host.signInPrompt({ text: "正在生成网易云音乐登录二维码…" });
+  const key = await eapi("/api/login/qrcode/unikey", { type: 3 }, { session: pending });
+  if (!key.unikey) throw new Error("网易云未返回登录二维码，请稍后重试");
+  const qr = `${SITE}/login?codekey=${encodeURIComponent(key.unikey)}`;
+  host.signInPrompt({ qr, text: "请用网易云音乐手机 App 扫码，并在手机上确认登录" });
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline && startedEpoch === epoch) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    if (startedEpoch !== epoch) break;
+    const result = await eapi("/api/login/qrcode/client/login", { key: key.unikey, type: 3 }, {
+      session: pending, codes: [800, 801, 802, 803],
+    });
+    if (result.code === 800) throw new Error("二维码已过期，请重新点击登录");
+    if (result.code === 802) host.signInPrompt({ qr, text: "已扫码，请在手机上确认登录" });
+    if (result.code === 803) {
+      if (!pending.cookies.MUSIC_U) throw new Error("网易云未返回有效会话，请重新扫码登录");
+      pending.profile = await profileFor(pending);
+      if (!pending.profile) throw new Error("无法读取已登录账号，请重新扫码");
+      if (startedEpoch !== epoch) break;
+      session = pending;
+      heartState = null;
+      pendingHeart = null;
+      profileCheckedAt = Date.now();
+      likedCache = null;
+      persistSession();
+      host.signInPrompt({ text: "登录成功" });
+      return pending.profile;
+    }
+  }
+  throw new Error("登录已取消或超时，请重新点击登录");
+}
+
+export function signOut() {
+  // Forget this plugin's session. Do not affect other NetEase clients.
+  clearSession();
+}
+
+export async function search({ query, kind = "tracks", offset = 0 }) {
+  const types = {
+    tracks: [1, "songs", "songCount", toTrack], albums: [10, "albums", "albumCount", toAlbum],
+    artists: [100, "artists", "artistCount", toArtist], playlists: [1000, "playlists", "playlistCount", toPlaylist],
+    shows: [1009, "djRadios", "djRadiosCount", toShow],
+  };
+  const type = types[kind];
+  if (!type) throw fail("unsupported", "支持歌曲、专辑、歌手、歌单和播客搜索");
+  const text = String(query || "").trim();
+  if (!text) return { [kind]: [], more: false };
+  offset = pageOffset(offset);
+  const data = await request("/api/cloudsearch/pc", { s: text, type: type[0], limit: PAGE_SIZE, offset, total: "true" });
+  const result = data.result || {};
+  const items = result[type[1]] || [];
+  const records = kind === "tracks" ? await songDetails(items.map((song) => song.id), items) : items;
+  return { [kind]: records.map(type[3]), more: items.length > 0 && offset + items.length < (result[type[2]] || 0) };
+}
+
+async function discoveryPlaylists() {
+  const data = await request("/api/personalized/playlist", { limit: 24 });
+  const playlists = (data.result || []).map(toPlaylist);
+  // Decorative artwork for navigation, not a preview of private recommendations.
+  discoveryCovers = playlists.map(item => item.imageUrl).filter(Boolean);
+  return playlists;
+}
+
+function discoveryCover(index) {
+  return discoveryCovers?.length ? discoveryCovers[index % discoveryCovers.length] : "";
+}
+
+async function discoverySection() {
+  try {
+    return { title: "推荐歌单", playlists: await discoveryPlaylists() };
+  } catch (error) {
+    // Authentication failures still reach the host's sign-in flow. Optional
+    // recommendations and cover art must not hide the navigation or radio.
+    if (error.code === "signIn") throw error;
+    return {
+      title: "推荐歌单", empty: "推荐歌单暂时无法加载，点击「查看全部」重试；其他入口仍可使用。",
+      morePage: "discovery",
+    };
+  }
+}
+
+export async function home() {
+  const recommendations = await discoverySection();
+  return {
+    title: "发现音乐", subtitle: "网易云音乐 · 发现喜欢的音乐",
+    sections: [
+      { title: "为你推荐", links: [
+        { title: "每日推荐", subtitle: "每天更新，为你推荐好音乐", page: "daily", imageUrl: discoveryCover(0) },
+        { title: "私人雷达", subtitle: "发现属于你的音乐", page: "radar", imageUrl: discoveryCover(1) },
+        { title: "个性化歌单", subtitle: "网易云为你推荐的歌单", page: "recommendations", imageUrl: discoveryCover(2) },
+      ] },
+      { title: "私人漫游", stations: stationList() },
+      recommendations,
+    ],
+  };
+}
+
+export async function browse({ page }) {
+  if (page === "discovery") {
+    return { title: "推荐歌单", sections: [{ playlists: await discoveryPlaylists(), empty: "暂时没有推荐歌单" }] };
+  }
+  if (page === "radar") {
+    // NetEase's dynamic playlist is selected for the signed-in listener.
+    // Never label its anonymous response as someone's personal radar.
+    await requireAccount();
+    const radar = await playlist({ id: PRIVATE_RADAR });
+    return { title: "私人雷达", subtitle: radar.name, sections: [{ tracks: radar.tracks }] };
+  }
+  if (page === "daily") {
+    await requireAccount();
+    const data = await request("/api/v3/discovery/recommend/songs");
+    const songs = data.data?.dailySongs || [];
+    return { title: "每日推荐", sections: [{ tracks: (await songDetails(songs.map(song => song.id), songs)).map(toTrack) }] };
+  }
+  if (page === "recommendations") {
+    await requireAccount();
+    const data = await request("/api/v1/discovery/recommend/resource");
+    return { title: "个性化歌单", sections: [{ playlists: (data.recommend || []).map(toPlaylist) }] };
+  }
+  if (page !== "charts") throw fail("unsupported", "没有这个页面");
+  const data = await request("/api/toplist/detail");
+  return { title: "排行榜", sections: [{ playlists: (data.list || []).map(toPlaylist) }] };
+}
+
+export async function playlists() {
+  const profile = await account();
+  if (!profile) return [];
+  // Return all pages instead of silently dropping subscriptions after 200.
+  const result = [];
+  for (let offset = 0; ; offset += 200) {
+    const data = await request("/api/user/playlist", { uid: profile.id, limit: 200, offset });
+    const items = data.playlist || [];
+    result.push(...items.map(toPlaylist));
+    if (!data.more || items.length < 200) return result;
+    if (offset >= 1800) throw new Error("账号歌单超过首版支持的 2000 个，暂时无法完整加载");
+  }
+}
+
+export async function playlist({ id }) {
+  const data = await request("/api/v6/playlist/detail", { id: idOf(id), n: PLAYLIST_LIMIT });
+  if (!data.playlist) throw fail("unavailable", "歌单不存在或当前账号无权访问");
+  const source = data.playlist;
+  const ids = (source.trackIds || source.tracks || []).slice(0, PLAYLIST_LIMIT).map((track) => track.id);
+  const result = toPlaylist(source);
+  result.tracks = (await songDetails(ids, source.tracks || [])).map(toTrack);
+  if (source.trackCount > PLAYLIST_LIMIT) {
+    result.description += `\n本版本载入前 ${PLAYLIST_LIMIT} 首（歌单共 ${source.trackCount} 首）。`;
+  }
+  return result;
+}
+
+export async function shows() {
+  await requireAccount();
+  const result = new Map();
+  for (let offset = 0; offset < 2000;) {
+    const data = await request("/api/djradio/get/subed", { limit: 100, offset, total: "true" }, { keepSession: true });
+    const items = data.djRadios || [];
+    const previousSize = result.size;
+    for (const item of items) result.set(String(item.id), { ...toShow(item), subscribed: true });
+    if (!data.hasMore) return [...result.values()];
+    if (!items.length || result.size === previousSize) {
+      throw new Error("网易云未返回完整的播客订阅列表，请稍后重试");
+    }
+    offset += items.length;
+  }
+  throw new Error("播客订阅超过本版本支持的 2000 个，暂时无法完整加载");
+}
+
+export async function show({ id, offset = 0 }) {
+  id = idOf(id);
+  offset = pageOffset(offset);
+  const [detail, programs] = await Promise.all([
+    request("/api/djradio/v2/get", { id }, { keepSession: true }),
+    request("/api/dj/program/byradio", { radioId: id, limit: PAGE_SIZE, offset, asc: "false" }, { keepSession: true }),
+  ]);
+  if (!detail.data || String(detail.data.id) !== id) throw fail("unavailable", "播客不存在或当前账号无权访问");
+  return {
+    show: toShow(detail.data),
+    episodes: (programs.programs || []).map(program => toEpisode(program, detail.data)),
+    more: !!programs.more,
+  };
+}
+
+export async function album({ id }) {
+  const data = await request(`/api/v1/album/${idOf(id)}`);
+  if (!data.album) throw fail("unavailable", "专辑不可用");
+  return { album: toAlbum(data.album), tracks: (await songDetails((data.songs || []).map((song) => song.id), data.songs || [])).map(toTrack) };
+}
+
+async function artistAlbums(id) {
+  // The host has no artist-album pagination action. Collect every page here,
+  // advancing by raw page length so overlapping albums do not shift offsets.
+  const albums = new Map();
+  for (let offset = 0; offset < 10000;) {
+    const data = await request(`/api/artist/albums/${id}`, { limit: PAGE_SIZE, offset });
+    const items = data.hotAlbums || [];
+    const previousSize = albums.size;
+    for (const item of items) albums.set(String(item.id), toAlbum(item));
+    if (!data.more) return [...albums.values()];
+    if (!items.length || albums.size === previousSize) {
+      throw new Error("网易云未返回完整的歌手专辑列表，请稍后重试");
+    }
+    offset += items.length;
+  }
+  throw new Error("歌手专辑过多，暂时无法完整加载");
+}
+
+export async function artist({ id }) {
+  id = idOf(id);
+  const [detail, albums] = await Promise.all([
+    request(`/api/v1/artist/${id}`), artistAlbums(id),
+  ]);
+  if (!detail.artist) throw fail("unavailable", "歌手不可用");
+  return {
+    artist: toArtist(detail.artist), albums,
+    tracks: (await songDetails((detail.hotSongs || []).map((song) => song.id), detail.hotSongs || [])).map(toTrack),
+  };
+}
+
+async function likedIDs() {
+  const profile = await requireAccount();
+  if (likedCache && likedCache.uid === profile.id && Date.now() - likedCache.at < 60000) return likedCache.ids;
+  const data = await eapi("/api/song/like/get", { uid: profile.id });
+  const ids = (data.ids || []).map(String);
+  likedCache = { uid: profile.id, ids, at: Date.now() };
+  return ids;
+}
+
+export async function liked({ offset = 0 }) {
+  offset = pageOffset(offset);
+  const ids = await likedIDs();
+  return { tracks: (await songDetails(ids.slice(offset, offset + PAGE_SIZE))).map(toTrack), more: offset + PAGE_SIZE < ids.length };
+}
+
+export async function isLiked({ ids }) {
+  const identities = ids.map(id => ({ id, ...trackIdentity(id) }));
+  const songs = identities.filter(item => !item.program);
+  const result = Object.fromEntries(ids.map(id => [id, false]));
+  // The host also asks about episode IDs. This read-only podcast integration
+  // does not export likeEpisode and must not query song likes for episodes.
+  if (!songs.length) return result;
+  currentSession();
+  if (!session.cookies.MUSIC_U) return result;
+  const liked = new Set(await likedIDs());
+  for (const item of songs) result[item.id] = liked.has(item.audio);
+  return result;
+}
+
+export async function like({ id, on }) {
+  const identity = trackIdentity(id);
+  if (identity.program) throw fail("unsupported", "暂不支持喜欢或取消喜欢播客节目");
+  await requireAccount();
+  await eapi("/api/radio/like", { alg: "itembased", trackId: identity.audio, like: String(!!on), time: "3" });
+  likedCache = null;
+}
+
+function checkPlaylistSession(activeSession, generation) {
+  if (generation !== epoch || activeSession !== session) {
+    throw new Error("账号状态已改变，请重试");
+  }
+}
+
+async function submitPlaylistTracks(op, id, ids, activeSession, generation) {
+  checkPlaylistSession(activeSession, generation);
+  const form = new URLSearchParams({ op, pid: id, imme: "true", trackIds: JSON.stringify(ids.map(Number)) });
+  if (activeSession.cookies.__csrf) form.set("csrf_token", activeSession.cookies.__csrf);
+  try {
+    const data = await request("/api/playlist/manipulate/tracks", {}, {
+      session: activeSession, form: form.toString(), keepSession: true, codes: [200, 502],
+    });
+    checkPlaylistSession(activeSession, generation);
+    return data;
+  } catch (error) {
+    // Preserve signIn so the host can offer login; a content 401 keeps session.
+    error.message = `${op === "add" ? "添加到歌单" : "移出歌单"}失败：${error.message}`;
+    throw error;
+  }
+}
+
+async function playlistTrackIDs(id, activeSession, generation) {
+  checkPlaylistSession(activeSession, generation);
+  const data = await request("/api/v6/playlist/detail", { id, n: PLAYLIST_LIMIT }, {
+    session: activeSession, keepSession: true,
+  });
+  checkPlaylistSession(activeSession, generation);
+  const source = data.playlist;
+  if (String(source?.id) !== id || !Array.isArray(source.trackIds) || source.trackIds.length < source.trackCount) {
+    throw new Error("无法确认歌单的完整歌曲列表，请刷新后重试");
+  }
+  return new Set(source.trackIds.map(track => String(track.id)));
+}
+
+async function manipulatePlaylistTracks(op, id, trackIds) {
+  const pid = String(Number(idOf(id)));
+  if (trackIds == null) trackIds = [];
+  if (!Array.isArray(trackIds)) throw new Error("无效的歌曲列表");
+  const ids = [...new Set(trackIds.map(value => {
+    const identity = trackIdentity(value);
+    if (identity.program) throw fail("unsupported", "暂不支持将播客节目添加到歌曲歌单或从中移除");
+    return String(Number(identity.audio));
+  }))];
+  if (!ids.length) return;
+  const activeSession = currentSession();
+  const generation = epoch;
+  await requireAccount();
+  checkPlaylistSession(activeSession, generation);
+  let data = await submitPlaylistTracks(op, pid, ids, activeSession, generation);
+  if (op === "add" && Number(data.code) === 502) {
+    // A duplicate rejects the whole batch. Only retry songs proved absent;
+    // never treat an unexplained 502 or a concurrent edit as successful.
+    const present = await playlistTrackIDs(pid, activeSession, generation);
+    const missing = ids.filter(trackID => !present.has(trackID));
+    if (!missing.length) {
+      throw fail("duplicate", ids.length === 1 ? "这首歌已经在这个歌单里了" : "这些歌曲已经在这个歌单里了");
+    }
+    if (missing.length < ids.length) {
+      data = await submitPlaylistTracks(op, pid, missing, activeSession, generation);
+    }
+  }
+  if (Number(data.code) !== 200) {
+    throw new Error(`${op === "add" ? "添加到歌单" : "移出歌单"}未完成（${data.code}），请刷新歌单后重试`);
+  }
+  likedCache = null;
+}
+
+export async function addToPlaylist({ id, trackIds }) {
+  await manipulatePlaylistTracks("add", id, trackIds);
+}
+
+export async function removeFromPlaylist({ id, trackIds }) {
+  await manipulatePlaylistTracks("del", id, trackIds);
+}
+
+export async function comments({ trackId, offset = 0 }) {
+  const identity = trackIdentity(trackId);
+  const data = await request(`/api/v1/resource/comments/${identity.thread}`, {
+    limit: PAGE_SIZE, offset: pageOffset(offset),
+  }, { keepSession: true });
+  // Hot comments overlap the chronological list. Adding them here would make
+  // the host skip comments when it advances by the number already displayed.
+  return { comments: (data.comments || []).map(toComment), total: data.total || 0, more: !!data.more };
+}
+
+export async function lyrics({ id }) {
+  const identity = trackIdentity(id);
+  if (identity.program) return { lrc: "", translation: "" };
+  const activeSession = currentSession();
+  const generation = epoch;
+  const data = await request("/api/song/lyric", { id: identity.audio, lv: 1, tv: -1 });
+  const lrc = data.lrc?.lyric || "";
+  const translation = data.tlyric?.lyric || "";
+  if (lrc.trim()) return { lrc, translation };
+  // Some songs have empty web lyrics while the desktop endpoint has LRC.
+  // Do not treat that empty response as proof that the song is instrumental.
+  if (activeSession !== session || generation !== epoch) throw new Error("账号状态已改变，请重试");
+  const desktop = await eapi("/api/song/lyric/v1", {
+    id: identity.audio, cp: false, tv: 0, lv: 0, rv: 0, kv: 0, yv: 0, ytv: 0, yrv: 0,
+  }, { session: activeSession, keepSession: true });
+  if (activeSession !== session || generation !== epoch) throw new Error("账号状态已改变，请重试");
+  return { lrc: desktop.lrc?.lyric || "", translation: desktop.tlyric?.lyric || translation };
+}
+
+export async function stream({ id, quality = "high" }) {
+  id = trackIdentity(id).audio;
+  if (!id) throw fail("unavailable", "该播客节目没有可播放的音频");
+  const generation = epoch;
+  const key = `${generation}:${id}:${quality}`;
+  if (pendingStreams.has(key)) return pendingStreams.get(key);
+  const pending = loadStream(id, quality, generation);
+  pendingStreams.set(key, pending);
+  try { return await pending; }
+  finally { if (pendingStreams.get(key) === pending) pendingStreams.delete(key); }
+}
+
+async function loadStream(id, quality, generation) {
+  const level = { standard: "standard", high: "exhigh", lossless: "lossless" }[quality] || "exhigh";
+  let data;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (generation !== epoch) throw new Error("账号状态已改变，请重试");
+    try {
+      data = await eapi("/api/song/enhance/player/url/v1", {
+        ids: JSON.stringify([Number(id)]), level, encodeType: level === "lossless" ? "flac" : "mp3",
+      });
+      break;
+    } catch (error) {
+      if (![460, -460].includes(error.neteaseCode)) throw error;
+      if (attempt === 1) throw new Error(`网易云仍拒绝播放请求（${error.neteaseCode}），请稍后再试，并在官方客户端确认该歌曲可正常播放`);
+      // One delayed retry of this read only, with the same device/account and
+      // quality. Never retry account mutations or turn permission failures
+      // into a different source, a preview, or a lower-quality success.
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  const audio = (data.data || []).find((item) => String(item.id) === id);
+  if (!audio || !audio.url || (audio.code !== undefined && audio.code !== 200) || audio.freeTrialInfo != null) {
+    throw fail("unavailable", "当前账号无完整播放权限，或歌曲在当前地区不可用");
+  }
+  const url = new URL(secureURL(audio.url));
+  if (url.protocol !== "https:" || !/^(?:[a-z0-9-]+\.)*music\.126\.net$/i.test(url.hostname)) {
+    throw fail("unavailable", "网易云返回了不支持的音频地址");
+  }
+  const type = String(audio.type || "mp3").toLowerCase();
+  if (!["mp3", "flac", "ogg"].includes(type)) throw fail("unavailable", "该歌曲的音频格式暂不支持");
+  return {
+    url: url.toString(), type, size: audio.size || 0, bitRate: audio.br || 0,
+    quality: ["lossless", "hires"].includes(audio.level) ? "lossless" : audio.level === "standard" ? "standard" : "high",
+    gain: audio.gain || 0, peak: audio.peak || 0,
+    headers: { "User-Agent": UA, Referer: `${SITE}/` },
+  };
+}
+
+// The host asks stationNext again as the queue runs out. These modes are
+// NetEase's own recommendations, not a shuffle of the current local list.
+function stationList() {
+  return [
+    { id: "DEFAULT", name: "私人漫游", description: "随心听，持续推荐你可能喜欢的歌曲" },
+    { id: "FAMILIAR", name: "熟悉的歌", description: "回到熟悉的旋律" },
+    { id: "EXPLORE", name: "新发现", description: "探索还没听过的音乐" },
+  ].map((station, index) => ({
+    ...station,
+    // Older hosts replace source errors with a generic toast, so keep the
+    // prerequisite visible on the station card as well.
+    description: `${station.description}。需在网易云 App 中开启「个性化服务」。`,
+    imageUrl: discoveryCover(index + 3),
+  }));
+}
+
+export async function stations() {
+  if (discoveryCovers === null) await discoverySection();
+  return stationList();
+}
+
+// Candidate only: HEART is deliberately absent from stationList until live
+// account and continuation checks pass. This uses NetEase's intelligence API,
+// never the FAMILIAR radio or a local shuffle as a substitute.
+function checkHeartAccount(activeSession, generation) {
+  if (activeSession !== session || generation !== epoch) {
+    throw new Error("账号状态已改变，请重试");
+  }
+}
+
+async function startHeart(activeSession, generation, profile) {
+  let likedPlaylist;
+  for (let offset = 0; offset < 2000; offset += 200) {
+    const data = await request("/api/user/playlist", { uid: profile.id, limit: 200, offset }, {
+      session: activeSession, keepSession: true,
+    });
+    checkHeartAccount(activeSession, generation);
+    if (!Array.isArray(data.playlist)) throw new Error("无法读取喜欢的音乐歌单");
+    likedPlaylist = data.playlist.find(item => item && Number(item.specialType) === 5 &&
+      String(item.creator?.userId) === profile.id);
+    if (likedPlaylist) break;
+    if (!data.more || data.playlist.length < 200) break;
+  }
+  if (!likedPlaylist) throw fail("unavailable", "未找到当前账号的喜欢歌单，暂时无法开启心动模式");
+  const playlistID = idOf(likedPlaylist.id);
+  const data = await request("/api/v6/playlist/detail", { id: playlistID, n: 1 }, {
+    session: activeSession, keepSession: true,
+  });
+  checkHeartAccount(activeSession, generation);
+  const playlist = data.playlist;
+  if (!playlist || String(playlist.id) !== playlistID || Number(playlist.specialType) !== 5 ||
+      String(playlist.creator?.userId) !== profile.id) {
+    throw fail("unavailable", "无法确认当前账号的喜欢歌单");
+  }
+  const tracks = playlist.trackIds || playlist.tracks;
+  if (!Array.isArray(tracks)) throw new Error("网易云未返回喜欢歌单的歌曲列表");
+  if (!tracks.length) throw fail("unavailable", "喜欢歌单为空，请先在网易云喜欢一首歌曲");
+  const seedTrack = tracks.find(track => track && /^\d+$/.test(String(track.id)) &&
+    Number.isSafeInteger(Number(track.id)) && Number(track.id) > 0);
+  if (!seedTrack) throw fail("unavailable", "喜欢歌单没有可用的种子歌曲");
+  const seed = idOf(seedTrack.id);
+  return { uid: profile.id, generation, playlistID, seed, last: seed, seen: [] };
+}
+
+async function loadHeart(activeSession, generation) {
+  const profile = await requireAccount();
+  checkHeartAccount(activeSession, generation);
+  const state = heartState?.generation === generation && heartState.uid === profile.id
+    ? heartState : await startHeart(activeSession, generation, profile);
+  checkHeartAccount(activeSession, generation);
+  const seen = new Set(state.seen);
+  let cursor = state.last;
+  // Advance over repeated batches, but do not loop indefinitely if the
+  // service cannot supply a new recommendation or stops advancing its cursor.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const data = await eapi("/api/playmode/intelligence/list", {
+      songId: cursor, startMusicId: state.seed, playlistId: state.playlistID,
+      type: "fromPlayOne", count: 1,
+    }, { session: activeSession, keepSession: true });
+    checkHeartAccount(activeSession, generation);
+    if (!Array.isArray(data.data)) throw new Error("网易云未返回有效的心动推荐列表");
+    const songs = [];
+    let nextCursor = cursor;
+    for (const item of data.data) {
+      // Removed songs can leave null entries or empty songInfo records.
+      if (item == null) continue;
+      if (typeof item !== "object") throw new Error("网易云返回了无效的心动推荐歌曲");
+      if (item.songInfo == null) continue;
+      const id = idOf(item.songInfo.id);
+      nextCursor = id;
+      if (!seen.has(id)) { seen.add(id); songs.push(item.songInfo); }
+    }
+    if (songs.length) {
+      const ids = songs.map(song => idOf(song.id));
+      const tracks = (await songDetails(ids, songs, { session: activeSession, keepSession: true })).map(toTrack);
+      checkHeartAccount(activeSession, generation);
+      heartState = { ...state, last: nextCursor, seen: [...seen].slice(-200) };
+      return tracks;
+    }
+    // No new tracks need resolving; retain the service's cursor so the next
+    // invocation does not restart at the original repeated batch.
+    heartState = { ...state, last: nextCursor };
+    if (nextCursor === cursor) break;
+    cursor = nextCursor;
+  }
+  throw fail("unavailable", "网易云暂未返回新的心动推荐，请稍后重试");
+}
+
+async function heartNext() {
+  const activeSession = currentSession();
+  const generation = epoch;
+  if (pendingHeart?.session === activeSession && pendingHeart.generation === generation) {
+    return pendingHeart.promise;
+  }
+  const pending = { session: activeSession, generation, promise: loadHeart(activeSession, generation) };
+  pendingHeart = pending;
+  try { return await pending.promise; }
+  finally { if (pendingHeart === pending) pendingHeart = null; }
+}
+
+export async function stationNext({ id }) {
+  if (id === "HEART") return heartNext();
+  if (!["DEFAULT", "FAMILIAR", "EXPLORE"].includes(id)) throw fail("unsupported", "没有这个漫游模式");
+  await requireAccount();
+  const data = await eapi("/api/v1/radio/get", { mode: id, limit: 3 });
+  const songs = data.data || [];
+  if (songs.length === 0) {
+    let personalizationDisabled = false;
+    try {
+      const preferences = await request("/api/user/setting", {}, { keepSession: true });
+      personalizationDisabled = preferences.setting?.personalServiceSetting === 2;
+    } catch (error) {
+      // A diagnostic lookup must not turn a transient empty batch into a new
+      // failure, but an expired session still needs the normal sign-in flow.
+      if (error.code === "signIn") throw error;
+    }
+    if (personalizationDisabled) {
+      throw fail("unavailable", "网易云的「个性化服务」已关闭。请在官方 App 的「设置 → 消息和隐私 → 个性化服务」中开启后重试。");
+    }
+  }
+  return (await songDetails(songs.map(song => song.id), songs)).map(toTrack);
+}
+

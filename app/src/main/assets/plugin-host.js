@@ -30,7 +30,7 @@
     platform:'android', arch:__pluginConfig.arch, dir:__pluginConfig.dir, dataDir:__pluginConfig.dir + '/data',
     storage:{get:k => {const v=nativeHost.storageGet(String(k)); return v === '' ? undefined : JSON.parse(v);},
       set:(k,v) => nativeHost.storageSet(String(k), JSON.stringify(v)), remove:k => nativeHost.storageRemove(String(k))},
-    setting:k => nativeHost.setting(String(k)), language:()=>'zh-CN', t:x=>x,
+    setting:k => nativeHost.setting(String(k)), language:()=>'zh-CN', t:x=>__pluginConfig.translations?.[x] || x,
     crypto:{md5:x=>nativeHost.md5(String(x)), aesEcbEncrypt:(k,x)=>nativeHost.aesEcbEncrypt(String(k),String(x))},
     openURL:u=>nativeHost.openURL(String(u)), signInPrompt:x=>nativeHost.signInPrompt(JSON.stringify(x || {}))
   };
