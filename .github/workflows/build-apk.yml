@@ -34,6 +34,7 @@ jobs:
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee plugin-test-results.txt
+            adb logcat -d > android-logcat.txt
             grep -F MYGO_TESTS_OK plugin-test-results.txt
             adb shell am start -n com.mygo.music/.MainActivity
             adb shell input keyevent 82
@@ -45,6 +46,7 @@ jobs:
           name: android-plugin-test-results
           path: |
             plugin-test-results.txt
+            android-logcat.txt
             landscape.png
       - name: Decode stable release signing key
         run: |
@@ -63,6 +65,19 @@ jobs:
           unzip -t "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
           keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
+      - name: Verify upgrade from signed v5.0.0 on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb uninstall com.mygo.music || true
+            adb install tests/baseline-v5.0.apk
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=51'
+            adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |
           VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)
