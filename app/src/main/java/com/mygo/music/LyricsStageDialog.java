@@ -23,7 +23,7 @@ final class LyricsStageDialog extends Dialog {
     String trackUri="";
     private final Runnable tick=new Runnable(){public void run(){if(!isShowing())return;long duration=host.duration(),position=host.position();if(!touching)progress.setProgress(duration>0?(int)Math.min(10000,position*10000/duration):0);time.setText(format(position)+" / "+format(duration));play.setText(host.playing()?"暂停":"播放");if(host.playing())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stage.invalidate();handler.postDelayed(this,100);}};
     LyricsStageDialog(Activity activity,Host host){
-        super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;stage=new LyricsStageView(activity,host);
+        super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;stage=new LyricsStageView(activity,host);stage.setBackdrop(false);
         LinearLayout root=new LinearLayout(activity);root.setOrientation(1);root.setPadding(dp(16),dp(5),dp(16),dp(4));
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xff2c406a,0xff202744,0xff151627}));
         LinearLayout header=new LinearLayout(activity);header.setGravity(Gravity.CENTER_VERTICAL);

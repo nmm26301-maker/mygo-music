@@ -18,12 +18,13 @@ final class LyricsStageView extends View {
     private LyricsTimeline timeline=LyricsTimeline.empty();
     private int anchor=-1,effect=0;
     private float offset,downY,lastY;
-    private boolean dragging,following=true;
+    private boolean dragging,following=true,paintBackdrop=true;
     private long frameTime,lastPosition=-1;
     private float textSize,lineGap;
     private String message="正在获取歌词";
     LyricsStageView(Context context,Clock clock){super(context);this.clock=clock;setLayerType(View.LAYER_TYPE_SOFTWARE,null);setContentDescription("全屏歌词，滑动浏览，点按歌词跳转播放");}
     private float dp(float value){return value*getResources().getDisplayMetrics().density;}
+    void setBackdrop(boolean enabled){paintBackdrop=enabled;invalidate();}
     void setTimeline(LyricsTimeline timeline){this.timeline=timeline;layouts.clear();anchor=-1;offset=0;following=true;lastPosition=-1;invalidate();}
     LyricsTimeline timeline(){return timeline;}
     int activeLine(){return timeline.active(clock.position());}
@@ -41,7 +42,7 @@ final class LyricsStageView extends View {
     }
     private float distance(int from,int to){float result=0;if(from==to)return 0;int lo=Math.min(from,to),hi=Math.max(from,to);for(int i=lo;i<hi;i++)result+=(layout(i).getHeight()+layout(i+1).getHeight())/2f+lineGap;return from<to?result:-result;}
     @Override protected void onDraw(Canvas canvas){
-        super.onDraw(canvas);canvas.drawRect(0,0,getWidth(),getHeight(),backdrop);
+        super.onDraw(canvas);if(paintBackdrop)canvas.drawRect(0,0,getWidth(),getHeight(),backdrop);
         long position=clock.position(),now=SystemClock.uptimeMillis();int active=timeline.active(position);
         if(timeline.lines.isEmpty()){
             paint.setTextSize(dp(20));paint.setTypeface(Typeface.DEFAULT);paint.setColor(0xffc8cddd);paint.clearShadowLayer();paint.setTextAlign(Paint.Align.CENTER);

@@ -85,6 +85,7 @@ final class LyricsChecks {
             SystemClock.sleep(350);test.runOnMainSync(()->{try{File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();Bitmap image=draw(page[0].getWindow().getDecorView());try(FileOutputStream out=new FileOutputStream(new File(qa,"lyrics-stage.png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();}catch(Exception error){throw new RuntimeException(error);}});
             sourceRefresh(activity,page[0],firstUri);
             test.runOnMainSync(service[0]::next);await(()->page[0].trackUri.equals(secondUri)&&page[0].stage.timeline().lines.size()==2&&page[0].stage.timeline().lines.get(0).text.equals("新的歌曲歌词"),"track change left the previous song's lyric timeline visible");
+            await(()->service[0].snapshot().playing&&service[0].snapshot().uri.equals(secondUri),"new audio did not become ready before closing lyrics");
             test.runOnMainSync(()->{page[0].dismiss();check(service[0].snapshot().playing,"closing the lyric page paused the song");});
         }finally{test.runOnMainSync(()->{try{LyricsStageDialog page=(LyricsStageDialog)field(activity,"lyricsStage");if(page!=null)page.dismiss();}catch(Exception ignored){}service[0].stopPlayback();activity.finish();});context.getSharedPreferences("library",0).edit().putString("local_lyrics",original).commit();first.delete();second.delete();}
     }
