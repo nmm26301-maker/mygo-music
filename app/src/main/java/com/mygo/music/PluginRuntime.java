@@ -42,7 +42,8 @@ public final class PluginRuntime {
     private AlertDialog loginDialog;
     private TextView loginText;
     private ImageView loginQr;
-    private String lastQr="";
+    private String lastQr="", signInRequest="";
+    private Bitmap loginBitmap;
     private static PluginRuntime browserOwner;
     private AlertDialog browserDialog;
     private WebView browserView;
@@ -56,7 +57,7 @@ public final class PluginRuntime {
     public void validate(Callback cb){main.post(()->ensureLoaded(cb));}
     public void call(String function,JSONObject args,Callback callback){main.post(()->ensureLoaded((ok,message)->{
         if(!ok){callback.done(false,message);return;}
-        String request=String.valueOf(++sequence);pending.put(request,callback);
+        String request=String.valueOf(++sequence);pending.put(request,callback);if("signIn".equals(function))signInRequest=request;
         main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?300000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
@@ -140,7 +141,7 @@ public final class PluginRuntime {
         @JavascriptInterface public String removeDataDir(String name){try{File root=new File(directory,"data"),target=new File(root,name);if(name.isEmpty()||name.contains("\\")||!root.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator)||!target.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator))throw new IOException("插件数据目录路径越界");PluginArchive.delete(target);return result(true,null);}catch(Exception e){return result(false,e.getMessage()==null?e.toString():e.getMessage());}}
         @JavascriptInterface public void webSignIn(String request,String raw){main.post(()->showBrowserLogin(request,raw));}
         @JavascriptInterface public void ready(boolean ok,String value){main.post(()->finishLoad(ok,value));}
-        @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
+        @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{if(request.equals(signInRequest)){signInRequest="";if(loginDialog!=null)loginDialog.dismiss();loginBitmap=null;}Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
         @JavascriptInterface public String storageGet(String key){return storage.getString(key,"");}
         @JavascriptInterface public void storageSet(String key,String value){storage.edit().putString(key,value).commit();}
         @JavascriptInterface public void storageRemove(String key){storage.edit().remove(key).commit();}
@@ -151,8 +152,8 @@ public final class PluginRuntime {
         @JavascriptInterface public void request(String request,String address,String init){network.execute(()->{JSONObject result;try{result=requestHttp(address,new JSONObject(init));}catch(Exception e){result=new JSONObject();try{result.put("error",e.getMessage()==null?"网络失败":e.getMessage());}catch(Exception ignored){}}String raw=result.toString();main.post(()->{if(!closed&&web!=null)web.evaluateJavascript("window.__networkResult("+JSONObject.quote(request)+","+JSONObject.quote(raw)+");",null);});});}
         @JavascriptInterface public void signInPrompt(String raw){main.post(()->{
             if(closed)return;try{JSONObject prompt=new JSONObject(raw);String qr=prompt.optString("qr","");String text=prompt.optString("text","");
-                if(loginDialog==null||!loginDialog.isShowing()){LinearLayout box=new LinearLayout(context);box.setOrientation(1);box.setPadding(24,16,24,16);loginText=new TextView(context);box.addView(loginText);loginQr=new ImageView(context);int qrSize=Math.max(128,Math.min(400,(int)(context.getResources().getDisplayMetrics().heightPixels*0.5)));box.addView(loginQr,new LinearLayout.LayoutParams(qrSize,qrSize));ScrollView loginScroll=new ScrollView(context);loginScroll.addView(box);loginDialog=new AlertDialog.Builder(context).setTitle("插件登录").setView(loginScroll).setNegativeButton("关闭",(dialog,which)->dispose()).create();loginDialog.setOnCancelListener(dialog->dispose());lastQr="";loginDialog.show();}
-                loginText.setText(text);if(!qr.isEmpty()&&!qr.equals(lastQr)){BitMatrix matrix=new MultiFormatWriter().encode(qr,BarcodeFormat.QR_CODE,400,400);Bitmap b=Bitmap.createBitmap(400,400,Bitmap.Config.ARGB_8888);for(int y=0;y<400;y++)for(int x=0;x<400;x++)b.setPixel(x,y,matrix.get(x,y)?0xff000000:0xffffffff);loginQr.setImageBitmap(b);lastQr=qr;}
+                if(loginDialog==null||!loginDialog.isShowing()){LinearLayout box=new LinearLayout(context);box.setOrientation(1);box.setPadding(24,16,24,16);loginText=new TextView(context);box.addView(loginText);TextView phoneHint=new TextView(context);phoneHint.setText("同一部手机登录：保存二维码后，到对应音乐应用的扫一扫中从相册选择，再返回这里等待确认。");box.addView(phoneHint);Button saveQr=new Button(context);saveQr.setText("保存二维码");saveQr.setOnClickListener(view->{Bitmap bitmap=loginBitmap;if(bitmap==null){Toast.makeText(context,"二维码尚未生成",Toast.LENGTH_SHORT).show();return;}if(Build.VERSION.SDK_INT<29&&context instanceof MainActivity){((MainActivity)context).saveLoginQrDocument(bitmap);return;}submitHost("",()->{try{PluginQrImage.save(context,bitmap);main.post(()->Toast.makeText(context,"二维码已保存到相册，请到对应应用扫一扫中选择",Toast.LENGTH_LONG).show());}catch(Exception error){main.post(()->Toast.makeText(context,"保存失败："+error.getMessage(),Toast.LENGTH_LONG).show());}});});box.addView(saveQr);loginQr=new ImageView(context);int qrSize=Math.max(128,Math.min(400,(int)(context.getResources().getDisplayMetrics().heightPixels*0.5)));box.addView(loginQr,new LinearLayout.LayoutParams(qrSize,qrSize));ScrollView loginScroll=new ScrollView(context);loginScroll.addView(box);loginDialog=new AlertDialog.Builder(context).setTitle("插件登录").setView(loginScroll).setNegativeButton("关闭",(dialog,which)->dispose()).create();loginDialog.setOnCancelListener(dialog->dispose());lastQr="";loginDialog.show();}
+                loginText.setText(text);if(!qr.isEmpty()&&!qr.equals(lastQr)){loginBitmap=PluginQrImage.create(qr);loginQr.setImageBitmap(loginBitmap);lastQr=qr;}
             }catch(Exception e){Toast.makeText(context,"登录提示失败："+e.getMessage(),Toast.LENGTH_LONG).show();}
         });}
     }
