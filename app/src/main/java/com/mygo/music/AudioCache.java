@@ -11,6 +11,8 @@ import java.util.concurrent.*;
 
 /** Complete, validated audio files only; never reuses an expiring stream URL offline. */
 final class AudioCache implements Closeable {
+    private static AudioCache shared;
+    static synchronized AudioCache shared(Context context){if(shared==null||shared.closed)shared=new AudioCache(context.getApplicationContext());return shared;}
     static final long DEFAULT_LIMIT=512L*1024*1024,MAX_TRACK=128L*1024*1024;
     interface Callback {void done(boolean ok,String message);}
     static final class Entry {
@@ -18,11 +20,11 @@ final class AudioCache implements Closeable {
         Entry(String key,String track,String title,String quality,File file,long bytes,long used){this.key=key;this.track=track;this.title=title;this.quality=quality;this.file=file;this.bytes=bytes;this.used=used;}
     }
     private final File root;private final HashMap<String,Entry> entries=new HashMap<>();private final HashSet<String> pending=new HashSet<>();
-    private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16));
+    private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16));
     private String pinned="";
     private long limit,generation;private volatile boolean closed;
     AudioCache(Context context){this(new File(context.getNoBackupFilesDir(),"audio-cache"),DEFAULT_LIMIT);}
-    AudioCache(File root,long limit){this.root=root;this.limit=Math.max(1,limit);root.mkdirs();load();}
+    AudioCache(File root,long limit){this.root=root;this.limit=Math.max(1,limit);worker.allowCoreThreadTimeOut(true);root.mkdirs();load();}
     private void load(){File[] files=root.listFiles();if(files==null)return;for(File metadata:files){String name=metadata.getName();if(name.endsWith(".part")){metadata.delete();continue;}if(!name.matches("[a-f0-9]{64}\\.json"))continue;String key=name.substring(0,64);File audio=new File(root,key+".audio");try{JSONObject data;try(InputStream in=new FileInputStream(metadata)){byte[] bytes=new byte[(int)Math.min(metadata.length(),32768)];int n=in.read(bytes);data=new JSONObject(new String(bytes,0,Math.max(0,n),java.nio.charset.StandardCharsets.UTF_8));}String track=data.getString("track"),quality=data.getString("quality");long size=data.getLong("bytes");if(!key.equals(key(track,quality))||!audio.isFile()||size<=0||audio.length()!=size)throw new IOException("invalid audio cache");entries.put(key,new Entry(key,track,data.optString("title",track),quality,audio,size,data.optLong("used",System.currentTimeMillis())));}catch(Exception error){metadata.delete();audio.delete();}}for(File file:files)if(file.getName().matches("[a-f0-9]{64}\\.audio")&&!entries.containsKey(file.getName().substring(0,64)))file.delete();trim(null);}
     private static String key(String track,String quality){try{byte[] digest=MessageDigest.getInstance("SHA-256").digest((track+"\n"+quality).getBytes(java.nio.charset.StandardCharsets.UTF_8));StringBuilder value=new StringBuilder();for(byte b:digest)value.append(String.format(Locale.ROOT,"%02x",b&255));return value.toString();}catch(Exception error){throw new IllegalStateException(error);}}
     synchronized File find(String track,String quality){Entry entry=entries.get(key(track,quality));if(entry==null)return null;if(!entry.file.isFile()||entry.file.length()!=entry.bytes){removeEntry(entry);return null;}entry.used=System.currentTimeMillis();try{writeMetadata(entry);}catch(Exception ignored){}return entry.file;}

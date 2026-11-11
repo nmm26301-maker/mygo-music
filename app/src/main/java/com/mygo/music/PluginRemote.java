@@ -17,6 +17,8 @@ final class PluginRemote {
         clear(!source.equals(id));source=id;final long token=generation;
         try{manager.export(id,"remotePlay",new JSONObject().put("ids",ids).put("start",start).put("position",Math.max(0,position)),(ok,raw)->{if(closed||token!=generation)return;ready=ok;callback.done(ok,raw);if(ok)poll(token);else source="";});}catch(Exception error){source="";callback.done(false,error.getMessage());}
     }
+    void pause(){command("remotePause",new JSONObject());}
+    void resume(){command("remoteResume",new JSONObject());}
     void toggle(){if(ready)command(playing()?"remotePause":"remoteResume",new JSONObject());}
     void seek(int position){try{command("remoteSeek",new JSONObject().put("position",Math.max(0,position)));}catch(JSONException ignored){}}
     void volume(int percent){try{command("remoteVolume",new JSONObject().put("percent",Math.max(0,Math.min(100,percent))));}catch(JSONException ignored){}}

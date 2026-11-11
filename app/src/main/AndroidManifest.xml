@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <application android:extractNativeLibs="true" android:usesCleartextTraffic="true" android:icon="@drawable/ic_launcher" android:theme="@style/AppTheme" android:label="MyGo Music" android:allowBackup="true" android:supportsRtl="true">
