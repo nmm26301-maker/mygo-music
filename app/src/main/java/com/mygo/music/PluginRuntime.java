@@ -52,7 +52,7 @@ public final class PluginRuntime {
     public void call(String function,JSONObject args,Callback callback){main.post(()->ensureLoaded((ok,message)->{
         if(!ok){callback.done(false,message);return;}
         String request=String.valueOf(++sequence);pending.put(request,callback);
-        main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?200000:45000);
+        main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?300000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
     public void dispose(){main.post(()->{closed=true;if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();network.shutdownNow();});}
