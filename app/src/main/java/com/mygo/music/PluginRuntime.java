@@ -1,64 +1,118 @@
 package com.mygo.music;
 
-import android.app.Activity;
-import android.content.Context;
-import android.webkit.JavascriptInterface;
-import android.webkit.ValueCallback;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.StrictMode;
+import android.app.AlertDialog;
+import android.content.*;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.*;
+import android.webkit.*;
+import android.widget.*;
 import org.json.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.util.regex.*;
+import java.util.concurrent.*;
 import java.security.MessageDigest;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
+import com.google.zxing.*;
+import com.google.zxing.common.BitMatrix;
 
-/** Small WebView based bridge for MyGo plugin exports. */
+/** ES modules, asynchronous native I/O, per-plugin storage and network permissions. */
 public final class PluginRuntime {
     public interface Callback { void done(boolean ok,String value); }
     private final Context context;
     private final File directory;
     private final Handler main=new Handler(Looper.getMainLooper());
+    private final ExecutorService network=Executors.newFixedThreadPool(3);
+    private final HashMap<String,Callback> pending=new HashMap<>();
+    private final ArrayList<Callback> loading=new ArrayList<>();
+    private SharedPreferences storage, permissions;
+    private JSONArray hosts=new JSONArray();
     private WebView web;
-    private boolean loaded;
-    private final HashMap<String,String> storage=new HashMap<>();
-    private String lastPromptQr="";
+    private boolean loaded, starting, closed;
+    private String id, loadError="";
+    private int sequence;
+    private AlertDialog loginDialog;
+    private TextView loginText;
+    private ImageView loginQr;
+    private String lastQr="";
 
     public PluginRuntime(Context c,File dir){context=c;directory=dir;}
-
-    public void call(String function,JSONObject args,Callback callback){main.post(()->{ensureLoaded((ok,message)->{if(!ok){callback.done(false,message==null||message.isEmpty()?"插件脚本加载失败":message);return;}String source="window.__call("+JSONObject.quote(function)+","+args.toString()+").then(function(x){return JSON.stringify({ok:true,value:x});}).catch(function(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});})";web.evaluateJavascript(source,value->{try{Object decoded=new JSONTokener(value==null?"null":value).nextValue();if(!(decoded instanceof String)){callback.done(false,"插件返回值解析失败");return;}JSONObject envelope=new JSONObject((String)decoded);if(!envelope.optBoolean("ok",false)){callback.done(false,envelope.optString("error","插件接口调用失败"));return;}callback.done(true,envelope.optString("value","null"));}catch(Exception e){callback.done(false,"插件返回值解析失败："+e.getMessage());}});});});}
-
-    private void ensureLoaded(Callback cb){if(loaded){cb.done(true,"");return;}try{String manifest=read(new File(directory,"plugin.json"));JSONObject m=new JSONObject(manifest);String mainFile=m.optString("main","index.js");String source=read(new File(directory,mainFile));String script=transform(source);web=new WebView(context);WebSettings s=web.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setAllowFileAccessFromFileURLs(true);s.setAllowUniversalAccessFromFileURLs(true);s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView v,String url){if(loaded)return;loaded=true;cb.done(true,"");}});web.addJavascriptInterface(new NativeHost(),"nativeHost");String html="<html><body><script>"+script+"</script></body></html>";web.loadDataWithBaseURL("file://"+directory.getAbsolutePath()+"/",html,"text/html","UTF-8",null);}catch(Exception e){cb.done(false,e.getMessage()==null?"load error":e.getMessage());}}
-
-    private String transform(String source){
-        StringBuilder exports=new StringBuilder();
-        Matcher f=Pattern.compile("export\\s+(?:async\\s+)?function\\s+([A-Za-z_$][\\w$]*)").matcher(source);
-        while(f.find())exports.append("window.__exports[").append(JSONObject.quote(f.group(1))).append("]=").append(f.group(1)).append(";\\n");
-        String body=source.replaceAll("export\\s+(async\\s+)?function","$1function");
-        Matcher a=Pattern.compile("export\\s*\\{([^}]*)\\}\\s*;?").matcher(body);StringBuffer b=new StringBuffer();
-        while(a.find()){String[] parts=a.group(1).split(",");StringBuilder repl=new StringBuilder();for(String p:parts){String[] x=p.trim().split("\\s+as\\s+");if(x.length==2)repl.append("window.__exports[").append(JSONObject.quote(x[1].trim())).append("]=").append(x[0].trim()).append(";\\n");else if(x.length==1&&!x[0].trim().isEmpty())repl.append("window.__exports[").append(JSONObject.quote(x[0].trim())).append("]=").append(x[0].trim()).append(";\\n");}a.appendReplacement(b,Matcher.quoteReplacement(repl.toString()));}a.appendTail(b);body=b.toString();
-        String bridge="var __mygoFetch=function(input,init){init=init||{};var u=typeof input==='string'?input:input.url;var method=init.method||'GET';var body=init.body||'';var headers=init.headers||{};if(window.Headers&&headers instanceof Headers){var h={};headers.forEach(function(v,k){h[k]=v;});headers=h;}var raw=nativeHost.httpRequest(u,method,String(body),JSON.stringify(headers));var x=JSON.parse(raw);if(x.error){return Promise.reject(new Error(x.error));}var hs=new Headers(x.headers||{});hs.getSetCookie=function(){return x.cookies||[];};return Promise.resolve(new Response(x.body||'',{status:x.status||200,headers:hs}));};window.fetch=__mygoFetch;\\n";
-        String host="var host={platform:\"android\",arch:\"arm64\",dir:"+JSONObject.quote(directory.getAbsolutePath())+",dataDir:"+JSONObject.quote(new File(directory,"data").getAbsolutePath())+",storage:{get:function(k){var v=nativeHost.storageGet(k);return v?JSON.parse(v):undefined;},set:function(k,v){nativeHost.storageSet(k,JSON.stringify(v));},remove:function(k){nativeHost.storageRemove(k);}},crypto:{md5:function(x){return nativeHost.md5(String(x));},aesEcbEncrypt:function(k,x){return nativeHost.aesEcbEncrypt(String(k),String(x));}},setting:function(k){return nativeHost.setting(k);},language:function(){return nativeHost.language();},t:function(x){return nativeHost.translate(x);},openURL:function(u){return nativeHost.openURL(u);},signInPrompt:function(x){return nativeHost.signInPrompt(JSON.stringify(x||{}));}};\\n";
-        return bridge+host+"window.__exports={};\\n"+body+"\\n"+exports+"\\nwindow.__call=async function(n,a){var f=window.__exports[n];if(!f)throw new Error('插件未导出 '+n);var r=await f(a||{});return JSON.stringify(r===undefined?null:r);};\\n";
+    public void call(String function,JSONObject args,Callback callback){main.post(()->ensureLoaded((ok,message)->{
+        if(!ok){callback.done(false,message);return;}
+        String request=String.valueOf(++sequence);pending.put(request,callback);
+        main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?200000:45000);
+        web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
+    }));}
+    public void dispose(){main.post(()->{closed=true;for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();network.shutdownNow();});}
+    private void ensureLoaded(Callback cb){
+        if(closed){cb.done(false,"插件已关闭");return;}if(loaded){cb.done(true,"");return;}if(!loadError.isEmpty()){cb.done(false,loadError);return;}
+        loading.add(cb);if(starting)return;starting=true;
+        try{
+            JSONObject manifest=new JSONObject(read(new FileInputStream(new File(directory,"plugin.json"))));
+            id=manifest.getString("id");JSONObject p=manifest.optJSONObject("permissions");if(p!=null&&p.optJSONArray("network")!=null)hosts=p.getJSONArray("network");
+            storage=context.getSharedPreferences("plugin_data_"+id,Context.MODE_PRIVATE);permissions=context.getSharedPreferences("library",Context.MODE_PRIVATE);
+            File entry=new File(directory,manifest.optString("main","index.js"));
+            if(!entry.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("无效插件入口");
+            if(entry.getName().endsWith(".ts"))throw new IOException("此插件入口为 TypeScript，需要已编译的 JavaScript 版本");
+            String module="data:text/javascript;base64,"+android.util.Base64.encodeToString(read(new FileInputStream(entry)).getBytes("UTF-8"),android.util.Base64.NO_WRAP);
+            JSONObject config=new JSONObject().put("module",module).put("arch",Build.SUPPORTED_ABIS[0]).put("dir",directory.getAbsolutePath());
+            String bridge=read(context.getAssets().open("plugin-host.js"));
+            web=new WebView(context);WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
+            web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}});
+            web.addJavascriptInterface(new NativeHost(),"nativeHost");
+            String html="<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline' data:; connect-src 'none'\"><script>window.__pluginConfig="+config+";</script><script>"+bridge.replace("</script","<\\/script")+"</script>";
+            web.loadDataWithBaseURL("https://plugin.invalid/",html,"text/html","UTF-8",null);
+            main.postDelayed(()->{if(!loaded&&loadError.isEmpty())finishLoad(false,"插件加载超时，请更新 Android System WebView");},15000);
+        }catch(Exception e){finishLoad(false,e.getMessage());}
+    }
+    private void finishLoad(boolean ok,String message){if(closed)return;loaded=ok;loadError=ok?"":message;ArrayList<Callback> waiters=new ArrayList<>(loading);loading.clear();for(Callback cb:waiters)cb.done(ok,message);}
+    static boolean hostMatches(String host,String rule){host=host.toLowerCase(Locale.US);rule=rule.toLowerCase(Locale.US);return "*".equals(rule)||host.equals(rule)||(rule.startsWith("*.")&&host.endsWith(rule.substring(1))&&host.length()>rule.length()-1);}
+    private void requireNetwork(URL url)throws Exception{
+        if(!"https".equals(url.getProtocol())&&!"http".equals(url.getProtocol()))throw new IOException("仅支持 HTTP/HTTPS");
+        if(!permissions.getBoolean("plugin_network_"+id,false))throw new IOException("请在插件网络权限中允许访问");
+        for(int i=0;i<hosts.length();i++)if(hostMatches(url.getHost(),hosts.optString(i)))return;
+        throw new IOException("插件未声明该网络域名："+url.getHost());
+    }
+    private JSONObject requestHttp(String address,JSONObject init)throws Exception{
+        String method=init.optString("method","GET").toUpperCase(Locale.US),body=init.optString("body","");JSONObject headers=init.optJSONObject("headers");URL url=new URL(address);
+        for(int redirects=0;redirects<=5;redirects++){
+            requireNetwork(url);HttpURLConnection c=(HttpURLConnection)url.openConnection();
+            try{
+                c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setInstanceFollowRedirects(false);c.setRequestMethod(method);c.setRequestProperty("Accept-Encoding","identity");
+                if(headers!=null){Iterator<String> it=headers.keys();while(it.hasNext()){String key=it.next();c.setRequestProperty(key,headers.optString(key));}}
+                if(!body.isEmpty()&&!"GET".equals(method)&&!"HEAD".equals(method)){c.setDoOutput(true);try(OutputStream out=c.getOutputStream()){out.write(body.getBytes("UTF-8"));}}
+                int status=c.getResponseCode();
+                if(status>=300&&status<400&&c.getHeaderField("Location")!=null){
+                    if("error".equals(init.optString("redirect")))throw new IOException("插件禁止重定向");
+                    if(!"manual".equals(init.optString("redirect"))){URL next=new URL(url,c.getHeaderField("Location"));if(!next.getHost().equalsIgnoreCase(url.getHost()))headers=new JSONObject();url=next;if(status==303||((status==301||status==302)&&"POST".equals(method))){method="GET";body="";}continue;}
+                }
+                JSONObject responseHeaders=new JSONObject();JSONArray cookies=new JSONArray();for(Map.Entry<String,List<String>> entry:c.getHeaderFields().entrySet())if(entry.getKey()!=null){if("set-cookie".equalsIgnoreCase(entry.getKey()))for(String value:entry.getValue())cookies.put(value);else responseHeaders.put(entry.getKey(),String.join(", ",entry.getValue()));}
+                byte[] bytes=new byte[0];if(!"HEAD".equals(method)){InputStream in=status>=400?c.getErrorStream():c.getInputStream();if(in!=null)try(InputStream input=in){bytes=readBytes(input);}}
+                return new JSONObject().put("status",status).put("url",url.toString()).put("headers",responseHeaders).put("cookies",cookies).put("body",new String(bytes,"UTF-8")).put("base64",android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP));
+            }finally{c.disconnect();}
+        }throw new IOException("重定向次数过多");
     }
     private final class NativeHost {
-        @JavascriptInterface public String storageGet(String key){return storage.get(key);}
-        @JavascriptInterface public void storageSet(String key,String value){storage.put(key,value);}
-        @JavascriptInterface public void storageRemove(String key){storage.remove(key);}
-        @JavascriptInterface public String setting(String key){return "";}
-        @JavascriptInterface public String language(){return "zh-CN";}
-        @JavascriptInterface public String translate(String text){return text;}
-        @JavascriptInterface public void openURL(String url){try{context.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(url)));}catch(Exception ignored){}}
-        @JavascriptInterface public void signInPrompt(String payload){try{JSONObject o=new JSONObject(payload==null?"{}":payload);String text=o.optString("text","");String qr=o.optString("qr","");if(qr.isEmpty()){if(!text.isEmpty())android.widget.Toast.makeText(context,text,android.widget.Toast.LENGTH_SHORT).show();return;}if(qr.equals(lastPromptQr))return;lastPromptQr=qr;new android.app.AlertDialog.Builder(context).setTitle("插件登录").setMessage(text+"\n\n二维码地址：\n"+qr).setPositiveButton("打开二维码",(d,w)->{try{context.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(qr)));}catch(Exception ignored){}}).setNegativeButton("关闭",null).show();}catch(Exception ignored){}}
-        @JavascriptInterface public String md5(String text){try{byte[] d=MessageDigest.getInstance("MD5").digest((text==null?"":text).getBytes("UTF-8"));StringBuilder b=new StringBuilder();for(byte x:d)b.append(String.format("%02x",x&255));return b.toString();}catch(Exception e){return "";}}
-        @JavascriptInterface public String aesEcbEncrypt(String key,String text){try{Cipher c=Cipher.getInstance("AES/ECB/PKCS5Padding");c.init(Cipher.ENCRYPT_MODE,new SecretKeySpec((key==null?"":key).getBytes("UTF-8"),"AES"));byte[] out=c.doFinal((text==null?"":text).getBytes("UTF-8"));StringBuilder b=new StringBuilder();for(byte x:out)b.append(String.format("%02X",x&255));return b.toString();}catch(Exception e){return "";}}
-        @JavascriptInterface public String httpRequest(String address,String method,String body,String headersJson){StrictMode.ThreadPolicy old=StrictMode.getThreadPolicy();StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder(old).permitNetwork().build());HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(address).openConnection();c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setInstanceFollowRedirects(false);String verb=method==null||method.isEmpty()?"GET":method.toUpperCase(Locale.US);c.setRequestMethod(verb);c.setRequestProperty("Accept-Encoding","identity");if(headersJson!=null&&!headersJson.isEmpty()){JSONObject h=new JSONObject(headersJson);java.util.Iterator<String> it=h.keys();while(it.hasNext()){String k=it.next();c.setRequestProperty(k,h.optString(k,""));}}if(body!=null&&!body.isEmpty()&&!"GET".equals(verb)&&!"HEAD".equals(verb)){c.setDoOutput(true);OutputStream out=c.getOutputStream();out.write(body.getBytes("UTF-8"));out.close();}int status=c.getResponseCode();InputStream in=status>=200&&status<400?c.getInputStream():c.getErrorStream();String text="";if(in!=null){ByteArrayOutputStream buf=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))>0)buf.write(b,0,n);in.close();text=new String(buf.toByteArray(),"UTF-8");}JSONObject result=new JSONObject().put("status",status).put("body",text);JSONObject hs=new JSONObject();java.util.Map<String,java.util.List<String>> fields=c.getHeaderFields();if(fields!=null)for(java.util.Map.Entry<String,java.util.List<String>> e:fields.entrySet())if(e.getKey()!=null&&e.getValue()!=null&&!e.getValue().isEmpty())hs.put(e.getKey(),e.getValue().get(0));result.put("headers",hs);JSONArray cookies=new JSONArray();java.util.List<String> set=fields==null?null:fields.get("Set-Cookie");if(set!=null)for(String line:set)cookies.put(line);result.put("cookies",cookies);return result.toString();}catch(Exception e){try{return new JSONObject().put("error",e.getMessage()==null?"网络请求失败":e.getMessage()).toString();}catch(Exception ignored){return "{\"error\":\"network error\"}";}}finally{if(c!=null)c.disconnect();StrictMode.setThreadPolicy(old);}}
+        @JavascriptInterface public void ready(boolean ok,String value){main.post(()->finishLoad(ok,value));}
+        @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
+        @JavascriptInterface public String storageGet(String key){return storage.getString(key,"");}
+        @JavascriptInterface public void storageSet(String key,String value){storage.edit().putString(key,value).commit();}
+        @JavascriptInterface public void storageRemove(String key){storage.edit().remove(key).commit();}
+        @JavascriptInterface public String setting(String key){return context.getSharedPreferences("plugin_settings_"+id,Context.MODE_PRIVATE).getString(key,"");}
+        @JavascriptInterface public String md5(String text){try{return hex(MessageDigest.getInstance("MD5").digest(text.getBytes("UTF-8")));}catch(Exception e){throw new IllegalStateException(e);}}
+        @JavascriptInterface public String aesEcbEncrypt(String key,String text){try{Cipher c=Cipher.getInstance("AES/ECB/PKCS5Padding");c.init(Cipher.ENCRYPT_MODE,new SecretKeySpec(key.getBytes("UTF-8"),"AES"));return hex(c.doFinal(text.getBytes("UTF-8")));}catch(Exception e){throw new IllegalStateException(e);}}
+        @JavascriptInterface public void openURL(String address){main.post(()->{Uri uri=Uri.parse(address);if("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))context.startActivity(new Intent(Intent.ACTION_VIEW,uri));});}
+        @JavascriptInterface public void request(String request,String address,String init){network.execute(()->{JSONObject result;try{result=requestHttp(address,new JSONObject(init));}catch(Exception e){result=new JSONObject();try{result.put("error",e.getMessage()==null?"网络失败":e.getMessage());}catch(Exception ignored){}}String raw=result.toString();main.post(()->{if(!closed&&web!=null)web.evaluateJavascript("window.__networkResult("+JSONObject.quote(request)+","+JSONObject.quote(raw)+");",null);});});}
+        @JavascriptInterface public void signInPrompt(String raw){main.post(()->{
+            try{JSONObject prompt=new JSONObject(raw);String qr=prompt.optString("qr","");String text=prompt.optString("text","");
+                if(loginDialog==null||!loginDialog.isShowing()){LinearLayout box=new LinearLayout(context);box.setOrientation(1);box.setPadding(24,16,24,16);loginText=new TextView(context);box.addView(loginText);loginQr=new ImageView(context);box.addView(loginQr,new LinearLayout.LayoutParams(400,400));loginDialog=new AlertDialog.Builder(context).setTitle("插件登录").setView(box).setNegativeButton("关闭",null).create();lastQr="";loginDialog.show();}
+                loginText.setText(text);if(!qr.isEmpty()&&!qr.equals(lastQr)){BitMatrix matrix=new MultiFormatWriter().encode(qr,BarcodeFormat.QR_CODE,400,400);Bitmap b=Bitmap.createBitmap(400,400,Bitmap.Config.ARGB_8888);for(int y=0;y<400;y++)for(int x=0;x<400;x++)b.setPixel(x,y,matrix.get(x,y)?0xff000000:0xffffffff);loginQr.setImageBitmap(b);lastQr=qr;}
+            }catch(Exception e){Toast.makeText(context,"登录提示失败："+e.getMessage(),Toast.LENGTH_LONG).show();}
+        });}
     }
-    private String read(File f)throws Exception{InputStream in=new FileInputStream(f);try{ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] x=new byte[8192];int n;while((n=in.read(x))>0)b.write(x,0,n);return new String(b.toByteArray(),"UTF-8");}finally{in.close();}}
+    private static String hex(byte[] bytes){StringBuilder b=new StringBuilder();for(byte x:bytes)b.append(String.format(Locale.US,"%02x",x&255));return b.toString();}
+    private static byte[] readBytes(InputStream in)throws IOException{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>8*1024*1024)throw new IOException("插件响应超过 8 MB");out.write(buffer,0,n);}return out.toByteArray();}
+    private static String read(InputStream in)throws IOException{try(InputStream input=in){return new String(readBytes(input),java.nio.charset.StandardCharsets.UTF_8);}}
 }

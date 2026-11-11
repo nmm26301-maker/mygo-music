@@ -16,6 +16,36 @@ jobs:
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Enable emulator KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Build Android runtime tests
+        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Execute actual WebView plugin tests on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee plugin-test-results.txt
+            grep -F MYGO_TESTS_OK plugin-test-results.txt
+            adb shell am start -n com.mygo.music/.MainActivity
+            adb shell input keyevent 82
+            adb shell screencap -p /sdcard/landscape.png
+            adb pull /sdcard/landscape.png landscape.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-plugin-test-results
+          path: |
+            plugin-test-results.txt
+            landscape.png
       - name: Decode stable release signing key
         run: |
           test -s signing/mygo-release.keystore.b64
@@ -29,6 +59,8 @@ jobs:
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          unzip -t "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
           keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
       - name: Prepare direct install files
