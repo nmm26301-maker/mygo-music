@@ -1,0 +1,23 @@
+package com.mygo.music;
+
+import android.net.Uri;
+import android.webkit.WebResourceResponse;
+import java.io.*;
+import java.util.*;
+
+/** Same-origin ES modules, including relative imports, cycles and import.meta.url. */
+final class PluginResources {
+    static final String ORIGIN="https://plugin.invalid", PREFIX="/plugin/";
+    private final File root;
+    PluginResources(File root){this.root=root;}
+    String moduleURL(String main)throws IOException {file(Uri.parse(ORIGIN+PREFIX+main));return ORIGIN+PREFIX+main;}
+    boolean owns(Uri uri){return "https".equals(uri.getScheme())&&"plugin.invalid".equals(uri.getHost())&&uri.getPort()==-1;}
+    File file(Uri uri)throws IOException {
+        if(!owns(uri)||uri.getPath()==null||!uri.getPath().startsWith(PREFIX))throw new IOException("无效插件资源地址");
+        String path=uri.getPath().substring(PREFIX.length());if(path.contains("\\")||path.indexOf('\0')>=0)throw new IOException("无效插件资源路径");
+        File file=new File(root,path);if(!file.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator))throw new IOException("插件资源路径越界");
+        if(!file.isFile())throw new FileNotFoundException("插件文件不存在："+path);return file;
+    }
+    String mime(File file){String name=file.getName().toLowerCase(Locale.ROOT);if(name.endsWith(".js")||name.endsWith(".mjs"))return "application/javascript";if(name.endsWith(".json"))return "application/json";if(name.endsWith(".wasm"))return "application/wasm";if(name.endsWith(".svg"))return "image/svg+xml";if(name.endsWith(".png"))return "image/png";if(name.endsWith(".jpg")||name.endsWith(".jpeg"))return "image/jpeg";return "application/octet-stream";}
+    WebResourceResponse intercept(Uri uri){try{File file=file(uri);Map<String,String> headers=new HashMap<>();headers.put("Cache-Control","no-store");headers.put("Access-Control-Allow-Origin",ORIGIN);headers.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime(file),"UTF-8",200,"OK",headers,new FileInputStream(file));}catch(IOException e){return new WebResourceResponse("text/plain","UTF-8",404,"Not Found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));}}
+}

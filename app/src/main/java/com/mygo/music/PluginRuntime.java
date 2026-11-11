@@ -31,6 +31,7 @@ public final class PluginRuntime {
     private SharedPreferences storage, permissions;
     private JSONArray hosts=new JSONArray();
     private WebView web;
+    private PluginResources resources;
     private boolean loaded, starting, closed;
     private String id, loadError="";
     private int sequence;
@@ -65,17 +66,17 @@ public final class PluginRuntime {
             File entry=new File(directory,manifest.optString("main","index.js"));
             if(!entry.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("无效插件入口");
             if(entry.getName().endsWith(".ts"))throw new IOException("此插件入口为 TypeScript，需要已编译的 JavaScript 版本");
-            String module="data:text/javascript;base64,"+android.util.Base64.encodeToString(read(new FileInputStream(entry)).getBytes("UTF-8"),android.util.Base64.NO_WRAP);
+            resources=new PluginResources(directory);String module=resources.moduleURL(manifest.optString("main","index.js"));
             JSONObject locales=new JSONObject();File localeFile=new File(directory,"locales/zh-CN.json");if(localeFile.isFile())locales=new JSONObject(read(new FileInputStream(localeFile)));
             JSONObject config=new JSONObject().put("translations",locales).put("module",module).put("arch",Build.SUPPORTED_ABIS[0]).put("dir",directory.getAbsolutePath());
             String bridge=read(context.getAssets().open("plugin-host.js"));
             web=new WebView(context);WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
-            web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}});
+            web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}@Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){return resources.intercept(request.getUrl());}});
             web.addJavascriptInterface(new NativeHost(),"nativeHost");
-            String html="<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline' data:; connect-src 'none'\"><script>window.__pluginConfig="+config+";</script><script>"+bridge.replace("</script","<\\/script")+"</script>";
+            String html="<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self' 'unsafe-inline'; connect-src 'none'\"><script>window.__pluginConfig="+config+";</script><script>"+bridge.replace("</script","<\\/script")+"</script>";
             web.loadDataWithBaseURL("https://plugin.invalid/",html,"text/html","UTF-8",null);
             main.postDelayed(()->{if(!loaded&&loadError.isEmpty())finishLoad(false,"插件加载超时，请更新 Android System WebView");},15000);
-        }catch(Exception e){finishLoad(false,e.getMessage());}
+        }catch(Exception e){finishLoad(false,e.getMessage()==null?e.toString():e.getMessage());}
     }
     private void finishLoad(boolean ok,String message){if(closed)return;loaded=ok;loadError=ok?"":message;ArrayList<Callback> waiters=new ArrayList<>(loading);loading.clear();for(Callback cb:waiters)cb.done(ok,message);}
     static boolean hostMatches(String host,String rule){host=host.toLowerCase(Locale.US);rule=rule.toLowerCase(Locale.US);return "*".equals(rule)||host.equals(rule)||(rule.startsWith("*.")&&host.endsWith(rule.substring(1))&&host.length()>rule.length()-1);}
@@ -86,6 +87,7 @@ public final class PluginRuntime {
         throw new IOException("插件未声明该网络域名："+url.getHost());
     }
     private JSONObject requestHttp(String address,JSONObject init)throws Exception{
+        Uri local=Uri.parse(address);if(resources!=null&&resources.owns(local)){File file=resources.file(local);String method=init.optString("method","GET");if(!"GET".equalsIgnoreCase(method)&&!"HEAD".equalsIgnoreCase(method))throw new IOException("本地插件资源只允许读取");byte[] bytes=new byte[0];if(!"HEAD".equalsIgnoreCase(method))try(InputStream input=new FileInputStream(file)){bytes=readBytes(input);}return new JSONObject().put("status",200).put("url",address).put("headers",new JSONObject().put("Content-Type",resources.mime(file))).put("cookies",new JSONArray()).put("body",new String(bytes,"UTF-8")).put("base64",android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP));}
         String method=init.optString("method","GET").toUpperCase(Locale.US),body=init.optString("body","");JSONObject headers=init.optJSONObject("headers");URL url=new URL(address);
         for(int redirects=0;redirects<=5;redirects++){
             requireNetwork(url);HttpURLConnection c=(HttpURLConnection)url.openConnection();
@@ -141,4 +143,3 @@ public final class PluginRuntime {
     private static byte[] readBytes(InputStream in)throws IOException{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>8*1024*1024)throw new IOException("插件响应超过 8 MB");out.write(buffer,0,n);}return out.toByteArray();}
     private static String read(InputStream in)throws IOException{try(InputStream input=in){return new String(readBytes(input),java.nio.charset.StandardCharsets.UTF_8);}}
 }
-

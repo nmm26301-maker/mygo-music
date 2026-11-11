@@ -1,0 +1,4 @@
+MyGo Music Android
+QR code generation: ZXing Core 3.5.3, Apache License 2.0.
+Source: https://github.com/zxing/zxing
+License: ZXing-LICENSE.txt

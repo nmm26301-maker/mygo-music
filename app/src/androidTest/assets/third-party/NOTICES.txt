@@ -1,0 +1,7 @@
+Test fixture sources, retained without API rewrites:
+Li Zhi 1.1.0: https://github.com/djyde/mygo-lizhi
+NetEase 0.1.7: https://github.com/sogud/mygo-music-netease
+QQ Music 0.3.0: https://github.com/Amamiya23/mygo-music-qq-plugin
+Subsonic 0.1.9: https://github.com/TexasOct/mygo-subsonic
+See upstream repositories for author credits and license notices.
+NetEase and QQ Music fixture code carries AGPL-3.0 license notices.
