@@ -1,0 +1,28 @@
+package com.mygo.music;
+
+import android.app.Instrumentation;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+/** Tests the actual downloaded bytes, persistence, failed transfers, LRU and cancellation. */
+final class AudioCacheChecks {
+    static void check(boolean condition,String message){if(!condition)throw new AssertionError(message);}
+    static byte[] wav(){byte[] data=new byte[16044];java.nio.ByteBuffer b=java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.LITTLE_ENDIAN);try{b.put("RIFF".getBytes("US-ASCII")).putInt(data.length-8).put("WAVEfmt ".getBytes("US-ASCII")).putInt(16).putShort((short)1).putShort((short)1).putInt(8000).putInt(16000).putShort((short)2).putShort((short)16).put("data".getBytes("US-ASCII")).putInt(data.length-44);}catch(Exception error){throw new RuntimeException(error);}return data;}
+    static boolean store(AudioCache cache,String id,String url)throws Exception{CountDownLatch done=new CountDownLatch(1);boolean[] ok={false};Map<String,String> headers=new HashMap<>();headers.put("X-Audio-Key","fixture");cache.store(id,id,"high",url,headers,(success,message)->{ok[0]=success;done.countDown();});check(done.await(12,TimeUnit.SECONDS),"audio cache transfer callback missing");return ok[0];}
+    static void run(Instrumentation test)throws Exception{
+        File directory=new File(test.getTargetContext().getCacheDir(),"audio-cache-protocol-tests");PluginArchive.delete(directory);byte[] wav=wav();try(AudioServer server=new AudioServer(wav)){
+            AudioCache cache=new AudioCache(directory,wav.length*2L+10);AudioCache restored=null;
+            try{check(store(cache,"plugin://source?id=a",server.base()+"/audio"),"valid audio was not cached");check(server.authenticated,"cache omitted source request headers");File a=cache.find("plugin://source?id=a","high");check(a!=null&&Arrays.equals(java.nio.file.Files.readAllBytes(a.toPath()),wav),"cached bytes changed");check(cache.find("plugin://source?id=a","lossless")==null,"cache confused different requested qualities");cache.close();restored=new AudioCache(directory,wav.length*2L+10);check(restored.find("plugin://source?id=a","high")!=null,"cache lost on restart");check(store(restored,"plugin://source?id=b",server.base()+"/audio"),"second audio transfer failed");android.os.SystemClock.sleep(20);restored.find("plugin://source?id=a","high");android.os.SystemClock.sleep(20);check(store(restored,"plugin://source?id=c",server.base()+"/audio"),"third audio transfer failed");check(restored.find("plugin://source?id=a","high")!=null&&restored.find("plugin://source?id=b","high")==null,"LRU removed a recently used track");check(restored.bytes()<=wav.length*2L+10,"cache exceeded capacity");check(!store(restored,"plugin://source?id=html",server.base()+"/html"),"HTML page accepted as audio");check(!store(restored,"plugin://source?id=truncated",server.base()+"/truncated"),"incomplete download published as offline audio");check(!store(restored,"plugin://source?id=large",server.base()+"/large"),"oversized audio accepted");check(restored.list().size()==2,"failed transfers polluted the offline index");
+                CountDownLatch done=new CountDownLatch(1);boolean[] success={true};Map<String,String> headers=new HashMap<>();headers.put("X-Audio-Key","fixture");AudioCache active=restored;active.store("plugin://source?id=slow","Slow","high",server.base()+"/slow",headers,(ok,message)->{success[0]=ok;done.countDown();});check(server.slow.await(5,TimeUnit.SECONDS),"slow transfer not started");active.clear();server.release.countDown();check(done.await(5,TimeUnit.SECONDS)&&!success[0],"clearing cache did not cancel the active transfer");check(active.list().isEmpty()&&active.bytes()==0,"cancelled transfer reappeared after clear");File[] left=directory.listFiles();for(File file:left==null?new File[0]:left)check(!file.getName().endsWith(".audio")&&!file.getName().endsWith(".part"),"partial audio left after cancellation");
+            }finally{cache.close();if(restored!=null)restored.close();PluginArchive.delete(directory);}
+        }
+    }
+    private static final class AudioServer implements AutoCloseable {
+        final ServerSocket server=new ServerSocket(0);final byte[] wav;volatile boolean authenticated;final CountDownLatch slow=new CountDownLatch(1),release=new CountDownLatch(1);
+        AudioServer(byte[] wav)throws Exception{this.wav=wav;Thread thread=new Thread(()->{while(!server.isClosed())try(Socket socket=server.accept()){socket.setSoTimeout(5000);BufferedReader in=new BufferedReader(new InputStreamReader(socket.getInputStream(),"US-ASCII"));String first=in.readLine(),line;boolean key=false;while((line=in.readLine())!=null&&!line.isEmpty())if(line.equalsIgnoreCase("X-Audio-Key: fixture"))key=true;authenticated|=key;String path=first.split(" ")[1];boolean html=path.equals("/html"),large=path.equals("/large"),truncated=path.equals("/truncated");byte[] bytes=html?"<html>login required</html>".getBytes("US-ASCII"):wav;long size=large?AudioCache.MAX_TRACK+1:truncated?bytes.length+100:bytes.length;OutputStream out=socket.getOutputStream();out.write(("HTTP/1.1 200 OK\r\nContent-Type: "+(html?"text/html":"audio/wav")+"\r\nContent-Length: "+size+"\r\nConnection: close\r\n\r\n").getBytes("US-ASCII"));if(path.equals("/slow")){out.write(bytes,0,44);out.flush();slow.countDown();release.await(8,TimeUnit.SECONDS);out.write(bytes,44,bytes.length-44);}else if(!large)out.write(bytes);out.flush();}catch(Exception ignored){}});thread.setDaemon(true);thread.start();}
+        String base(){return "http://127.0.0.1:"+server.getLocalPort();}
+        public void close()throws Exception{release.countDown();server.close();}
+    }
+}
