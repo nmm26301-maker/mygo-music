@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.*;
 import android.webkit.*;
+import android.webkit.CookieManager;
 import android.widget.*;
 import org.json.*;
 import java.io.*;
@@ -140,3 +141,4 @@ public final class PluginRuntime {
     private static byte[] readBytes(InputStream in)throws IOException{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>8*1024*1024)throw new IOException("插件响应超过 8 MB");out.write(buffer,0,n);}return out.toByteArray();}
     private static String read(InputStream in)throws IOException{try(InputStream input=in){return new String(readBytes(input),java.nio.charset.StandardCharsets.UTF_8);}}
 }
+
