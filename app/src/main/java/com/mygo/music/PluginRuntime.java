@@ -37,6 +37,13 @@ public final class PluginRuntime {
     private TextView loginText;
     private ImageView loginQr;
     private String lastQr="";
+    private static PluginRuntime browserOwner;
+    private AlertDialog browserDialog;
+    private WebView browserView;
+    private String browserRequest="", cookiesOf="";
+    private JSONArray requiredCookies;
+    private Runnable browserPoll;
+
 
     public PluginRuntime(Context c,File dir){context=c;directory=dir;}
     public void validate(Callback cb){main.post(()->ensureLoaded(cb));}
@@ -46,7 +53,7 @@ public final class PluginRuntime {
         main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?200000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
-    public void dispose(){main.post(()->{closed=true;for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();network.shutdownNow();});}
+    public void dispose(){main.post(()->{closed=true;if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();network.shutdownNow();});}
     private void ensureLoaded(Callback cb){
         if(closed){cb.done(false,"插件已关闭");return;}if(loaded){cb.done(true,"");return;}if(!loadError.isEmpty()){cb.done(false,loadError);return;}
         loading.add(cb);if(starting)return;starting=true;
@@ -96,7 +103,22 @@ public final class PluginRuntime {
             }finally{c.disconnect();}
         }throw new IOException("重定向次数过多");
     }
+    private void hostResult(String request,boolean ok,String value){if(!closed&&web!=null)web.evaluateJavascript("window.__hostResult("+JSONObject.quote(request)+","+ok+","+JSONObject.quote(value)+");",null);}
+    private void finishBrowserLogin(boolean ok,String value){
+        if(browserRequest.isEmpty())return;String request=browserRequest;browserRequest="";if(browserPoll!=null)main.removeCallbacks(browserPoll);if(browserDialog!=null){browserDialog.setOnDismissListener(null);browserDialog.dismiss();browserDialog=null;}if(browserView!=null){browserView.stopLoading();browserView.destroy();browserView=null;}
+        WebStorage.getInstance().deleteAllData();CookieManager.getInstance().removeAllCookies(removed->{if(browserOwner==this)browserOwner=null;hostResult(request,ok,value);});
+    }
+    private boolean secureLoginURL(URL address){return "https".equals(address.getProtocol())||((context.getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0&&"http".equals(address.getProtocol())&&"127.0.0.1".equals(address.getHost()));}
+    private void showBrowserLogin(String request,String raw){
+        try{JSONObject options=new JSONObject(raw);URL address=new URL(options.getString("url")),cookieAddress=new URL(options.getString("cookiesOf"));if(!secureLoginURL(address)||!secureLoginURL(cookieAddress))throw new IOException("登录页面和 Cookie 地址必须使用 HTTPS");requireNetwork(cookieAddress);JSONArray names=options.optJSONArray("until");if(names==null||names.length()==0)throw new IOException("插件未指定登录成功的 Cookie");if(!(context instanceof android.app.Activity)||((android.app.Activity)context).isFinishing())throw new IOException("请在播放器界面中登录");if(browserOwner!=null)throw new IOException("已有登录窗口，请先完成或关闭");browserOwner=this;browserRequest=request;cookiesOf=cookieAddress.toString();requiredCookies=names;
+            WebStorage.getInstance().deleteAllData();CookieManager cookies=CookieManager.getInstance();cookies.setAcceptCookie(true);cookies.removeAllCookies(removed->{if(closed){finishBrowserLogin(false,"插件已关闭");return;}browserView=new WebView(context);WebSettings settings=browserView.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setCacheMode(WebSettings.LOAD_NO_CACHE);String userAgent=options.optString("userAgent","");if(!userAgent.isEmpty())settings.setUserAgentString(userAgent);CookieManager.getInstance().setAcceptThirdPartyCookies(browserView,false);browserView.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest req){String scheme=req.getUrl().getScheme();return !"http".equals(scheme)&&!"https".equals(scheme);}});
+                browserDialog=new AlertDialog.Builder(context).setTitle("插件网页登录").setView(browserView).setNegativeButton("取消",(d,w)->finishBrowserLogin(false,"已取消登录")).create();browserDialog.setOnCancelListener(d->finishBrowserLogin(false,"已取消登录"));browserDialog.show();browserDialog.getWindow().setLayout((int)(context.getResources().getDisplayMetrics().widthPixels*0.92),(int)(context.getResources().getDisplayMetrics().heightPixels*0.90));browserView.loadUrl(address.toString());final long deadline=android.os.SystemClock.elapsedRealtime()+180000;
+                browserPoll=()->{if(browserRequest.isEmpty())return;if(android.os.SystemClock.elapsedRealtime()>deadline){finishBrowserLogin(false,"登录超时");return;}String cookie=CookieManager.getInstance().getCookie(cookiesOf);HashSet<String> present=new HashSet<>();if(cookie!=null)for(String pair:cookie.split(";")){int equals=pair.indexOf('=');if(equals>0)present.add(pair.substring(0,equals).trim());}boolean complete=true;for(int i=0;i<requiredCookies.length();i++)if(!present.contains(requiredCookies.optString(i)))complete=false;if(complete){try{finishBrowserLogin(true,new JSONObject().put("cookie",cookie).toString());}catch(Exception e){finishBrowserLogin(false,"无法读取登录结果");}}else main.postDelayed(browserPoll,500);};main.postDelayed(browserPoll,500);
+            });
+        }catch(Exception e){hostResult(request,false,e.getMessage()==null?"登录失败":e.getMessage());}
+    }
     private final class NativeHost {
+        @JavascriptInterface public void webSignIn(String request,String raw){main.post(()->showBrowserLogin(request,raw));}
         @JavascriptInterface public void ready(boolean ok,String value){main.post(()->finishLoad(ok,value));}
         @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
         @JavascriptInterface public String storageGet(String key){return storage.getString(key,"");}

@@ -26,13 +26,25 @@
     nativeHost.request(id, String(input.url || input), JSON.stringify({method:init.method || 'GET',
       headers, body:init.body == null ? '' : String(init.body), redirect:init.redirect || 'follow'}));
   });
+  const hostTasks = new Map(); let hostSequence = 0;
+  window.__hostResult = (id, ok, raw) => {
+    const task = hostTasks.get(id); if (!task) return; hostTasks.delete(id);
+    if (ok) { try { task.resolve(JSON.parse(raw)); } catch(e) { task.reject(e); } }
+    else task.reject(new Error(raw));
+  };
+  const webSignIn = options => new Promise((resolve, reject) => {
+    const id = String(++hostSequence); hostTasks.set(id, {resolve, reject});
+    nativeHost.webSignIn(id, JSON.stringify(options || {}));
+  });
   window.host = {
     platform:'android', arch:__pluginConfig.arch, dir:__pluginConfig.dir, dataDir:__pluginConfig.dir + '/data',
     storage:{get:k => {const v=nativeHost.storageGet(String(k)); return v === '' ? undefined : JSON.parse(v);},
       set:(k,v) => nativeHost.storageSet(String(k), JSON.stringify(v)), remove:k => nativeHost.storageRemove(String(k))},
     setting:k => nativeHost.setting(String(k)), language:()=>'zh-CN', t:x=>__pluginConfig.translations?.[x] || x,
     crypto:{md5:x=>nativeHost.md5(String(x)), aesEcbEncrypt:(k,x)=>nativeHost.aesEcbEncrypt(String(k),String(x))},
-    openURL:u=>nativeHost.openURL(String(u)), signInPrompt:x=>nativeHost.signInPrompt(JSON.stringify(x || {}))
+    openURL:u=>nativeHost.openURL(String(u)), webSignIn,
+    spawn:()=>{throw new Error('安卓版本尚未提供这个插件所需的桌面辅助程序');},
+    waitForRedirect:()=>{throw new Error('安卓版本尚未提供此插件的本机回调登录方式');}, signInPrompt:x=>nativeHost.signInPrompt(JSON.stringify(x || {}))
   };
   window.__invoke = async (id, name, args) => {
     try {
