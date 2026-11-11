@@ -32,10 +32,19 @@
     if (ok) { try { task.resolve(JSON.parse(raw)); } catch(e) { task.reject(e); } }
     else task.reject(new Error(raw));
   };
-  const webSignIn = options => new Promise((resolve, reject) => {
+  const hostTask = (method, ...args) => new Promise((resolve, reject) => {
     const id = String(++hostSequence); hostTasks.set(id, {resolve, reject});
-    nativeHost.webSignIn(id, JSON.stringify(options || {}));
+    try { nativeHost[method](id, ...args); } catch(error) { hostTasks.delete(id); reject(error); }
   });
+  const webSignIn = options => hostTask('webSignIn', JSON.stringify(options || {}));
+  const nativeResult = raw => { const result = JSON.parse(raw); if (!result.ok) throw new Error(result.error); return result.value; };
+  const spawn = (command, args = []) => {
+    const info = nativeResult(nativeHost.processSpawn(String(command), JSON.stringify(args)));
+    const sync = (method, value = '') => nativeResult(nativeHost.processSync(info.pid, method, String(value)));
+    return {pid:info.pid, write:text=>sync('write', text), closeStdin:()=>sync('closeStdin'),
+      readLine:()=>hostTask('processTask', info.pid, 'readLine'), wait:()=>hostTask('processTask', info.pid, 'wait'),
+      kill:()=>sync('kill'), errorOutput:()=>sync('errorOutput')};
+  };
   window.host = {
     platform:'android', arch:__pluginConfig.arch, dir:__pluginConfig.dir, dataDir:__pluginConfig.dir + '/data',
     storage:{get:k => {const v=nativeHost.storageGet(String(k)); return v === '' ? undefined : JSON.parse(v);},
@@ -43,8 +52,9 @@
     setting:k => nativeHost.setting(String(k)), language:()=>'zh-CN', t:x=>__pluginConfig.translations?.[x] || x,
     crypto:{md5:x=>nativeHost.md5(String(x)), aesEcbEncrypt:(k,x)=>nativeHost.aesEcbEncrypt(String(k),String(x))},
     openURL:u=>nativeHost.openURL(String(u)), webSignIn,
-    spawn:()=>{throw new Error('安卓版本尚未提供这个插件所需的桌面辅助程序');},
-    waitForRedirect:()=>{throw new Error('安卓版本尚未提供此插件的本机回调登录方式');}, signInPrompt:x=>nativeHost.signInPrompt(JSON.stringify(x || {}))
+    spawn,
+    waitForRedirect:options=>hostTask('waitForRedirect', JSON.stringify(options || {})),
+    removeDataDir:name=>nativeResult(nativeHost.removeDataDir(String(name))), signInPrompt:x=>nativeHost.signInPrompt(JSON.stringify(x || {}))
   };
   window.__invoke = async (id, name, args) => {
     try {
@@ -52,7 +62,7 @@
       if (typeof fn !== 'function') throw new Error('插件未提供接口：' + name);
       const value = await fn(args || {});
       nativeHost.complete(id, true, JSON.stringify(value === undefined ? null : value));
-    } catch(e) { nativeHost.complete(id, false, String(e?.message || e)); }
+    } catch(e) { nativeHost.complete(id, false, JSON.stringify({__mygoError:true,code:String(e?.code || ''),message:String(e?.message || e)})); }
   };
   import(__pluginConfig.module).then(module => {
     window.__plugin = module;

@@ -16,6 +16,18 @@ jobs:
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Build Android plugin launcher for all supported ABIs
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager "ndk;27.2.12479018"
+          TOOLCHAIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for SPEC in "arm64-v8a:aarch64-linux-android" "armeabi-v7a:armv7a-linux-androideabi" "x86_64:x86_64-linux-android" "x86:i686-linux-android"; do
+            ABI="${SPEC%%:*}"
+            TARGET="${SPEC#*:}"
+            mkdir -p "app/src/main/jniLibs/$ABI"
+            "$TOOLCHAIN/${TARGET}23-clang" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384 app/src/main/cpp/plugin-launcher.c -o "app/src/main/jniLibs/$ABI/libmygo-launcher.so"
+          done
       - name: Enable emulator KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -65,7 +77,7 @@ jobs:
           unzip -t "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
           keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
-      - name: Verify upgrade from signed v5.1.0 on Android
+      - name: Verify upgrade from signed v5.2.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -74,9 +86,9 @@ jobs:
           disable-animations: true
           script: |
             adb uninstall com.mygo.music || true
-            adb install tests/baseline-v5.1.apk
+            adb install tests/baseline-v5.2.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=52'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=53'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |
