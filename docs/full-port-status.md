@@ -39,6 +39,8 @@ GitHub Actions is the required build path. It prepares pinned TypeScript/compile
 
 FullPortChecks is the new first test stage so module, provider adapter or radio failures stop the run early. Existing lyrics, QR, process, login, playlist, network/header and background audio checks continue unchanged. Inspect the latest Actions run and its android-plugin-test-results artifact before claiming tests passed.
 
+Explicit stop now releases the finished media session and creates a new identity. Session callbacks and notification controls carry that identity so delayed controls from a stopped song cannot stop a newly started queue. Android regression tests send both the old MediaController stop and the old notification PendingIntent after a new radio has started. This follows the [official MediaSession lifecycle](https://developer.android.com/reference/android/media/session/MediaSession).
+
 ## Remaining work requiring explicit compatibility proof
 
 * Live credentials, memberships, remote devices and user-owned servers cannot be inferred from successful module installation. See the shipped per-source diagnostic report for the exact tested stage.
