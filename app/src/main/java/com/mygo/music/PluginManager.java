@@ -78,6 +78,18 @@ public final class PluginManager {
     private void searchPlugin(ArrayList<PluginInfo> plugins,int index,String query,ArrayList<PluginTrack> out,SearchCallback cb){if(index>=plugins.size()){cb.done(out);return;}PluginInfo p=plugins.get(index);searchSource(p.id,query,(ok,value)->{if(ok)for(PluginTrack t:parseTracks(value)){t.pluginId=p.id;t.url=new android.net.Uri.Builder().scheme("plugin").authority(p.id).appendQueryParameter("id",t.id).build().toString();out.add(t);}searchPlugin(plugins,index+1,query,out,cb);});}
     private ArrayList<PluginTrack> parseTracks(String raw){ArrayList<PluginTrack> out=new ArrayList<>();try{JSONObject root=new JSONObject(raw);JSONArray a=root.optJSONArray("tracks");if(a==null)return out;for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;PluginTrack t=new PluginTrack();t.id=o.optString("id","");t.name=o.optString("name",o.optString("title",""));t.url=o.optString("url","");t.pic=o.optString("imageUrl",o.optString("pic",""));JSONArray artists=o.optJSONArray("artists");if(artists!=null&&artists.length()>0&&artists.optJSONObject(0)!=null)t.artist=artists.optJSONObject(0).optString("name","");if(t.artist.isEmpty())t.artist=o.optString("artist","");if(!t.name.isEmpty())out.add(t);}}catch(Exception ignored){}return out;}
 
+    private final HashMap<String,JSONObject> marketChecks=new HashMap<>();private boolean marketChecksLoaded;
+    public JSONObject marketCheck(String repository){if(!marketChecksLoaded){marketChecksLoaded=true;try{JSONArray rows=new JSONObject(read(context.getAssets().open("plugin-audit.json"))).getJSONArray("results");for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);marketChecks.put(row.getString("repo").toLowerCase(Locale.ROOT),row);}}catch(Exception ignored){}}return marketChecks.get(repository.toLowerCase(Locale.ROOT));}
+    public static String checkSummary(JSONObject check){
+        if(check==null)return "尚无安卓实测记录";
+        if(!check.optString("install").equals("passed"))return "安卓安装或加载未通过，查看检查结果";
+        if(check.optString("androidDecoder").equals("prepared"))return "匿名歌曲样本通过，账号功能待验证";
+        if(check.optString("stream").equals("requires_signed_in_remote_device"))return "搜索通过，播放需登录并配置远程设备";
+        if(check.optString("stream").equals("http_passed"))return "音频连接通过，实际播放待验证";
+        if(check.optString("search").equals("passed"))return "搜索通过，播放条件请查看检查结果";
+        if(check.optString("search").equals("not_exported"))return "已加载，请从插件导航使用专有功能";
+        return "已加载，搜索未通过，请查看检查结果";
+    }
     public JSONArray marketSnapshot(){try{String cached=prefs.getString("plugin_market","");return new JSONArray(cached.isEmpty()?read(context.getAssets().open("plugin-market.json")):cached);}catch(Exception e){return new JSONArray();}}
     public void refreshMarket(Callback callback){executor.execute(()->{try{JSONArray out=new JSONArray();for(int page=1;page<=10;page++){JSONObject answer=new JSONObject(get("https://api.github.com/search/repositories?q=topic%3Amygo-music-plugin%20archived%3Afalse&sort=stars&per_page=100&page="+page));JSONArray items=answer.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject repo=items.getJSONObject(i);out.put(new JSONObject().put("repo",repo.getString("full_name")).put("name",repo.getString("name")).put("description",repo.optString("description","")).put("stars",repo.optInt("stargazers_count")));}if(items.length()<100)break;}if(out.length()==0)throw new IOException("插件目录为空");prefs.edit().putString("plugin_market",out.toString()).apply();callback.done(true,"已刷新 "+out.length()+" 个插件");}catch(Exception e){callback.done(false,"刷新失败，已保留本机目录："+e.getMessage());}});}
     public void installFromGitHub(String input,Callback cb){

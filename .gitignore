@@ -1,3 +1,4 @@
 
 # Pinned third-party packages are fetched only for CI tests.
 app/src/androidTest/assets/market-audit/
+app/src/main/assets/plugin-audit.json

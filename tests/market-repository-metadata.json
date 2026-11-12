@@ -1,0 +1,450 @@
+[
+  {
+    "repo": "AdkinsHan/mygo-local-lyrics",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T14:50:05Z",
+    "archived": false,
+    "updated_at": "2026-11-07T20:53:07Z"
+  },
+  {
+    "repo": "AkinoKaede/mygo-music-netease-cloud-music",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-10T09:05:31Z",
+    "archived": false,
+    "updated_at": "2026-11-12T02:35:08Z"
+  },
+  {
+    "repo": "Amamiya23/mygo-music-qq-plugin",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-10T14:28:31Z",
+    "archived": false,
+    "updated_at": "2026-11-10T14:28:36Z"
+  },
+  {
+    "repo": "Arteiimis/mygo-music-netease",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-06T20:21:35Z",
+    "archived": false,
+    "updated_at": "2026-11-07T04:22:54Z"
+  },
+  {
+    "repo": "AsperaUlt/mygo-netease",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T03:04:10Z",
+    "archived": false,
+    "updated_at": "2026-11-07T03:05:48Z"
+  },
+  {
+    "repo": "DaviRain-Su/mygo-music-qishui",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-10T15:27:08Z",
+    "archived": false,
+    "updated_at": "2026-11-10T15:27:14Z"
+  },
+  {
+    "repo": "Faye-bit/MyGo-Music-Netease-All",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-08T08:00:35Z",
+    "archived": false,
+    "updated_at": "2026-11-08T09:28:14Z"
+  },
+  {
+    "repo": "GYRYEZ/mygo-music-roamdial",
+    "license": "unknown",
+    "pushed_at": "2026-11-09T09:15:27Z",
+    "archived": false,
+    "updated_at": "2026-11-12T02:34:34Z"
+  },
+  {
+    "repo": "GentleM4dman/mygo-music-bilibili",
+    "license": "MIT",
+    "pushed_at": "2026-11-10T16:03:33Z",
+    "archived": false,
+    "updated_at": "2026-11-10T16:11:55Z"
+  },
+  {
+    "repo": "Guyu23/mygo-music-qishui",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T09:23:32Z",
+    "archived": false,
+    "updated_at": "2026-11-09T04:11:45Z"
+  },
+  {
+    "repo": "Guyu23/mygo-music-qqmusic",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T16:33:15Z",
+    "archived": false,
+    "updated_at": "2026-11-10T08:42:48Z"
+  },
+  {
+    "repo": "InkCitrus/mygo-music-apple-music",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T10:28:13Z",
+    "archived": false,
+    "updated_at": "2026-11-08T20:09:17Z"
+  },
+  {
+    "repo": "Jimmyzzt/mygo-music-incompetech",
+    "license": "MIT",
+    "pushed_at": "2026-11-08T10:33:39Z",
+    "archived": false,
+    "updated_at": "2026-11-08T08:56:56Z"
+  },
+  {
+    "repo": "KirishimaRin/mygo-music-netease-cloud-music",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T15:44:02Z",
+    "archived": false,
+    "updated_at": "2026-11-10T01:18:43Z"
+  },
+  {
+    "repo": "LANMIN-X/mygo-plugin-ximalaya",
+    "license": "unknown",
+    "pushed_at": "2026-11-08T08:41:43Z",
+    "archived": false,
+    "updated_at": "2026-11-08T09:22:48Z"
+  },
+  {
+    "repo": "LYJW131/mygo-music-apple-music",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-11T19:48:42Z",
+    "archived": false,
+    "updated_at": "2026-11-11T20:44:13Z"
+  },
+  {
+    "repo": "LYJW131/mygo-music-emby-jellyfin",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-08T14:14:01Z",
+    "archived": false,
+    "updated_at": "2026-11-08T14:25:09Z"
+  },
+  {
+    "repo": "Lorpaves/mygo-music-qqmusic",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T08:27:30Z",
+    "archived": false,
+    "updated_at": "2026-11-12T04:33:25Z"
+  },
+  {
+    "repo": "MaYunFei/mygo-music-feiniu",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T07:03:23Z",
+    "archived": false,
+    "updated_at": "2026-11-07T07:03:26Z"
+  },
+  {
+    "repo": "Maker-World/mygo-music-migu",
+    "license": "unknown",
+    "pushed_at": "2026-11-08T14:28:23Z",
+    "archived": false,
+    "updated_at": "2026-11-08T14:28:27Z"
+  },
+  {
+    "repo": "SixWa12138/mygo-music-netease-music",
+    "license": "unknown",
+    "pushed_at": "2026-11-09T06:33:26Z",
+    "archived": false,
+    "updated_at": "2026-11-11T16:16:39Z"
+  },
+  {
+    "repo": "TengYangTuoHai/mygo-music-navidrome",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-09T01:54:21Z",
+    "archived": false,
+    "updated_at": "2026-11-09T01:54:25Z"
+  },
+  {
+    "repo": "TexasOct/mygo-subsonic",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-12T03:55:17Z",
+    "archived": false,
+    "updated_at": "2026-11-12T04:55:20Z"
+  },
+  {
+    "repo": "VenusLuna/mygo-music-netease-plus",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-10T06:56:09Z",
+    "archived": false,
+    "updated_at": "2026-11-10T07:02:36Z"
+  },
+  {
+    "repo": "YeeYeung/mygo-music-overcast",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T12:27:47Z",
+    "archived": false,
+    "updated_at": "2026-11-07T12:27:51Z"
+  },
+  {
+    "repo": "ZONGZI-000/zongzi-mygo-plugin-beta",
+    "license": "unknown",
+    "pushed_at": "2026-11-12T02:00:17Z",
+    "archived": false,
+    "updated_at": "2026-11-12T03:00:17Z"
+  },
+  {
+    "repo": "ZONGZI-000/zongzi-mygo-plugin-stable",
+    "license": "unknown",
+    "pushed_at": "2026-11-10T10:11:54Z",
+    "archived": false,
+    "updated_at": "2026-11-12T03:25:18Z"
+  },
+  {
+    "repo": "amqsy/mygo-music-bodian",
+    "license": "MIT",
+    "pushed_at": "2026-11-09T17:56:47Z",
+    "archived": false,
+    "updated_at": "2026-11-10T20:50:41Z"
+  },
+  {
+    "repo": "benhaotang/mygo-music-Ampache",
+    "license": "unknown",
+    "pushed_at": "2026-11-09T12:19:41Z",
+    "archived": false,
+    "updated_at": "2026-11-09T12:18:20Z"
+  },
+  {
+    "repo": "biaobiaobiao108/mygo-yun-music",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T13:24:28Z",
+    "archived": false,
+    "updated_at": "2026-11-07T13:24:32Z"
+  },
+  {
+    "repo": "bitbyte404/mygo-music-kugou-lite",
+    "license": "NOASSERTION",
+    "pushed_at": "2026-11-11T15:04:37Z",
+    "archived": false,
+    "updated_at": "2026-11-11T16:00:13Z"
+  },
+  {
+    "repo": "craigary/mygo-music-kugou-lite",
+    "license": "NOASSERTION",
+    "pushed_at": "2026-11-11T20:51:01Z",
+    "archived": false,
+    "updated_at": "2026-11-11T21:41:31Z"
+  },
+  {
+    "repo": "dddaniel1/mygo-plugin-kugou",
+    "license": "MIT",
+    "pushed_at": "2026-11-06T16:25:07Z",
+    "archived": false,
+    "updated_at": "2026-11-07T03:36:37Z"
+  },
+  {
+    "repo": "dddaniel1/mygo-plugin-qqmusic",
+    "license": "MIT",
+    "pushed_at": "2026-11-06T17:51:59Z",
+    "archived": false,
+    "updated_at": "2026-11-08T18:05:36Z"
+  },
+  {
+    "repo": "djyde/mygo-lizhi",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T02:37:12Z",
+    "archived": false,
+    "updated_at": "2026-11-12T01:43:32Z"
+  },
+  {
+    "repo": "e5u/mygo-taskbar-lyrics",
+    "license": "unknown",
+    "pushed_at": "2026-11-08T09:36:50Z",
+    "archived": false,
+    "updated_at": "2026-11-08T09:36:54Z"
+  },
+  {
+    "repo": "egoist/mygo-music-youtube-music",
+    "license": "unknown",
+    "pushed_at": "2026-11-06T15:03:21Z",
+    "archived": false,
+    "updated_at": "2026-11-10T16:48:43Z"
+  },
+  {
+    "repo": "fansion314/mygo-music-yoi",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-09T09:13:26Z",
+    "archived": false,
+    "updated_at": "2026-11-09T09:30:46Z"
+  },
+  {
+    "repo": "fcmfcm1999/mygo-music-kugou",
+    "license": "MIT",
+    "pushed_at": "2026-11-06T17:10:36Z",
+    "archived": false,
+    "updated_at": "2026-11-06T17:10:40Z"
+  },
+  {
+    "repo": "hiSlowMo/neteaseXqqmusic",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-09T15:25:10Z",
+    "archived": false,
+    "updated_at": "2026-11-09T15:24:58Z"
+  },
+  {
+    "repo": "hubandad/mygo-music-netease",
+    "license": "MIT",
+    "pushed_at": "2026-11-06T14:59:10Z",
+    "archived": false,
+    "updated_at": "2026-11-09T02:25:03Z"
+  },
+  {
+    "repo": "iko233/webdav4mygo",
+    "license": "unknown",
+    "pushed_at": "2026-11-09T06:41:03Z",
+    "archived": false,
+    "updated_at": "2026-11-09T06:41:07Z"
+  },
+  {
+    "repo": "ivanxguo/mygo-music-bitrate",
+    "license": "MIT",
+    "pushed_at": "2026-11-11T05:12:46Z",
+    "archived": false,
+    "updated_at": "2026-11-11T05:14:10Z"
+  },
+  {
+    "repo": "jfeng018/mygo-music-lx-source",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T14:36:08Z",
+    "archived": false,
+    "updated_at": "2026-11-07T14:34:25Z"
+  },
+  {
+    "repo": "lane128/mygo-music-qishui",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-11T17:37:12Z",
+    "archived": false,
+    "updated_at": "2026-11-11T18:37:06Z"
+  },
+  {
+    "repo": "liuxiaofengone/synology-DSAudio-mygo-music-plugin",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T08:14:31Z",
+    "archived": false,
+    "updated_at": "2026-11-07T08:15:22Z"
+  },
+  {
+    "repo": "louisgreen0726/mygo-music-pocket-casts",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T15:28:52Z",
+    "archived": false,
+    "updated_at": "2026-11-07T22:18:37Z"
+  },
+  {
+    "repo": "maxbeau/mygo-music-youtube-music",
+    "license": "unknown",
+    "pushed_at": "2026-11-10T03:15:56Z",
+    "archived": false,
+    "updated_at": "2026-11-10T03:15:59Z"
+  },
+  {
+    "repo": "nimrc/mygo-chensheng",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T07:23:41Z",
+    "archived": false,
+    "updated_at": "2026-11-09T08:00:19Z"
+  },
+  {
+    "repo": "pingfury108/mygo-music-sonust",
+    "license": "MIT",
+    "pushed_at": "2026-11-09T06:56:57Z",
+    "archived": false,
+    "updated_at": "2026-11-09T06:56:55Z"
+  },
+  {
+    "repo": "popeyelau/mygo-queyue",
+    "license": "unknown",
+    "pushed_at": "2026-11-08T05:45:51Z",
+    "archived": false,
+    "updated_at": "2026-11-08T05:45:54Z"
+  },
+  {
+    "repo": "qile222/mygo-music-qishui",
+    "license": "MIT",
+    "pushed_at": "2026-11-11T15:52:57Z",
+    "archived": false,
+    "updated_at": "2026-11-11T16:42:04Z"
+  },
+  {
+    "repo": "r0k1s-i/mygotify",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-11T04:49:01Z",
+    "archived": false,
+    "updated_at": "2026-11-11T21:20:47Z"
+  },
+  {
+    "repo": "rocona/mygo-navidrome",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T05:44:27Z",
+    "archived": false,
+    "updated_at": "2026-11-07T05:42:57Z"
+  },
+  {
+    "repo": "satyawikananda/soundgo",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T11:32:37Z",
+    "archived": false,
+    "updated_at": "2026-11-07T11:38:58Z"
+  },
+  {
+    "repo": "shensl4499/mygo-music-xiaoyuzhou",
+    "license": "NOASSERTION",
+    "pushed_at": "2026-11-07T06:41:08Z",
+    "archived": false,
+    "updated_at": "2026-11-11T11:59:14Z"
+  },
+  {
+    "repo": "sogud/mygo-music-netease",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-08T15:38:40Z",
+    "archived": false,
+    "updated_at": "2026-11-11T18:44:07Z"
+  },
+  {
+    "repo": "sounfury/mygo-music-spotify-soloist",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T18:55:13Z",
+    "archived": false,
+    "updated_at": "2026-11-07T19:23:33Z"
+  },
+  {
+    "repo": "specialhua/mygo-ximalaya",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T13:05:03Z",
+    "archived": false,
+    "updated_at": "2026-11-09T22:16:51Z"
+  },
+  {
+    "repo": "starriv/mygo-music-spotify",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T19:30:27Z",
+    "archived": false,
+    "updated_at": "2026-11-11T11:55:28Z"
+  },
+  {
+    "repo": "xingkaixin/mygo-music-spotify",
+    "license": "unknown",
+    "pushed_at": "2026-11-07T07:45:29Z",
+    "archived": false,
+    "updated_at": "2026-11-09T08:30:18Z"
+  },
+  {
+    "repo": "yiyiSmallti/mygo-qishui",
+    "license": "unknown",
+    "pushed_at": "2026-11-11T03:03:35Z",
+    "archived": false,
+    "updated_at": "2026-11-11T15:14:39Z"
+  },
+  {
+    "repo": "yunforge/mygo-music-download",
+    "license": "MIT",
+    "pushed_at": "2026-11-07T15:47:28Z",
+    "archived": false,
+    "updated_at": "2026-11-10T08:54:07Z"
+  },
+  {
+    "repo": "yusgsysh/mygo-music-fnos-plugin",
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-11-07T02:11:35Z",
+    "archived": false,
+    "updated_at": "2026-11-08T03:00:46Z"
+  }
+]

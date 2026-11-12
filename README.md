@@ -3,6 +3,7 @@
 - Follow upstream requestHeaders for authenticated images and audio, including live settings/storage interpolation and explicit stream-header precedence.
 - Keep plugins from different repositories with the same declared id installed separately. Existing source ids and accounts stay valid on upgrade.
 - Resolve media redirects without forwarding saved account headers across origins.
+- Add installed-source diagnostics using the phone’s saved session, with direct retry, account/settings access and a listen action. Show the packaged per-source check record in the market.
 - Run the existing Android regression suite plus a read-only audit of all 64 pinned market repositories. A successful install is not a playback certification. Account, subscription, private-server and desktop-helper conditions are reported separately.
 
 # MyGo Music Android

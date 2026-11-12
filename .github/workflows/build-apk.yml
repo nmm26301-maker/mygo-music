@@ -75,6 +75,8 @@ jobs:
             lyrics-pop/
             web-qr-test.png
             source-browser.png
+      - name: Include per-source Android check results in the release
+        run: cp market-audit.json app/src/main/assets/plugin-audit.json
       - name: Decode stable release signing key
         run: |
           test -s signing/mygo-release.keystore.b64
