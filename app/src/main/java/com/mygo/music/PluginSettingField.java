@@ -20,6 +20,7 @@ final class PluginSettingField {
         view.setContentDescription(specification.optString("label",specification.optString("key")));
     }
     String value(){if(view instanceof EditText)return ((EditText)view).getText().toString();if(view instanceof Switch)return touched?(((Switch)view).isChecked()?"true":"false"):saved;return values.get(((Spinner)view).getSelectedItemPosition());}
+    boolean changed(){return !value().equals(saved);}
     void saved(String value){saved=value;touched=false;}
     void restore(String value){binding=true;saved=value;touched=false;if(view instanceof EditText)((EditText)view).setText(value);else if(view instanceof Switch)((Switch)view).setChecked(value.equals("true"));else ((Spinner)view).setSelection(values.indexOf(value));binding=false;}
     void commits(Commit commit){
