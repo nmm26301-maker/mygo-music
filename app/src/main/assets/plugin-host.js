@@ -1,27 +1,48 @@
 // Android implementation of MyGo's documented host interface.
 (() => {
   const requests = new Map(); let seq = 0;
-  window.__networkResult = (id, raw) => {
+  window.__networkResult = (id, phase, raw) => {
     const task = requests.get(id); if (!task) return;
-    requests.delete(id); task.cleanup();
     try {
       const result = JSON.parse(raw);
-      if (result.error) throw new Error(result.error);
-      const headers = new Headers(result.headers || {});
-      headers.getSetCookie = () => result.cookies || [];
-      // Return the header object directly: Response copies headers and loses getSetCookie.
-      task.resolve({ok: result.status >= 200 && result.status < 300, status: result.status,
-        url: result.url, headers, text: async () => result.body || '',
-        json: async () => JSON.parse(result.body || ''),
-        arrayBuffer: async () => Uint8Array.from(atob(result.base64 || ''), c => c.charCodeAt(0)).buffer});
-    } catch (e) { task.reject(e); }
+      if (phase === 'error') throw new Error(result.error || 'Network request failed');
+      if (phase === 'headers') {
+        task.headersDone = true;
+        const headers = new Headers(result.headers || {});
+        headers.getSetCookie = () => result.cookies || [];
+        const consume = async () => {
+          if (task.bodyUsed) throw new TypeError('Body has already been consumed');
+          task.bodyUsed = true;
+          if (task.error) throw task.error;
+          return new Promise((resolve, reject) => {
+            task.bodyResolve = resolve; task.bodyReject = reject;
+            nativeHost.readResponse(id);
+          });
+        };
+        task.resolve({ok:result.status >= 200 && result.status < 300, status:result.status,
+          url:result.url, headers, get bodyUsed(){return !!task.bodyUsed;},
+          text:async () => (await consume()).body || '',
+          json:async () => JSON.parse((await consume()).body || ''),
+          arrayBuffer:async () => Uint8Array.from(atob((await consume()).base64 || ''), c => c.charCodeAt(0)).buffer});
+      } else if (phase === 'body') {
+        requests.delete(id); task.cleanup(); task.bodyResolve?.(result);
+      }
+    } catch (error) {
+      task.error = error; requests.delete(id); task.cleanup();
+      if (!task.headersDone) task.reject(error); else task.bodyReject?.(error);
+    }
   };
   window.fetch = (input, init = {}) => new Promise((resolve, reject) => {
     const id = String(++seq), signal = init.signal;
-    const abort = () => { requests.delete(id); reject(new DOMException('Aborted', 'AbortError')); };
+    const task = {resolve, reject, cleanup:() => signal?.removeEventListener('abort', abort)};
+    const abort = () => {
+      const error = new DOMException('Aborted', 'AbortError'); task.error = error;
+      requests.delete(id); task.cleanup(); nativeHost.cancelResponse(id);
+      if (!task.headersDone) reject(error); else task.bodyReject?.(error);
+    };
     if (signal?.aborted) { abort(); return; }
     const headers = {}; new Headers(init.headers || {}).forEach((v, k) => headers[k] = v);
-    requests.set(id, {resolve, reject, cleanup: () => signal?.removeEventListener('abort', abort)});
+    requests.set(id, task);
     signal?.addEventListener('abort', abort, {once:true});
     nativeHost.request(id, String(input.url || input), JSON.stringify({method:init.method || 'GET',
       headers, body:init.body == null ? '' : String(init.body), redirect:init.redirect || 'follow'}));
@@ -60,7 +81,15 @@
     try {
       const fn = window.__plugin[name];
       if (typeof fn !== 'function') throw new Error('插件未提供接口：' + name);
-      const value = await fn(args || {});
+      let value;
+      for (let attempt = 0; ; attempt++) {
+        try { value = await fn(args || {}); break; }
+        catch (error) {
+          // Retry only QQ's known transient read-only search error, never account/library writes.
+          if (name !== 'search' || attempt >= 2 || !/^QQ Music DoSearchForQQMusicDesktop: 0\/2001$/.test(String(error?.message))) throw error;
+          await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1)));
+        }
+      }
       nativeHost.complete(id, true, JSON.stringify(value === undefined ? null : value));
     } catch(e) { nativeHost.complete(id, false, JSON.stringify({__mygoError:true,code:String(e?.code || ''),message:String(e?.message || e)})); }
   };
