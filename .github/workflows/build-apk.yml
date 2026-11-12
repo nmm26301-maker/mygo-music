@@ -41,7 +41,10 @@ jobs:
       - name: Prepare pinned upstream market packages for tests
         run: python3 tests/prepare-market-audit.py
       - name: Prepare original provider and HLS fixtures
-        run: python3 tests/prepare-port-fixtures.py
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python3 tests/prepare-port-fixtures.py
       - name: Build Android runtime tests
         run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Execute actual WebView plugin tests on Android
