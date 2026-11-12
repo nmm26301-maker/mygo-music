@@ -82,13 +82,14 @@ final class SourceBrowser {
     private int dp(float value){return (int)(value*activity.getResources().getDisplayMetrics().density+.5f);}
     private TextView text(String value,int size,int color){TextView view=new TextView(activity);view.setText(value);view.setTextSize(size);view.setTextColor(color);view.setGravity(Gravity.CENTER_VERTICAL);view.setPadding(dp(5),dp(3),dp(5),dp(3));return view;}
     private Button button(String value,Runnable action){Button button=new Button(activity);button.setText(value);button.setAllCaps(false);button.setTextColor(0xffe4d9f4);button.setTextSize(13);button.setMinHeight(0);button.setMinimumHeight(0);button.setMinWidth(0);button.setMinimumWidth(0);button.setPadding(dp(8),0,dp(8),0);button.setBackgroundColor(Color.TRANSPARENT);button.setOnClickListener(view->action.run());return button;}
-    private void heading(String value){if(!value.isEmpty()){TextView view=text(value,17,Color.WHITE);view.setTypeface(null,Typeface.BOLD);container.addView(view,new LinearLayout.LayoutParams(-1,dp(34)));}}
+    private boolean compact(){return activity.getResources().getDisplayMetrics().heightPixels/activity.getResources().getDisplayMetrics().density<420;}
+    private void heading(String value){if(!value.isEmpty()){TextView view=text(value,17,Color.WHITE);view.setTypeface(null,Typeface.BOLD);container.addView(view,new LinearLayout.LayoutParams(-1,dp(compact()?28:34)));}}
     private void render(){
         if(!active()||page==null)return;container.removeAllViews();
         final Page displayed=page;
         LinearLayout toolbar=new LinearLayout(activity);toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        Button back=button("返回",this::back);back.setEnabled(!history.isEmpty());toolbar.addView(back,new LinearLayout.LayoutParams(dp(60),dp(36)));
-        TextView title=text(displayed.result==null?displayed.title:displayed.result.optString("title",displayed.title),16,Color.WHITE);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);toolbar.addView(title,new LinearLayout.LayoutParams(0,dp(44),1));
+        Button back=button("返回",this::back);back.setEnabled(!history.isEmpty());toolbar.addView(back,new LinearLayout.LayoutParams(dp(compact()?44:60),dp(36)));
+        TextView title=text(displayed.result==null?displayed.title:displayed.result.optString("title",displayed.title),16,Color.WHITE);title.setMaxLines(compact()?1:2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);toolbar.addView(title,new LinearLayout.LayoutParams(0,dp(compact()?36:44),1));
         if(!displayed.method.equals("external")&&!displayed.method.equals("landing"))toolbar.addView(button("刷新",this::reload),new LinearLayout.LayoutParams(dp(55),dp(36)));
         if(source.supports("account")||source.supports("signIn")){PluginManager.PluginInfo accountSource=source;toolbar.addView(button("账号",()->host.account(accountSource)),new LinearLayout.LayoutParams(dp(55),dp(36)));}
         container.addView(toolbar);
@@ -96,7 +97,7 @@ final class SourceBrowser {
         for(Map.Entry<String,String> entry:source.navigationPages.entrySet())addNavigation(navigation,entries,entry.getKey(),entry.getValue());
         String[][] builtin={{"首页","home"},{"我喜欢","liked"},{"收藏专辑","savedAlbums"},{"歌单","playlists"},{"播客","shows"},{"电台","stations"},{"最近播放","recent"}};
         for(String[] entry:builtin)if(source.supports(entry[1]))addNavigation(navigation,entries,entry[0],entry[1]);
-        if(navigation.getChildCount()>0){HorizontalScrollView strip=new HorizontalScrollView(activity);strip.setHorizontalScrollBarEnabled(false);strip.addView(navigation);container.addView(strip,new LinearLayout.LayoutParams(-1,dp(36)));}
+        if(navigation.getChildCount()>0){if(compact()){Button categories=button("分类",()->{});categories.setOnClickListener(view->{PopupMenu popup=new PopupMenu(activity,categories);for(int i=0;i<navigation.getChildCount();i++){Button item=(Button)navigation.getChildAt(i);popup.getMenu().add(0,i,i,item.getText());}popup.setOnMenuItemClickListener(item->{((Button)navigation.getChildAt(item.getItemId())).performClick();return true;});popup.show();});toolbar.addView(categories,2,new LinearLayout.LayoutParams(dp(52),dp(36)));}else{HorizontalScrollView strip=new HorizontalScrollView(activity);strip.setHorizontalScrollBarEnabled(false);strip.addView(navigation);container.addView(strip,new LinearLayout.LayoutParams(-1,dp(36)));}}
         if(displayed.result==null){container.addView(text(loading?"正在加载音乐源内容":"加载失败，可点击刷新重试",14,0xffb8adca));return;}
         JSONObject result=displayed.result;
         String subtitle=result.optString("subtitle"),description=result.optString("description");if(!subtitle.isEmpty())container.addView(text(subtitle,13,0xffb8adca));if(!description.isEmpty())container.addView(text(description,13,0xffb8adca));
