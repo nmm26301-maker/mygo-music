@@ -1,3 +1,7 @@
+## Android 5.12.0
+
+Six saved native lyric display styles: character pop, immersive flow, two-line karaoke, large focus, classic scrolling, and neon gradient. Album-derived fluid/static backgrounds, font size, spacing, alignment, existing translation, accent palette and motion strength are adjustable. Reduced-motion mode keeps source-timed highlighting. Native Android tests export each preset and verify playback-position sampling, real settings controls, preference restoration and artwork ownership. Cover callbacks are matched to the current track.
+
 ## Android 5.11.0
 
 - Follow upstream requestHeaders for authenticated images and audio, including live settings/storage interpolation and explicit stream-header precedence.

@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
     private final HashMap<String,String> pluginTrackRefs = new HashMap<>();
     private final HashMap<String,String> localLyrics = new HashMap<>();
     private LyricsStageDialog lyricsStage;
+    private String coverRequest="";
     private int lyricsRequest;
     private String pendingLyricUri;
     private final ExecutorService lyricsExecutor=Executors.newSingleThreadExecutor();
@@ -166,9 +167,9 @@ public class MainActivity extends Activity {
         if(address==null||!address.startsWith("http"))return;
         final HashMap<String,String> headers;try{headers=pluginManager.mediaHeaders(sourceId,address,"image",null);}catch(Exception ignored){return;}
         // Include account-dependent headers in the cache key, never in URLs or logs.
-        String cacheKey=sourceId+"\n"+address+"\n"+new java.util.TreeMap<>(headers).toString();view.setTag(cacheKey);Bitmap cached=artworkCache.get(cacheKey);if(cached!=null){view.setImageBitmap(cached);return;}
+        String cacheKey=sourceId+"\n"+address+"\n"+new java.util.TreeMap<>(headers).toString();view.setTag(cacheKey);Bitmap cached=artworkCache.get(cacheKey);if(cached!=null){view.setImageBitmap(cached);if(view==coverArt)updateLyricsArtwork();return;}
         artworkExecutor.execute(()->{try(PluginMedia.Connection connection=PluginMedia.open(address,headers,false);InputStream input=connection.http.getInputStream()){
-            ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;while((n=input.read(buffer))!=-1){if(bytes.size()+n>4*1024*1024)throw new IOException("封面超过大小限制");bytes.write(buffer,0,n);}byte[] data=bytes.toByteArray();BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,options);options.inSampleSize=1;while(options.outWidth/options.inSampleSize>400||options.outHeight/options.inSampleSize>400)options.inSampleSize*=2;options.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,options);if(bitmap!=null){artworkCache.put(cacheKey,bitmap);runOnUiThread(()->{if(!isDestroyed()&&cacheKey.equals(view.getTag()))view.setImageBitmap(bitmap);});}
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;while((n=input.read(buffer))!=-1){if(bytes.size()+n>4*1024*1024)throw new IOException("封面超过大小限制");bytes.write(buffer,0,n);}byte[] data=bytes.toByteArray();BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,options);options.inSampleSize=1;while(options.outWidth/options.inSampleSize>400||options.outHeight/options.inSampleSize>400)options.inSampleSize*=2;options.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,options);if(bitmap!=null){artworkCache.put(cacheKey,bitmap);runOnUiThread(()->{if(!isDestroyed()&&cacheKey.equals(view.getTag())){view.setImageBitmap(bitmap);if(view==coverArt)updateLyricsArtwork();}});}
         }catch(Exception ignored){}});
     }
     private String artworkSource(Uri uri){return "plugin".equals(uri.getScheme())?uri.getAuthority():"";}
@@ -324,7 +325,13 @@ public class MainActivity extends Activity {
             if(current>=0&&current<tracks.size()&&target.equals(tracks.get(current).toString()))showLyricsText(names.get(current),raw);
         }catch(Exception error){Toast.makeText(this,"歌词文件读取失败："+error.getMessage(),Toast.LENGTH_LONG).show();}
     }
-    private void loadCover(Uri uri){if(coverArt==null)return;coverArt.setTag(null);coverArt.setImageResource(com.mygo.music.R.drawable.ic_launcher);String cu=covers.get(uri.toString());if(cu!=null&&cu.startsWith("http")){loadGridArtwork(coverArt,cu,artworkSource(uri));return;}artworkExecutor.execute(()->{try{Bitmap b=null;if(cu!=null&&!cu.isEmpty())b=BitmapFactory.decodeStream(new URL(cu).openStream());else{MediaMetadataRetriever r=new MediaMetadataRetriever();r.setDataSource(this,uri);byte[] data=r.getEmbeddedPicture();if(data!=null)b=BitmapFactory.decodeByteArray(data,0,data.length);r.release();}Bitmap result=b;if(result!=null)runOnUiThread(()->coverArt.setImageBitmap(result));}catch(Exception ignored){}});}
+    private void updateLyricsArtwork(){if(lyricsStage==null)return;Bitmap bitmap=null;if(coverRequest.equals(lyricsStage.trackUri)&&coverArt!=null&&coverArt.getDrawable() instanceof android.graphics.drawable.BitmapDrawable)bitmap=((android.graphics.drawable.BitmapDrawable)coverArt.getDrawable()).getBitmap();lyricsStage.setArtwork(bitmap);}
+    private void loadCover(Uri uri){
+        if(coverArt==null)return;String request=uri.toString();coverRequest=request;coverArt.setTag(null);coverArt.setImageResource(com.mygo.music.R.drawable.ic_launcher);updateLyricsArtwork();String cu=covers.get(request);
+        if(cu!=null&&cu.startsWith("http")){loadGridArtwork(coverArt,cu,artworkSource(uri));return;}
+        artworkExecutor.execute(()->{try{Bitmap bitmap=null;if(cu!=null&&!cu.isEmpty())try(InputStream input=new URL(cu).openStream()){bitmap=BitmapFactory.decodeStream(input);}else{MediaMetadataRetriever retriever=new MediaMetadataRetriever();try{retriever.setDataSource(this,uri);byte[] data=retriever.getEmbeddedPicture();if(data!=null)bitmap=BitmapFactory.decodeByteArray(data,0,data.length);}finally{retriever.release();}}Bitmap result=bitmap;if(result!=null)runOnUiThread(()->{if(!isDestroyed()&&coverRequest.equals(request)){coverArt.setImageBitmap(result);updateLyricsArtwork();}});}catch(Exception ignored){}});
+    }
+
     private void addRemote(Uri u,String name,String pic){runOnUiThread(()->{if(tracks.contains(u))return;tracks.add(u);names.add(name);if(pic!=null&&!pic.isEmpty())covers.put(u.toString(),pic);saveLibrary();saveCovers();adapter.notifyDataSetChanged();refreshLandscapeGrid();if(headingView!=null)headingView.setText("本地歌曲  ·  "+names.size());});}
     private void loadComments(){try{JSONObject all=new JSONObject(prefs.getString("comments","{}"));java.util.Iterator<String> it=all.keys();while(it.hasNext()){String k=it.next();JSONArray a=all.getJSONArray(k);ArrayList<String> v=new ArrayList<>();for(int i=0;i<a.length();i++)v.add(a.getString(i));comments.put(k,v);}}catch(Exception ignored){}}
     private void saveComments(){try{JSONObject all=new JSONObject();for(String k:comments.keySet()){JSONArray a=new JSONArray();for(String v:comments.get(k))a.put(v);all.put(k,a);}prefs.edit().putString("comments",all.toString()).apply();}catch(Exception ignored){}}
@@ -364,7 +371,7 @@ public class MainActivity extends Activity {
     private void add(Uri u){if(tracks.contains(u))return;tracks.add(u);names.add(metadataName(u));saveLibrary(); if(adapter!=null)adapter.notifyDataSetChanged();refreshLandscapeGrid(); if(headingView!=null)headingView.setText("本地歌曲  ·  "+names.size());}
     private void showLyricsText(String title,String raw){
         if(current<0||current>=tracks.size())return;
-        ensureLyricsStage();String uri=tracks.get(current).toString();lyricsStage.setTrack(uri,title);
+        ensureLyricsStage();String uri=tracks.get(current).toString();lyricsStage.setTrack(uri,title);updateLyricsArtwork();
         applyStageLyrics(uri,raw,++lyricsRequest,false);
     }
     private void ensureLyricsStage(){
@@ -396,7 +403,7 @@ public class MainActivity extends Activity {
         if(lyricsStage==null||current<0||current>=tracks.size())return;
         final String uri=tracks.get(current).toString(),rawTitle=names.get(current);int cut=rawTitle.indexOf("  ·  ");
         final String title=cut>0?rawTitle.substring(0,cut).trim():rawTitle.trim(),artist=cut>0?rawTitle.substring(cut+4).trim():"";
-        final int request=++lyricsRequest;lyricsStage.setTrack(uri,rawTitle);
+        final int request=++lyricsRequest;lyricsStage.setTrack(uri,rawTitle);updateLyricsArtwork();
         String saved=localLyrics.get(uri);if(!refresh&&saved!=null&&!saved.trim().isEmpty()){applyStageLyrics(uri,saved,request,false);return;}
         String ref=pluginTrackRefs.get(uri);
         if(ref!=null){String[] parts=ref.split("\\n",2);pluginManager.lyrics(parts[0],parts.length>1?parts[1]:"",(ok,value)->runOnUiThread(()->{

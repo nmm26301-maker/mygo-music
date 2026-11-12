@@ -5,3 +5,4 @@ app/src/main/assets/plugin-audit.json
 
 **/__pycache__/
 tests/baseline-v510/
+tests/baseline-v511/
