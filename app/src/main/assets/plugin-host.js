@@ -37,8 +37,9 @@
     const task = {resolve, reject, cleanup:() => signal?.removeEventListener('abort', abort)};
     const abort = () => {
       const error = new DOMException('Aborted', 'AbortError'); task.error = error;
-      requests.delete(id); task.cleanup(); nativeHost.cancelResponse(id);
+      requests.delete(id); task.cleanup();
       if (!task.headersDone) reject(error); else task.bodyReject?.(error);
+      try { nativeHost.cancelResponse(id); } catch (_) {}
     };
     if (signal?.aborted) { abort(); return; }
     const headers = {}; new Headers(init.headers || {}).forEach((v, k) => headers[k] = v);

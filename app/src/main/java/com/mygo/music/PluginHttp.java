@@ -22,13 +22,14 @@ final class PluginHttp {
     private static final int LIMIT=8*1024*1024;
     private static final class Transfer {
         volatile HttpURLConnection connection;
-        volatile InputStream input;
         volatile boolean cancelled;
         boolean reading;
         String method;
         File local;
         Runnable expiry;
-        void close(){cancelled=true;HttpURLConnection c=connection;if(c!=null)c.disconnect();InputStream in=input;if(in!=null)try{in.close();}catch(IOException ignored){}}
+        // Disconnect cancels the socket. The reading worker alone owns InputStream.close():
+        // Android's buffered stream cannot be closed concurrently with its read operation.
+        void close(){cancelled=true;HttpURLConnection c=connection;if(c!=null)try{c.disconnect();}catch(RuntimeException ignored){}}
     }
     PluginHttp(Access access,Reply reply,PluginResources resources){this.access=access;this.reply=reply;this.resources=resources;}
     void open(String id,String address,JSONObject init){
@@ -70,7 +71,7 @@ final class PluginHttp {
         submit(id,()->{try{
             byte[] bytes=new byte[0];
             if(!transfer.method.equals("HEAD")){
-                HttpURLConnection c=transfer.connection;InputStream input=transfer.local!=null?new FileInputStream(transfer.local):c.getResponseCode()>=400?c.getErrorStream():c.getInputStream();transfer.input=input;
+                HttpURLConnection c=transfer.connection;InputStream input=transfer.local!=null?new FileInputStream(transfer.local):c.getResponseCode()>=400?c.getErrorStream():c.getInputStream();
                 if(input!=null)try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){
                     byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(transfer.cancelled||closed)throw new IOException("请求已取消");if(out.size()+n>LIMIT)throw new IOException("插件响应超过 8 MB");out.write(buffer,0,n);}bytes=out.toByteArray();
                 }
