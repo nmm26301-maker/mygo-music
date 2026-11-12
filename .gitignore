@@ -10,3 +10,8 @@ app/src/main/assets/vendor/babel.min.js
 app/src/main/assets/third-party/Babel-MIT.txt
 app/src/androidTest/assets/port-fixtures/
 tests/baseline-v512/
+
+.native-audio-cache/
+app/src/main/assets/third-party/FFmpeg-LGPL-2.1.txt
+app/src/main/assets/third-party/FFmpeg-CREDITS.txt
+app/src/main/assets/third-party/FFmpeg-build.json

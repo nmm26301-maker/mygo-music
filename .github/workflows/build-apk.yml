@@ -31,6 +31,12 @@ jobs:
             mkdir -p "app/src/main/jniLibs/$ABI"
             "$TOOLCHAIN/${TARGET}23-clang" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384 app/src/main/cpp/plugin-launcher.c -o "app/src/main/jniLibs/$ABI/libmygo-launcher.so"
           done
+      - uses: actions/cache@v4
+        with:
+          path: .native-audio-cache
+          key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
+      - name: Build pinned Android audio decoder and corresponding source archive
+        run: python3 tests/build-native-audio.py
       - name: Enable emulator KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
