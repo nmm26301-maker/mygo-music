@@ -9,15 +9,19 @@ export async function probe({url}) {
     return {status:response.status, length:response.headers.get('content-length'), aborted};
   } finally { clearTimeout(timer); }
 }
+let pendingAbort;
+export function abort() { pendingAbort?.abort(); }
 export async function cancel({url, path}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 250);
+  pendingAbort = controller;
   try {
     const response = await fetch(url + path, {signal:controller.signal});
-    await response.text();
+    const body = response.text();
+    host.storage.set('body-started', true);
+    await body;
     return 'not cancelled';
   } catch (error) { return error.name; }
-  finally { clearTimeout(timer); }
+  finally { pendingAbort = undefined; }
 }
 export async function body({url}) {
   const response = await fetch(url + '/json');
