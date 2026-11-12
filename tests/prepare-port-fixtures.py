@@ -12,3 +12,16 @@ assert b'GNU AFFERO GENERAL PUBLIC LICENSE' in license_text
 (target/'SoundGo-AGPL-3.0.txt').write_bytes(license_text)
 subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=440:duration=8','-c:a','aac','-b:a','96k','-f','hls','-hls_time','2','-hls_playlist_type','vod','-hls_segment_filename',str(target/'segment-%03d.ts'),str(target/'sample.m3u8')],check=True)
 print('Verified original SoundGo source and generated native HLS audio fixtures')
+
+for bits,fmt in [(16,'s16p'),(24,'s32p')]:
+    subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=659:duration=8','-sample_fmt',fmt,'-bits_per_raw_sample',str(bits),'-c:a','alac',str(target/f'alac-{bits}.m4a')],check=True)
+(target/'master.m3u8').write_text('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=128000,CODECS="mp4a.40.2"\nsample.m3u8\n')
+key=target/'key.bin'
+key.write_bytes(bytes(range(16)))
+key_info=target/'key-info.txt'
+key_info.write_text('key.bin\n'+str(key.resolve())+'\n00000000000000000000000000000001\n')
+try:
+    subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=523:duration=8','-c:a','aac','-b:a','96k','-f','hls','-hls_time','2','-hls_playlist_type','vod','-hls_key_info_file',str(key_info),'-hls_segment_filename',str(target/'encrypted-%03d.ts'),str(target/'encrypted.m3u8')],check=True)
+finally:
+    key_info.unlink()
+print('Generated 16/24-bit ALAC and encrypted HLS audio fixtures')

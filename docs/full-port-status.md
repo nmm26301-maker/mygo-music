@@ -1,6 +1,6 @@
-# Android migration checkpoint, 5.13.0
+# Android migration checkpoint, 5.15.0
 
-Baseline: egoist/mygo-music v0.1.24, commit 552e25c04023aa00c551d77db69aaab16f60bf2d, reviewed 2026-11-12. Android package remains com.mygo.music; versionCode 63. This is a resumable migration checkpoint, not a claim that every third-party service or desktop-only helper works on Android.
+Baseline: egoist/mygo-music v0.1.24, commit 552e25c04023aa00c551d77db69aaab16f60bf2d, reviewed 2026-11-12. Android package remains com.mygo.music; versionCode 65. This is a resumable migration checkpoint, not a claim that every third-party service or desktop-only helper works on Android.
 
 ## Implementation map
 
@@ -9,7 +9,7 @@ Baseline: egoist/mygo-music v0.1.24, commit 552e25c04023aa00c551d77db69aaab16f60
 | Plugin ZIP / GitHub installation, discovery, enable/remove, atomic updates | PluginManager, PluginArchive, repository-specific identities, deep-link install review | Existing original-provider and 64 pinned repository Android audits; per-stage failures retained |
 | ES modules, dynamic/relative imports, host APIs | PluginRuntime, plugin-host.js, PluginResources | Real Android WebView instrumentation; native network, cookies, processes and redirect callbacks |
 | TypeScript entry and imported modules | Lazy offline Babel transforms, original URL and browser module graph retained | FullPortChecks: enum, type-only import, .js-to-.ts import, dynamic .ts import, unused invalid test ignored, invalid entry update rollback |
-| Minimum app protocol version | PluginProtocol 0.1.24, separate from Android version 5.13.0 | Reject newer or malformed requirements before publishing plugin update |
+| Minimum app protocol version | PluginProtocol 0.1.24, separate from Android version 5.15.0 | Reject newer or malformed requirements before publishing plugin update |
 | signIn / signOut / account / setSetting | Native prompts, web login, QR gallery save, private persisted source data, typed ordered settings | Existing QQ, Kugou, Subsonic and Spotify protocol checks; foreground login invalidates stale service runtime session |
 | home / browse / search / suggest / recent / liked / isLiked / like | SourceBrowser, SourceSuggestions, MainActivity | Existing source UI tests plus debounced suggestions, stale response rejection; live authentication depends on provider |
 | album / artist / savedAlbums / saveAlbum / followArtist | SourceBrowser and source navigation | Existing acknowledged save/follow UI tests; metadata and sized images retained |
@@ -45,8 +45,20 @@ Explicit stop now releases the finished media session and creates a new identity
 
 * Live credentials, memberships, remote devices and user-owned servers cannot be inferred from successful module installation. See the shipped per-source diagnostic report for the exact tested stage.
 * macOS AppleScript, Windows desktop applications and downloaded desktop executables need Android-specific replacements or an explicitly configured external device. Declared process permission is not a compatibility guarantee.
-* ReplayGain gain/peak normalization, full desktop codec parity including ALAC, HLS offline caching, and remote-player automatic station end detection are not yet implemented or verified.
-* Global setting ordering across multiple simultaneously open settings dialogs and additional account-specific source UI tests remain future regression work.
+* ReplayGain gain/peak, global settings ordering and remote completion-driven station continuation passed Android CI in commit 7efe7d72ff65c30d7a1db88a5430f8c5a91e1625, run 43227538227. ALAC and complete HLS offline conversion are implemented in the next checkpoint; final native decoder regression evidence is recorded in the 5.15 release report. Codec parity does not imply DRM support or compatibility with arbitrary desktop FFmpeg arguments.
+* Cross-manager setting acknowledgement and rollback are now globally ordered and tested with simultaneously open native dialogs. Account-specific live source tests still require real user sessions.
 * Revalidate any newer SoundGo revision against its license and changed implementation before adding a new source hash. Do not turn off hash checks to force compatibility.
 
 Resume from GitHub main and the latest workflow logs. Do not reinitialize or repeat successful migration stages. Preserve existing users' package identity, signing key, source credentials, preferences and local music database.
+
+## Native audio completion checkpoint, 5.15
+
+The existing application and media service are retained. PlaybackLoudness applies source gain plus the upstream 4 dB preamp, limits by peak, and uses the actual Android audio session for amplification. SourceSettingQueue serializes the whole preference/acknowledgement/rollback transaction across managers. RemoteCompletion distinguishes manual pause from natural track completion before advancing a station.
+
+FFmpeg 9.0.2 was selected after comparing maintained FFmpeg/FFmpeg, AndroidX Media3 and the retired arthenica/ffmpeg-kit wrapper. Official source: https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz . SHA-256: 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e. Its detached release signature was verified against the official FFmpeg signing key FCF986EA15E6E293A5644F10B4322F04D67658D8. See https://ffmpeg.org/download.html and https://ffmpeg.org/legal.html . No binaries from unmaintained wrappers are used.
+
+The separately executable helper is compiled for arm64-v8a, armeabi-v7a, x86_64 and x86 with NDK 27.2.12479018. GPL, nonfree, version3, autodetected external libraries and desktop protocols are disabled. Full configure commands, LGPL text and credits are shipped. The corresponding-source ZIP contains the unchanged pinned FFmpeg tarball and Android app/build sources, excluding signing keys. Original HTTPS and authorization remain in Java; only a random-token loopback URL is passed to the helper. Cross-origin requests do not inherit another origin's explicit headers; child-specific manifest requestHeaders are evaluated independently.
+
+NativeAudioChecks exercises actual Android executable conversion of 16/24-bit ALAC, lossless FLAC stream format, native playback/pause/seek/resume, source metadata and played acknowledgement, master and AES-128 HLS offline files after stopping the original server, segment/key headers, cross-origin credential separation, live/DRM rejection and cache-clear cancellation. It is a controlled transport/codec check, not a substitute for a subscribed third-party account.
+
+HLS offline caching supports finite VOD manifests, standard AES-128 keys and audio streams accepted by the pinned decoder. Live manifests, DRM and EXT-X-DEFINE variables produce an explicit cache error and do not publish partial songs; ordinary supported online playback remains available. The output is complete FLAC, not a saved expiring manifest. Unsupported ALAC/M4A is decoded into a complete local FLAC before native playback. This is bounded by 128 MiB per song and a 180-second conversion timeout. It does not provide general-purpose yt-dlp, macOS applications, Windows programs, Node built-ins or arbitrary FFmpeg process compatibility.

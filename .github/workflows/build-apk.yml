@@ -32,11 +32,17 @@ jobs:
             "$TOOLCHAIN/${TARGET}23-clang" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384 app/src/main/cpp/plugin-launcher.c -o "app/src/main/jniLibs/$ABI/libmygo-launcher.so"
           done
       - uses: actions/cache@v4
+        id: native-audio-cache
         with:
           path: .native-audio-cache
           key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
       - name: Build pinned Android audio decoder and corresponding source archive
         run: python3 tests/build-native-audio.py
+      - uses: actions/cache/save@v4
+        if: steps.native-audio-cache.outputs.cache-hit != 'true'
+        with:
+          path: .native-audio-cache
+          key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
       - name: Enable emulator KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -116,7 +122,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 43222841867 --name mygo-music-android-release --dir tests/baseline-v514
-      - name: Verify upgrades from signed v5.6.0 and v5.13.0 on Android
+      - name: Verify upgrades from signed v5.6.0 and v5.14.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
