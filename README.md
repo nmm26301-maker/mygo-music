@@ -1,3 +1,9 @@
+## Android 5.14.0
+
+Same-phone gallery QR login: save the clean QR image before opening the correct scanner app. QQ authorization opens mobile QQ, WeChat opens WeChat, and NetEase/Kugou/Bilibili codes use their matching apps. Missing-app guidance and stale handoff guards retain pending authorization. Native and web login windows expose save-and-open actions. Size/orientation changes retain the login runtime while handing off to a portrait app; the local library reflows on return. No private scanner Activity names or automatic account confirmations are used.
+
+Verified Android 13 tests and stable-signed upgrades from 5.6.0 and 5.13.0: [same-phone flow and test scope](docs/phone-qr-login.md). Platform restrictions on recognizing particular login codes from an album still apply. The remaining migration boundaries in docs/full-port-status.md are unchanged.
+
 ## Android 5.13.0
 
 Continues the upstream 0.1.24 host port with offline TypeScript module compilation, debounced provider suggestions, paginated comments and source-acknowledged comment likes/posts, episode-aware favorites, continuous station fetching, rich track actions and native queue editing. Native setting types include masked passwords, booleans and validated selects. Provider login/settings changes invalidate other manager instances before their next call. A hash-pinned SoundGo adaptation uses Android's HLS player and optional in-app web sign-in while preserving the original provider authorization and installed source. The interface displays the installed Android version.
