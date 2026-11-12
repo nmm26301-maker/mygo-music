@@ -9,8 +9,16 @@ import java.io.*;
 import java.util.*;
 import com.google.zxing.*;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.common.HybridBinarizer;
 
 final class PluginQrImage {
+    /** Read the displayed QR and regenerate a clean image with its quiet zone. */
+    static Bitmap extract(Bitmap image)throws Exception {
+        int width=image.getWidth(),height=image.getHeight();int[] pixels=new int[width*height];image.getPixels(pixels,0,width,0,0,width,height);
+        Map<DecodeHintType,Object> hints=new EnumMap<>(DecodeHintType.class);hints.put(DecodeHintType.TRY_HARDER,true);hints.put(DecodeHintType.POSSIBLE_FORMATS,Collections.singletonList(BarcodeFormat.QR_CODE));
+        Result result=new MultiFormatReader().decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(width,height,pixels))),hints);
+        return create(result.getText());
+    }
     static Bitmap create(String value)throws Exception {
         Map<EncodeHintType,Object> hints=new EnumMap<>(EncodeHintType.class);
         hints.put(EncodeHintType.CHARACTER_SET,"UTF-8");hints.put(EncodeHintType.MARGIN,4);
