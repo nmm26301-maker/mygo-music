@@ -41,7 +41,13 @@ final class QrSaveUiChecks {
             check(saved!=null,"save button did not publish a gallery image");
             assertSaved(saved,payload);
             test.runOnMainSync(()->check(prompt[0].isShowing()&&!runtime.isClosed()&&completed.getCount()==1,"saving QR cancelled the login confirmation wait"));
-        }finally{runtime.dispose();if(saved!=null)context.getContentResolver().delete(saved,null,null);test.runOnMainSync(activity::finish);PluginArchive.delete(directory);}
+        }finally{runtime.dispose();cleanupSaved(saved);test.runOnMainSync(activity::finish);PluginArchive.delete(directory);}
+    }
+    private void cleanupSaved(Uri image){
+        if(image==null)return;
+        // The emulator's initial volume scan may replace a published row after it was decoded.
+        // Cleanup is best effort; retain the original decode or UI assertion as the test result.
+        try{context.getContentResolver().delete(image,null,null);}catch(SecurityException ignored){}
     }
     private void assertSaved(Uri image,String payload)throws Exception{
         try(InputStream in=context.getContentResolver().openInputStream(image)){Bitmap bitmap=BitmapFactory.decodeStream(in);check(bitmap!=null&&bitmap.getWidth()==640,"saved QR is not a clean readable PNG");int[] pixels=new int[bitmap.getWidth()*bitmap.getHeight()];bitmap.getPixels(pixels,0,bitmap.getWidth(),0,0,bitmap.getWidth(),bitmap.getHeight());Result result=new MultiFormatReader().decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(bitmap.getWidth(),bitmap.getHeight(),pixels))));check(payload.equals(result.getText()),"actual gallery image has a wrong or unscannable QR payload");bitmap.recycle();}
@@ -64,6 +70,6 @@ final class QrSaveUiChecks {
             if(saved==null){File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();Bitmap screen=test.getUiAutomation().takeScreenshot();if(screen!=null){try(FileOutputStream out=new FileOutputStream(new File(qa,"web-qr-test.png"))){screen.compress(Bitmap.CompressFormat.PNG,100,out);}screen.recycle();}}
             check(saved!=null,"web login save button did not publish a QR image; size="+dimensions[0]+"x"+dimensions[1]);assertSaved(saved,payload);
             test.runOnMainSync(()->check(dialog[0].isShowing()&&completed.getCount()==1,"saving the page QR dismissed or completed login"));
-        }finally{runtime.dispose();if(saved!=null)context.getContentResolver().delete(saved,null,null);test.runOnMainSync(activity::finish);server.close();PluginArchive.delete(directory);context.getSharedPreferences("library",0).edit().remove("plugin_network_"+id).commit();}
+        }finally{runtime.dispose();cleanupSaved(saved);test.runOnMainSync(activity::finish);server.close();PluginArchive.delete(directory);context.getSharedPreferences("library",0).edit().remove("plugin_network_"+id).commit();}
     }
 }
