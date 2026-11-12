@@ -67,7 +67,7 @@ public final class PluginRuntime {
         loading.add(cb);if(starting)return;starting=true;
         try{
             JSONObject manifest=new JSONObject(read(new FileInputStream(new File(directory,"plugin.json"))));
-            id=manifest.getString("id");JSONObject p=manifest.optJSONObject("permissions");if(p!=null&&p.optJSONArray("network")!=null)hosts=p.getJSONArray("network");
+            id=PluginIdentity.instance(directory,manifest);PluginMedia.validate(manifest);JSONObject p=manifest.optJSONObject("permissions");if(p!=null&&p.optJSONArray("network")!=null)hosts=p.getJSONArray("network");
             storage=context.getSharedPreferences("plugin_data_"+id,Context.MODE_PRIVATE);permissions=context.getSharedPreferences("library",Context.MODE_PRIVATE);processes=new PluginProcesses(context,directory,id,p==null?null:p.opt("process"));
             File entry=new File(directory,manifest.optString("main","index.js"));
             if(!entry.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("无效插件入口");

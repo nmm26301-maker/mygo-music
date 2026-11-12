@@ -16,7 +16,7 @@ final class SourceBrowser {
         void play(PluginManager.PluginInfo source,ArrayList<JSONObject> tracks,int index);
         void playlist(PluginManager.PluginInfo source,JSONObject playlist);
         void account(PluginManager.PluginInfo source);
-        void image(ImageView image,String url);
+        void image(PluginManager.PluginInfo source,ImageView image,String url);
     }
     private static final String[] KINDS={"tracks","albums","artists","playlists","shows","stations","links","episodes"};
     private final Activity activity;
@@ -139,7 +139,7 @@ final class SourceBrowser {
         int columns=activity.getResources().getDisplayMetrics().widthPixels/activity.getResources().getDisplayMetrics().density>1000?4:3;int cardHeight=dense()?76:136;LinearLayout row=null;int count=0;
         int visible=visibleCount(items,items.length());for(int i=0;i<visible;i++){JSONObject item=items.optJSONObject(i);if(item==null)continue;if(count%columns==0){row=new LinearLayout(activity);container.addView(row,new LinearLayout.LayoutParams(-1,-2));}
             LinearLayout card=new LinearLayout(activity);card.setOrientation(1);card.setPadding(dp(6),dp(6),dp(6),dp(6));GradientDrawable background=new GradientDrawable();background.setColor(0xff25212a);background.setCornerRadius(dp(10));card.setBackground(background);
-            ImageView image=new ImageView(activity);image.setImageResource(R.drawable.ic_launcher);image.setScaleType(ImageView.ScaleType.CENTER_CROP);card.addView(image,new LinearLayout.LayoutParams(-1,dp(dense()?40:82)));host.image(image,item.optString("imageUrl"));TextView label=text(item.optString("name",item.optString("title","内容")),13,Color.WHITE);label.setMaxLines(dense()?1:2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(label,new LinearLayout.LayoutParams(-1,dp(dense()?24:42)));card.setOnClickListener(v->openItem(kind,item));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(cardHeight),1);params.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(card,params);count++;
+            ImageView image=new ImageView(activity);image.setImageResource(R.drawable.ic_launcher);image.setScaleType(ImageView.ScaleType.CENTER_CROP);card.addView(image,new LinearLayout.LayoutParams(-1,dp(dense()?40:82)));host.image(source,image,item.optString("imageUrl"));TextView label=text(item.optString("name",item.optString("title","内容")),13,Color.WHITE);label.setMaxLines(dense()?1:2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(label,new LinearLayout.LayoutParams(-1,dp(dense()?24:42)));card.setOnClickListener(v->openItem(kind,item));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(cardHeight),1);params.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(card,params);count++;
         }
         if(row!=null)while(count%columns!=0){row.addView(new View(activity),new LinearLayout.LayoutParams(0,dp(cardHeight),1));count++;}showMoreLoaded(items,visible,items.length());
     }

@@ -1,3 +1,10 @@
+## Android 5.11.0
+
+- Follow upstream requestHeaders for authenticated images and audio, including live settings/storage interpolation and explicit stream-header precedence.
+- Keep plugins from different repositories with the same declared id installed separately. Existing source ids and accounts stay valid on upgrade.
+- Resolve media redirects without forwarding saved account headers across origins.
+- Run the existing Android regression suite plus a read-only audit of all 64 pinned market repositories. A successful install is not a playback certification. Account, subscription, private-server and desktop-helper conditions are reported separately.
+
 # MyGo Music Android
 
 基于 MyGo Music 插件协议的 Android 横屏适配版，当前开发版本 5.10.0。

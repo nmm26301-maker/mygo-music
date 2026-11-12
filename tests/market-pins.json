@@ -1,0 +1,958 @@
+[
+  {
+    "repo": "AdkinsHan/mygo-local-lyrics",
+    "commit": "00422b89503bb815a22ea739ec451caaad669559",
+    "name": "LRCLib Lyrics",
+    "url": "https://codeload.github.com/AdkinsHan/mygo-local-lyrics/zip/00422b89503bb815a22ea739ec451caaad669559",
+    "sha256": "c59a2b40dc519f56660e2b764bf51c121f194d151897e9e4a4d373f40d40392b",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "lrclib-lyrics",
+    "programs": [
+      "bin/read-index-*"
+    ],
+    "sourceBytes": 61700
+  },
+  {
+    "repo": "AkinoKaede/mygo-music-netease-cloud-music",
+    "commit": "c7a0eb1a93b16187d6fa05a356b8d73faf38b542",
+    "name": "NetEase Cloud Music",
+    "url": "https://github.com/AkinoKaede/mygo-music-netease-cloud-music/releases/download/v0.1.12/mygo-music-netease-cloud-music-v0.1.12.zip",
+    "sha256": "ab68efd90bc8c48b503b99d392877b505909243a097a312909bdab060d9448dc",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "netease-cloud-music",
+    "programs": [],
+    "sourceBytes": 106426,
+    "release": "v0.1.12"
+  },
+  {
+    "repo": "Amamiya23/mygo-music-qq-plugin",
+    "commit": "378b5555172fbf9e71028aa2c3ab9c7f17f24b8a",
+    "name": "QQ Music",
+    "url": "https://codeload.github.com/Amamiya23/mygo-music-qq-plugin/zip/378b5555172fbf9e71028aa2c3ab9c7f17f24b8a",
+    "sha256": "2589969c3e2d7744cbd673aaa09c04b94f00169bc517dfd7fb05e3abc067500e",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "dist/index.js",
+    "declaredId": "qqmusic",
+    "programs": [],
+    "sourceBytes": 223403
+  },
+  {
+    "repo": "Arteiimis/mygo-music-netease",
+    "commit": "7c15ed9294999c530d45173951e8204d2e467902",
+    "name": "NetEase Cloud Music Plus",
+    "url": "https://codeload.github.com/Arteiimis/mygo-music-netease/zip/7c15ed9294999c530d45173951e8204d2e467902",
+    "sha256": "97529ee5a9d4b4da8e36fd6bd5381d5b6cf6c5102b0aa21af8909e382cb6c882",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "netease-cloud-music-plus",
+    "programs": [],
+    "sourceBytes": 40227
+  },
+  {
+    "repo": "AsperaUlt/mygo-netease",
+    "commit": "4aaf695d9579681c59b52f50e5a408de555db79a",
+    "name": "网易云音乐",
+    "url": "https://codeload.github.com/AsperaUlt/mygo-netease/zip/4aaf695d9579681c59b52f50e5a408de555db79a",
+    "sha256": "4d3575009c34007aea1f04828ae4c834cfb56d9c19c52f6d0b2a5479486dd81e",
+    "licenseFiles": [
+      "LICENSE",
+      "NOTICE"
+    ],
+    "main": "index.js",
+    "declaredId": "netease",
+    "programs": [],
+    "sourceBytes": 32325
+  },
+  {
+    "repo": "DaviRain-Su/mygo-music-qishui",
+    "commit": "68ff332fe60eaa869f4a9afc55cc2144e151e312",
+    "name": "汽水音乐",
+    "url": "https://codeload.github.com/DaviRain-Su/mygo-music-qishui/zip/68ff332fe60eaa869f4a9afc55cc2144e151e312",
+    "sha256": "69e0748e3ba8507477e96b18a6e2a4dbbfe5a43b05aeaacc8038e805d0f0c243",
+    "licenseFiles": [
+      "LICENSE",
+      "NOTICE.md"
+    ],
+    "main": "index.js",
+    "declaredId": "qishui",
+    "programs": [
+      "bin/qishui-helper-*"
+    ],
+    "sourceBytes": 898994
+  },
+  {
+    "repo": "Faye-bit/MyGo-Music-Netease-All",
+    "commit": "0ac44c9a5add511477ef6da5e5eace6307da0b1f",
+    "name": "网易云音乐 All",
+    "url": "https://codeload.github.com/Faye-bit/MyGo-Music-Netease-All/zip/0ac44c9a5add511477ef6da5e5eace6307da0b1f",
+    "sha256": "3e5c1249266a6bc5819d66b2e1b45979e63d22b6012b8e10ea0f357ddbb4d8d2",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "plugin/index.js",
+    "declaredId": "netease-all",
+    "programs": [],
+    "sourceBytes": 26604207
+  },
+  {
+    "repo": "GYRYEZ/mygo-music-roamdial",
+    "commit": "54a64dff2b58f590c898bd682360ca3c7205d0f0",
+    "name": "RoamDial 电台",
+    "url": "https://codeload.github.com/GYRYEZ/mygo-music-roamdial/zip/54a64dff2b58f590c898bd682360ca3c7205d0f0",
+    "sha256": "8d18451e308f233eaf2cadd95e22f114351c6c216e626373f342f68a92ddfe6b",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "roamdial",
+    "programs": [],
+    "sourceBytes": 3805207
+  },
+  {
+    "repo": "GentleM4dman/mygo-music-bilibili",
+    "commit": "43d15cca5f2eb3616bb7718a752b8e240b6c5cc5",
+    "name": "Bilibili",
+    "url": "https://codeload.github.com/GentleM4dman/mygo-music-bilibili/zip/43d15cca5f2eb3616bb7718a752b8e240b6c5cc5",
+    "sha256": "e064e5046b2ce85ac31da8a1c49dcd17100d65e6a0bf384fd07c7388a5330e95",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "bilibili",
+    "programs": [
+      "ffmpeg",
+      "/opt/homebrew/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg"
+    ],
+    "sourceBytes": 39240
+  },
+  {
+    "repo": "Guyu23/mygo-music-qishui",
+    "commit": "dd4b334c5ce95d84c65747f0381ad3b93f2a37fb",
+    "name": "Soda Music",
+    "url": "https://codeload.github.com/Guyu23/mygo-music-qishui/zip/dd4b334c5ce95d84c65747f0381ad3b93f2a37fb",
+    "sha256": "5a4f7d0e91eaa542f30ed9be98d9cb9fb06f861404cd3398391c20c3cde5229b",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "qishui",
+    "programs": [],
+    "sourceBytes": 17908
+  },
+  {
+    "repo": "Guyu23/mygo-music-qqmusic",
+    "commit": "d60aacceefeb78879899c9aac283198533a96979",
+    "name": "QQ Music",
+    "url": "https://codeload.github.com/Guyu23/mygo-music-qqmusic/zip/d60aacceefeb78879899c9aac283198533a96979",
+    "sha256": "5c591e2784177290d4a51bdfeacde6f47311b53245917a2759c5de086d33d21b",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "qqmusic",
+    "programs": [],
+    "sourceBytes": 21686
+  },
+  {
+    "repo": "InkCitrus/mygo-music-apple-music",
+    "commit": "afc54a0c72a447c7875c5d3d12faf6dbf4ffd2b3",
+    "name": "Apple Music",
+    "url": "https://codeload.github.com/InkCitrus/mygo-music-apple-music/zip/afc54a0c72a447c7875c5d3d12faf6dbf4ffd2b3",
+    "sha256": "472017be6ad1a888aa485c392f547e25fed9ac7ccb7793b7b700a64bb44b5722",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "dist/index.js",
+    "declaredId": "apple-music",
+    "programs": [
+      "/usr/bin/osascript",
+      "osascript"
+    ],
+    "sourceBytes": 159018
+  },
+  {
+    "repo": "Jimmyzzt/mygo-music-incompetech",
+    "commit": "c967d7878ad697f2d91c0d2eeba63c411db5cb13",
+    "name": "Incompetech",
+    "url": "https://codeload.github.com/Jimmyzzt/mygo-music-incompetech/zip/c967d7878ad697f2d91c0d2eeba63c411db5cb13",
+    "sha256": "bb87d3cdb77a40b74eb97f87d7bea29feb4e6d0bbc74b800fa8d03763ba7b710",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "incompetech",
+    "programs": [],
+    "sourceBytes": 17322
+  },
+  {
+    "repo": "KirishimaRin/mygo-music-netease-cloud-music",
+    "commit": "1b2c67c78373130eb79060463564519319e827d6",
+    "name": "NetEase Cloud Music",
+    "url": "https://codeload.github.com/KirishimaRin/mygo-music-netease-cloud-music/zip/1b2c67c78373130eb79060463564519319e827d6",
+    "sha256": "e11e8e3a14eded3e39a1775875e1a7eef7ebf8f8249a1bb1b6cd80efb662f5c8",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "netease-cloud-music",
+    "programs": [],
+    "sourceBytes": 35502
+  },
+  {
+    "repo": "LANMIN-X/mygo-plugin-ximalaya",
+    "commit": "62229e12ff5411ece48796da0f91cfae683272cd",
+    "name": "喜马拉雅",
+    "url": "https://codeload.github.com/LANMIN-X/mygo-plugin-ximalaya/zip/62229e12ff5411ece48796da0f91cfae683272cd",
+    "sha256": "0d2987ccf70c476c3fb82a847083c5973cdcdf3e1b80c2755f732041ce759d6d",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "ximalaya",
+    "programs": [],
+    "sourceBytes": 52081
+  },
+  {
+    "repo": "LYJW131/mygo-music-apple-music",
+    "commit": "3dafb66bdc0d77a08c223736eefb19daf08c9a19",
+    "name": "Apple Music",
+    "url": "https://github.com/LYJW131/mygo-music-apple-music/releases/download/v0.3.5/mygo-music-apple-music-v0.3.5.zip",
+    "sha256": "90219e8eecb23f764ee4f83dc44a20f4e3914fd5950579943a621c1c487dd576",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "apple-music",
+    "programs": [
+      "ffmpeg",
+      "/opt/homebrew/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg",
+      "bin/amhelper",
+      "bin/amhelper.exe"
+    ],
+    "sourceBytes": 377162,
+    "release": "v0.3.5"
+  },
+  {
+    "repo": "LYJW131/mygo-music-emby-jellyfin",
+    "commit": "bbc1b56b1c4194922304515f8b7f13b532537797",
+    "name": "Emby / Jellyfin",
+    "url": "https://github.com/LYJW131/mygo-music-emby-jellyfin/releases/download/v0.1.0/mygo-music-emby-jellyfin-v0.1.0.zip",
+    "sha256": "f306ad6980c3cdb953cf0c3dbba57a95a4229c2f6d500664a9859aa7acf56a58",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "emby",
+    "programs": [],
+    "sourceBytes": 66686,
+    "release": "v0.1.0"
+  },
+  {
+    "repo": "Lorpaves/mygo-music-qqmusic",
+    "commit": "d231ffa30d9fb240ea6664b081f0100d5c80dbf8",
+    "name": "QQ Music",
+    "url": "https://codeload.github.com/Lorpaves/mygo-music-qqmusic/zip/d231ffa30d9fb240ea6664b081f0100d5c80dbf8",
+    "sha256": "02b40490c89fa4a3a792c83f6dfaad05c9627de6a46ffac35511f70fbc550fc6",
+    "licenseFiles": [
+      "LICENSE",
+      "NOTICE.md"
+    ],
+    "main": "dist/index.js",
+    "declaredId": "qqmusic",
+    "programs": [],
+    "sourceBytes": 242195
+  },
+  {
+    "repo": "MaYunFei/mygo-music-feiniu",
+    "commit": "8b821cdad563c5a637922d5d556c70c20bdb4032",
+    "name": "Feiniu Music",
+    "url": "https://codeload.github.com/MaYunFei/mygo-music-feiniu/zip/8b821cdad563c5a637922d5d556c70c20bdb4032",
+    "sha256": "60f7ef2088f3fecc8f137362944e7ec271fcb2a7788dbb67c7de0173e5bd35e6",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "feiniu",
+    "programs": [],
+    "sourceBytes": 17875
+  },
+  {
+    "repo": "Maker-World/mygo-music-migu",
+    "commit": "80417dd3d38cb80bc4c5f59e09844561ffb80fb1",
+    "name": "Migu Music",
+    "url": "https://codeload.github.com/Maker-World/mygo-music-migu/zip/80417dd3d38cb80bc4c5f59e09844561ffb80fb1",
+    "sha256": "7b4184f0c84c33aedb41c8b8edb75bbaf365313cdaf99a433504148ebcc6ee1e",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "migu",
+    "programs": [],
+    "sourceBytes": 107211
+  },
+  {
+    "repo": "SixWa12138/mygo-music-netease-music",
+    "commit": "6954e261f2af2966cb43ec7e3ff0c0d3926b7dc0",
+    "name": "网易云音乐",
+    "url": "https://codeload.github.com/SixWa12138/mygo-music-netease-music/zip/6954e261f2af2966cb43ec7e3ff0c0d3926b7dc0",
+    "sha256": "c835880e5e81c8fd567294f3cccdf9a9a2ac87f880d03f80d42bb9d715984399",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "netease-music",
+    "programs": [],
+    "sourceBytes": 25642226
+  },
+  {
+    "repo": "TengYangTuoHai/mygo-music-navidrome",
+    "commit": "5f3121535df3f310c641ec54d220bb3d907f1888",
+    "name": "Navidrome",
+    "url": "https://codeload.github.com/TengYangTuoHai/mygo-music-navidrome/zip/5f3121535df3f310c641ec54d220bb3d907f1888",
+    "sha256": "55312bace367b2164e612824ffafa4294bae0cb713e190cca5e852c013522f7e",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "navidrome",
+    "programs": [],
+    "sourceBytes": 29627
+  },
+  {
+    "repo": "TexasOct/mygo-subsonic",
+    "commit": "ad7da36c72a3cfb018d3307e394a58c4e55c390f",
+    "name": "Subsonic",
+    "url": "https://codeload.github.com/TexasOct/mygo-subsonic/zip/ad7da36c72a3cfb018d3307e394a58c4e55c390f",
+    "sha256": "b632d3d2f8099d8a3ba46dd924294826a0d2faab984820bb145326da953cfdad",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "subsonic",
+    "programs": [],
+    "sourceBytes": 141847
+  },
+  {
+    "repo": "VenusLuna/mygo-music-netease-plus",
+    "commit": "9acfd41f726dba2dd826eb9c75d024e9a2ea2110",
+    "name": "网易云音乐 Plus",
+    "url": "https://codeload.github.com/VenusLuna/mygo-music-netease-plus/zip/9acfd41f726dba2dd826eb9c75d024e9a2ea2110",
+    "sha256": "153fb3b4dadd619aacdaf70abfe8bb151a93f79c161420080bbcde50fc00eac3",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "netease-plus",
+    "programs": [],
+    "sourceBytes": 53552
+  },
+  {
+    "repo": "YeeYeung/mygo-music-overcast",
+    "commit": "5ee48fd2214ace960b424a947984fccab201c81a",
+    "name": "Overcast",
+    "url": "https://codeload.github.com/YeeYeung/mygo-music-overcast/zip/5ee48fd2214ace960b424a947984fccab201c81a",
+    "sha256": "7cfc26092b15a1fd5fd16ee5042608b356295e6a0096609e48d66889d701ec99",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "overcast",
+    "programs": [],
+    "sourceBytes": 43852
+  },
+  {
+    "repo": "ZONGZI-000/zongzi-mygo-plugin-beta",
+    "commit": "6c81dc5d4537f9ffa642c5f54025e795205d574f",
+    "name": "粽子音源",
+    "url": "https://codeload.github.com/ZONGZI-000/zongzi-mygo-plugin-beta/zip/6c81dc5d4537f9ffa642c5f54025e795205d574f",
+    "sha256": "e12bab7aeeb34ed142adb99d2b86be6a0445876b81494c981a67887d59d56367",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "zongzi-music",
+    "programs": [
+      "*",
+      "bin/win32-amd64/ffmpeg.exe",
+      "bin/win32-arm64/ffmpeg.exe",
+      "bin/darwin-arm64/ffmpeg",
+      "bin/darwin-x64/ffmpeg",
+      "bin/linux-x64/ffmpeg",
+      "bin/linux-arm64/ffmpeg",
+      "powershell",
+      "pwsh",
+      "/bin/sh"
+    ],
+    "sourceBytes": 11761701
+  },
+  {
+    "repo": "ZONGZI-000/zongzi-mygo-plugin-stable",
+    "commit": "f59cd22aa46db1660da10907a564f7b7d2114e61",
+    "name": "粽子音源",
+    "url": "https://codeload.github.com/ZONGZI-000/zongzi-mygo-plugin-stable/zip/f59cd22aa46db1660da10907a564f7b7d2114e61",
+    "sha256": "dfe1d28723253fdeeff66eb7239e447eeeee7cd4c07623584deb6f8582b8cb43",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "zongzi-music",
+    "programs": [
+      "*",
+      "bin/win32-amd64/ffmpeg.exe",
+      "bin/win32-arm64/ffmpeg.exe",
+      "bin/darwin-arm64/ffmpeg",
+      "bin/darwin-x64/ffmpeg",
+      "bin/linux-x64/ffmpeg",
+      "bin/linux-arm64/ffmpeg",
+      "powershell",
+      "pwsh",
+      "/bin/sh"
+    ],
+    "sourceBytes": 163617
+  },
+  {
+    "repo": "amqsy/mygo-music-bodian",
+    "commit": "83feb77704d0bed4f09888b120ced53d980ab5b0",
+    "name": "Bodian Music",
+    "url": "https://codeload.github.com/amqsy/mygo-music-bodian/zip/83feb77704d0bed4f09888b120ced53d980ab5b0",
+    "sha256": "82cc87db0d9ad5fa3152cf5a1e2ff70599388e9b0a473a8435e8d3c9c6742286",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "bodian",
+    "programs": [],
+    "sourceBytes": 44947
+  },
+  {
+    "repo": "benhaotang/mygo-music-Ampache",
+    "commit": "a256ee8e7c15c5f6282195cf0e6fc73ffaf6d1bb",
+    "name": "Ampache",
+    "url": "https://codeload.github.com/benhaotang/mygo-music-Ampache/zip/a256ee8e7c15c5f6282195cf0e6fc73ffaf6d1bb",
+    "sha256": "2e600a66a7e790ebd1fc03867f3950d3273bdd8cc6142be81c4b4161524a519a",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "ampache",
+    "programs": [],
+    "sourceBytes": 8475
+  },
+  {
+    "repo": "biaobiaobiao108/mygo-yun-music",
+    "commit": "68b898377d32a3ac9c71d142b378f01222b93536",
+    "name": "YunLu Music",
+    "url": "https://codeload.github.com/biaobiaobiao108/mygo-yun-music/zip/68b898377d32a3ac9c71d142b378f01222b93536",
+    "sha256": "596d04a6244904f23067ca0d15869094050b132bff111f259ad17b9f575f0d31",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "yun-music",
+    "programs": [],
+    "sourceBytes": 136501
+  },
+  {
+    "repo": "bitbyte404/mygo-music-kugou-lite",
+    "commit": "b964ac03274163d3bf64bb530a452332be244635",
+    "name": "Kugou Concept",
+    "url": "https://codeload.github.com/bitbyte404/mygo-music-kugou-lite/zip/b964ac03274163d3bf64bb530a452332be244635",
+    "sha256": "0b56790201fd510efabeebd617f1b8d5d2ec0715d107025bf286da1ff14f3a48",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "kugou-lite",
+    "programs": [],
+    "sourceBytes": 26086
+  },
+  {
+    "repo": "craigary/mygo-music-kugou-lite",
+    "commit": "f06eae15d792684211d6d6c83a124ea21e5cebde",
+    "name": "Kugou Lite",
+    "url": "https://codeload.github.com/craigary/mygo-music-kugou-lite/zip/f06eae15d792684211d6d6c83a124ea21e5cebde",
+    "sha256": "53ed212e9ab1f1f45a148788572f1681cb16505aa12abf41234a0b07d2b6a1b2",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "kugou-lite",
+    "programs": [],
+    "sourceBytes": 38960
+  },
+  {
+    "repo": "dddaniel1/mygo-plugin-kugou",
+    "commit": "96e9b7669f7acb17be33bd2dacc5f3509b3941e8",
+    "name": "KuGou Music",
+    "url": "https://codeload.github.com/dddaniel1/mygo-plugin-kugou/zip/96e9b7669f7acb17be33bd2dacc5f3509b3941e8",
+    "sha256": "48bab895b90285d92482856dc07e30240cee7af357160b2cdeb9e3544bfbfdce",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "kugou",
+    "programs": [],
+    "sourceBytes": 13786
+  },
+  {
+    "repo": "dddaniel1/mygo-plugin-qqmusic",
+    "commit": "4bb04cc4d5f8ff2ea528a237c4fe9737b79eda87",
+    "name": "QQ Music",
+    "url": "https://codeload.github.com/dddaniel1/mygo-plugin-qqmusic/zip/4bb04cc4d5f8ff2ea528a237c4fe9737b79eda87",
+    "sha256": "1b974021a423bfe93f5e49e9ce47412fead02b652bfe98c0aeec748be9c8776c",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "qqmusic",
+    "programs": [],
+    "sourceBytes": 13452
+  },
+  {
+    "repo": "djyde/mygo-lizhi",
+    "commit": "87b97fd99a8453c56af5a768ce48a3454305f869",
+    "name": "Li Zhi",
+    "url": "https://codeload.github.com/djyde/mygo-lizhi/zip/87b97fd99a8453c56af5a768ce48a3454305f869",
+    "sha256": "0a72f678efc265279a23be71fcb47053227010bd50707ba533e8ed0b145a6a68",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "lizhi",
+    "programs": [],
+    "sourceBytes": 8135
+  },
+  {
+    "repo": "e5u/mygo-taskbar-lyrics",
+    "commit": "c0e4f06530591dbcb40a1115f94a398b10952933",
+    "name": "Taskbar Lyrics",
+    "url": "https://codeload.github.com/e5u/mygo-taskbar-lyrics/zip/c0e4f06530591dbcb40a1115f94a398b10952933",
+    "sha256": "8c93e88557ef4f844b84497936df1e58fc716802a149cfb8c3573c8f122e4d2d",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "taskbar-lyrics",
+    "programs": [
+      "bin/*"
+    ],
+    "sourceBytes": 2034968
+  },
+  {
+    "repo": "egoist/mygo-music-youtube-music",
+    "commit": "eb4e42abc22e5fbd04df691aa0633cdaa1ad7a63",
+    "name": "YouTube Music",
+    "url": "https://codeload.github.com/egoist/mygo-music-youtube-music/zip/eb4e42abc22e5fbd04df691aa0633cdaa1ad7a63",
+    "sha256": "4044f75bd36b1f072b253a9a5725fbf97c1a5cc9aca4a9003b882234b92f0fc0",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "youtube-music",
+    "programs": [
+      "ffmpeg",
+      "yt-dlp",
+      "/opt/homebrew/bin/ffmpeg",
+      "/opt/homebrew/bin/yt-dlp",
+      "/usr/local/bin/ffmpeg",
+      "/usr/local/bin/yt-dlp"
+    ],
+    "sourceBytes": 17409
+  },
+  {
+    "repo": "fansion314/mygo-music-yoi",
+    "commit": "6d8f74548dcb700fb6dc500ce25e7cc041e498f1",
+    "name": "You Own It",
+    "url": "https://codeload.github.com/fansion314/mygo-music-yoi/zip/6d8f74548dcb700fb6dc500ce25e7cc041e498f1",
+    "sha256": "038b94f4ed41677b2ad3717df1ecdb0a06af93fa64c48e2e37c8bfbda1ddbfb4",
+    "licenseFiles": [
+      "LICENSE",
+      "NOTICE.md"
+    ],
+    "main": "index.js",
+    "declaredId": "world.fansionia.mygo-music-yoi",
+    "programs": [],
+    "sourceBytes": 129536
+  },
+  {
+    "repo": "fcmfcm1999/mygo-music-kugou",
+    "commit": "d1ed5a25e5bc0303bb7b06dc210fb4dc0e40a9aa",
+    "name": "酷狗",
+    "url": "https://codeload.github.com/fcmfcm1999/mygo-music-kugou/zip/d1ed5a25e5bc0303bb7b06dc210fb4dc0e40a9aa",
+    "sha256": "0461ec941e4cd3a140940537a82bef8f687a1d4e42fcc6101165409cbc6e10d4",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "kugou",
+    "programs": [],
+    "sourceBytes": 11641
+  },
+  {
+    "repo": "hiSlowMo/neteaseXqqmusic",
+    "commit": "459f4c02f4308141de73766a4d27a673830c66da",
+    "name": "NetEaseXQQMusic",
+    "url": "https://codeload.github.com/hiSlowMo/neteaseXqqmusic/zip/459f4c02f4308141de73766a4d27a673830c66da",
+    "sha256": "2fedc131f3428b45ac94c4e1eaf0a9a860a3d4593e5a34802f4f0a620cabf090",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "dist/index.js",
+    "declaredId": "music-fusion",
+    "programs": [
+      "bin/qqmusic-login-darwin-arm64",
+      "bin/qqmusic-login-darwin-amd64",
+      "bin/qqmusic-login-linux-arm64",
+      "bin/qqmusic-login-linux-amd64",
+      "bin/qqmusic-login-windows-arm64.exe",
+      "bin/qqmusic-login-windows-amd64.exe"
+    ],
+    "sourceBytes": 411873
+  },
+  {
+    "repo": "hubandad/mygo-music-netease",
+    "commit": "f39e8f09f5ae6ab46002c58bbe49ae8b6dd1b33c",
+    "name": "网易云音乐",
+    "url": "https://codeload.github.com/hubandad/mygo-music-netease/zip/f39e8f09f5ae6ab46002c58bbe49ae8b6dd1b33c",
+    "sha256": "a89abb46c7710b1ab02f36bef4e37df93efad2572e4a2f4a2814939d8eca18aa",
+    "licenseFiles": [
+      "LICENSE",
+      "NOTICE"
+    ],
+    "main": "index.js",
+    "declaredId": "netease",
+    "programs": [],
+    "sourceBytes": 30450
+  },
+  {
+    "repo": "iko233/webdav4mygo",
+    "commit": "39a57a84be9861f0893b2b4d1265ac6586793faa",
+    "name": "WebDAV",
+    "url": "https://codeload.github.com/iko233/webdav4mygo/zip/39a57a84be9861f0893b2b4d1265ac6586793faa",
+    "sha256": "2890ef840f1a1d111519a02a246daa58627a25844aaa5f35979f943e6d984c4a",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "webdav4mygo",
+    "programs": [
+      "bin/cover-*"
+    ],
+    "sourceBytes": 20658
+  },
+  {
+    "repo": "ivanxguo/mygo-music-bitrate",
+    "commit": "df79640a7628799caeb1a884efc02488a3d29f42",
+    "name": "Bitrate",
+    "url": "https://codeload.github.com/ivanxguo/mygo-music-bitrate/zip/df79640a7628799caeb1a884efc02488a3d29f42",
+    "sha256": "896334fd853660088db2f4af6ff4b971db753a9a64e75cb2b1f785ae99dff075",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "bitrate",
+    "programs": [],
+    "sourceBytes": 12023
+  },
+  {
+    "repo": "jfeng018/mygo-music-lx-source",
+    "commit": "862d45822735b04da1316b248e5562bb739d31c1",
+    "name": "LX Source",
+    "url": "https://codeload.github.com/jfeng018/mygo-music-lx-source/zip/862d45822735b04da1316b248e5562bb739d31c1",
+    "sha256": "2e1e460d2d44e4b8b9a20391194ebc222582e49b1f38f23e9e7aa2fcdf7159ce",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "lx-source",
+    "programs": [],
+    "sourceBytes": 49882
+  },
+  {
+    "repo": "lane128/mygo-music-qishui",
+    "commit": "aee2501f770499ac77ce4449070c93ad55444bd7",
+    "name": "汽水音乐",
+    "url": "https://codeload.github.com/lane128/mygo-music-qishui/zip/aee2501f770499ac77ce4449070c93ad55444bd7",
+    "sha256": "f19cf8010bc85704aa5bd32f924188709da633c425bba726c3bf6eb386784c87",
+    "licenseFiles": [
+      "LICENSE",
+      "NOTICE.md"
+    ],
+    "main": "index.js",
+    "declaredId": "qishui-app-login",
+    "programs": [
+      "bin/qishui-helper-*"
+    ],
+    "sourceBytes": 632623
+  },
+  {
+    "repo": "liuxiaofengone/synology-DSAudio-mygo-music-plugin",
+    "commit": "a1a56188469a98aeb953624fa41933df14bdc4ed",
+    "name": "群晖 Audio Station",
+    "url": "https://codeload.github.com/liuxiaofengone/synology-DSAudio-mygo-music-plugin/zip/a1a56188469a98aeb953624fa41933df14bdc4ed",
+    "sha256": "49f1fb9c3e082b6c9beee8992f2cb70933f4158de05ddd832e389ff63fd6833b",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "synology-audio",
+    "programs": [],
+    "sourceBytes": 51366
+  },
+  {
+    "repo": "louisgreen0726/mygo-music-pocket-casts",
+    "commit": "6c8b1a96c4301f25ec8550f8ecf1dd6ced553cc7",
+    "name": "Pocket Casts",
+    "url": "https://codeload.github.com/louisgreen0726/mygo-music-pocket-casts/zip/6c8b1a96c4301f25ec8550f8ecf1dd6ced553cc7",
+    "sha256": "97409277ca2b0261c50d4d707cf3466ea15a37c50ec4b6bdc515b4dc378f13fc",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "pocket-casts",
+    "programs": [
+      "ffmpeg",
+      "/opt/homebrew/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg"
+    ],
+    "sourceBytes": 983028
+  },
+  {
+    "repo": "maxbeau/mygo-music-youtube-music",
+    "commit": "c1d60269054f8b9f8de32aa60fd04843546708fd",
+    "name": "YouTube Music",
+    "url": "https://codeload.github.com/maxbeau/mygo-music-youtube-music/zip/c1d60269054f8b9f8de32aa60fd04843546708fd",
+    "sha256": "39403129e8b1fb7a946bddd8615919bfb557d9a7f4c408f8170a58e1fb35b91d",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "youtube-music",
+    "programs": [
+      "ffmpeg",
+      "yt-dlp",
+      "/opt/homebrew/bin/ffmpeg",
+      "/opt/homebrew/bin/yt-dlp",
+      "/usr/local/bin/ffmpeg",
+      "/usr/local/bin/yt-dlp"
+    ],
+    "sourceBytes": 39351
+  },
+  {
+    "repo": "nimrc/mygo-chensheng",
+    "commit": "042976866e7abef834987638ac7b40916dab1c2a",
+    "name": "Bobby Chen",
+    "url": "https://codeload.github.com/nimrc/mygo-chensheng/zip/042976866e7abef834987638ac7b40916dab1c2a",
+    "sha256": "386e14717f96d7fbabcb6aaeef3bf317ca88be6ca819fb840a667c586caf532e",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "chensheng",
+    "programs": [],
+    "sourceBytes": 9910
+  },
+  {
+    "repo": "pingfury108/mygo-music-sonust",
+    "commit": "3a6dc0999c11c53d6b03ad269ed53ed1f6fe2a82",
+    "name": "Sonust",
+    "url": "https://codeload.github.com/pingfury108/mygo-music-sonust/zip/3a6dc0999c11c53d6b03ad269ed53ed1f6fe2a82",
+    "sha256": "8468f135dc3b5e6a8a8e8da04fd1b58b4671303ae961a6aaeb13c54623bcb0f7",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "sonust",
+    "programs": [],
+    "sourceBytes": 12231
+  },
+  {
+    "repo": "popeyelau/mygo-queyue",
+    "commit": "76ec66a1e35447f97c042d851b9fc07a5a5c93cd",
+    "name": "QueYue",
+    "url": "https://codeload.github.com/popeyelau/mygo-queyue/zip/76ec66a1e35447f97c042d851b9fc07a5a5c93cd",
+    "sha256": "f4b9574b3cc763aa85372c9d87678d7ece2d5609e70aff82c98de162b26bc3d2",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "mygo-queyue",
+    "programs": [],
+    "sourceBytes": 78333
+  },
+  {
+    "repo": "qile222/mygo-music-qishui",
+    "commit": "7b70ccd73e39a1b80e20cd0ca9975c6fe3e3f269",
+    "name": "Qishui Music",
+    "url": "https://codeload.github.com/qile222/mygo-music-qishui/zip/7b70ccd73e39a1b80e20cd0ca9975c6fe3e3f269",
+    "sha256": "75634b617cc3a67d4010f4340bedf9fbffc281b47678b82850a43fdc4e60c54e",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "qishui",
+    "programs": [
+      "/usr/bin/base64",
+      "/usr/bin/env"
+    ],
+    "sourceBytes": 421140
+  },
+  {
+    "repo": "r0k1s-i/mygotify",
+    "commit": "a62fde0922baf91510846dfa8c323577862934e7",
+    "name": "MyGotify",
+    "url": "https://codeload.github.com/r0k1s-i/mygotify/zip/a62fde0922baf91510846dfa8c323577862934e7",
+    "sha256": "1c61dc3a972c8c63242a413c8ecbe7c7a3dddbf9e8570d04d188e443a89ebd09",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "mygotify",
+    "programs": [
+      "ffmpeg",
+      "yt-dlp",
+      "/opt/homebrew/bin/ffmpeg",
+      "/opt/homebrew/bin/yt-dlp",
+      "/usr/local/bin/ffmpeg",
+      "/usr/local/bin/yt-dlp"
+    ],
+    "sourceBytes": 42178
+  },
+  {
+    "repo": "rocona/mygo-navidrome",
+    "commit": "34d00fdc360360958d8e95157d56f4b388e57ee7",
+    "name": "Navidrome",
+    "url": "https://codeload.github.com/rocona/mygo-navidrome/zip/34d00fdc360360958d8e95157d56f4b388e57ee7",
+    "sha256": "784f8abedca10b8b86747aca0445881dc45ea1afa064d408511ad197fcf0a706",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "navidrome",
+    "programs": [],
+    "sourceBytes": 8179
+  },
+  {
+    "repo": "satyawikananda/soundgo",
+    "commit": "3a5b3e6bd2f6e5bb833be1f1a658a4e4095fc7fe",
+    "name": "SoundGo",
+    "url": "https://codeload.github.com/satyawikananda/soundgo/zip/3a5b3e6bd2f6e5bb833be1f1a658a4e4095fc7fe",
+    "sha256": "24ce21b2698632970115657fc09c011d8d731ecef18f0dc8b84681a6a5fc4453",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "soundgo",
+    "programs": [
+      "ffmpeg",
+      "/opt/homebrew/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg"
+    ],
+    "sourceBytes": 38400
+  },
+  {
+    "repo": "shensl4499/mygo-music-xiaoyuzhou",
+    "commit": "045cff05f0d418362eaffe9bd3fdb4ad193950be",
+    "name": "小宇宙",
+    "url": "https://codeload.github.com/shensl4499/mygo-music-xiaoyuzhou/zip/045cff05f0d418362eaffe9bd3fdb4ad193950be",
+    "sha256": "2132837d664c1c23ad1f7a71971f68cbceb2843fb7a712921e43dedda67638e6",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "xiaoyuzhou",
+    "programs": [],
+    "sourceBytes": 15901
+  },
+  {
+    "repo": "sogud/mygo-music-netease",
+    "commit": "2b7f7263133c7e4bdf290b5e7681ee42943a31a9",
+    "name": "网易云音乐",
+    "url": "https://codeload.github.com/sogud/mygo-music-netease/zip/2b7f7263133c7e4bdf290b5e7681ee42943a31a9",
+    "sha256": "5f863422f8db3cd35e45f58d62ccfdde7dc4c2f29faef804d4681657d254f12e",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "netease",
+    "programs": [],
+    "sourceBytes": 40990
+  },
+  {
+    "repo": "sounfury/mygo-music-spotify-soloist",
+    "commit": "1d5632c43e0bf9d360765031f9855b75f9edaa4a",
+    "name": "Spotify Soloist",
+    "url": "https://codeload.github.com/sounfury/mygo-music-spotify-soloist/zip/1d5632c43e0bf9d360765031f9855b75f9edaa4a",
+    "sha256": "6742ccbeec0317939cba04010e886193c77490fdccaa0e49e358b3439d22c3af",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "spotify-soloist",
+    "programs": [
+      "bin/soloist.exe",
+      "powershell.exe"
+    ],
+    "sourceBytes": 25694
+  },
+  {
+    "repo": "specialhua/mygo-ximalaya",
+    "commit": "5084fa6ed17ff2b698fb7ccd554d028c6630bc1c",
+    "name": "喜马拉雅",
+    "url": "https://codeload.github.com/specialhua/mygo-ximalaya/zip/5084fa6ed17ff2b698fb7ccd554d028c6630bc1c",
+    "sha256": "d8b316908651e2f973e613f47d303c6176c77f065dfe689219f4769fbe8c2f6e",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "ximalaya",
+    "programs": [],
+    "sourceBytes": 65950
+  },
+  {
+    "repo": "starriv/mygo-music-spotify",
+    "commit": "0f4ec3077a068b70214b31559ad8ba6cb9c01c66",
+    "name": "Spotify",
+    "url": "https://codeload.github.com/starriv/mygo-music-spotify/zip/0f4ec3077a068b70214b31559ad8ba6cb9c01c66",
+    "sha256": "f9feda6fa45ad3ba067c7c259cbdfdb63c7e4d024588db6091b7046ec09e32de",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "src/index.js",
+    "declaredId": "spotify-connect",
+    "programs": [
+      "soloist/soloist",
+      "soloist/soloist.exe",
+      "curl",
+      "tar"
+    ],
+    "sourceBytes": 2453407
+  },
+  {
+    "repo": "xingkaixin/mygo-music-spotify",
+    "commit": "573e98e54c0231b3d62b2dffc6bec895a98dcbd8",
+    "name": "Spotify",
+    "url": "https://codeload.github.com/xingkaixin/mygo-music-spotify/zip/573e98e54c0231b3d62b2dffc6bec895a98dcbd8",
+    "sha256": "c59eb34a803b913199b39a865f1cae17011830331580ab50772e1fb0e01c89a2",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "spotify",
+    "programs": [
+      "/opt/homebrew/bin/librespot",
+      "/usr/local/bin/librespot"
+    ],
+    "sourceBytes": 15614
+  },
+  {
+    "repo": "yiyiSmallti/mygo-qishui",
+    "commit": "32462ccecc66db66d8dff838cc969be9e1c8dfd7",
+    "name": "mygo-qishui",
+    "url": "https://codeload.github.com/yiyiSmallti/mygo-qishui/zip/32462ccecc66db66d8dff838cc969be9e1c8dfd7",
+    "sha256": "e9d49f1d11b0f1c503278e16ecf6b1aad37ab7f8da3f4bd2ea3d103fb5fb921c",
+    "licenseFiles": [],
+    "main": "index.js",
+    "declaredId": "qishui-account",
+    "programs": true,
+    "sourceBytes": 4298768
+  },
+  {
+    "repo": "yunforge/mygo-music-download",
+    "commit": "8d493e3bde136aa557c2407a89b70989988e9232",
+    "name": "Music Download",
+    "url": "https://codeload.github.com/yunforge/mygo-music-download/zip/8d493e3bde136aa557c2407a89b70989988e9232",
+    "sha256": "cdbd1dc783ffeab74280a7e724d21d8d6b4d20bfd32dad3fcc088cbbe120ca6d",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "download-music",
+    "programs": [],
+    "sourceBytes": 19968
+  },
+  {
+    "repo": "yusgsysh/mygo-music-fnos-plugin",
+    "commit": "64bac143507d581605310dcd7c9111bb420a218c",
+    "name": "fnOS Music",
+    "url": "https://codeload.github.com/yusgsysh/mygo-music-fnos-plugin/zip/64bac143507d581605310dcd7c9111bb420a218c",
+    "sha256": "dfc549b9c8383637758e3d49cc08f33c4e2b355782ccf07b0c91cffbd5ac0493",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "main": "index.js",
+    "declaredId": "fnos-music",
+    "programs": [],
+    "sourceBytes": 23034
+  }
+]

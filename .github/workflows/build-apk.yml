@@ -33,6 +33,8 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare pinned upstream market packages for tests
+        run: python3 tests/prepare-market-audit.py
       - name: Build Android runtime tests
         run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Execute actual WebView plugin tests on Android
@@ -52,6 +54,9 @@ jobs:
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-pop lyrics-pop || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/web-qr-test.png web-qr-test.png || true
             grep -F MYGO_TESTS_OK plugin-test-results.txt
+            adb shell am instrument -w -e marketAudit true com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee market-test-results.txt
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/market-audit.json market-audit.json
+            grep -F MYGO_MARKET_AUDIT_OK market-test-results.txt
             adb shell am start -n com.mygo.music/.MainActivity
             adb shell input keyevent 82
             adb shell screencap -p /sdcard/landscape.png
@@ -63,6 +68,8 @@ jobs:
           path: |
             plugin-test-results.txt
             android-logcat.txt
+            market-test-results.txt
+            market-audit.json
             landscape.png
             lyrics-stage.png
             lyrics-pop/
@@ -96,7 +103,7 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=60'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=61'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |
