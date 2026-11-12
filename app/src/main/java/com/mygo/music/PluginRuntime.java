@@ -40,7 +40,7 @@ public final class PluginRuntime {
     private String id, loadError="";
     private int sequence;
     private AlertDialog loginDialog;
-    private TextView loginText;
+    private TextView loginText,loginPhoneHint,browserPhoneHint;private Button loginSaveButton,loginOpenButton;private AlertDialog phoneDialog;private boolean loginQrSaving;private String loginPromptText="";
     private ImageView loginQr;
     private String lastQr="", signInRequest="";
     private Bitmap loginBitmap;
@@ -58,10 +58,10 @@ public final class PluginRuntime {
     public void call(String function,JSONObject args,Callback callback){main.post(()->ensureLoaded((ok,message)->{
         if(!ok){callback.done(false,message);return;}
         String request=String.valueOf(++sequence);pending.put(request,callback);if("signIn".equals(function))signInRequest=request;
-        main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?300000:45000);
+        main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null){finishSignInPrompt(request);timeout.done(false,"插件接口超时："+function);}},"signIn".equals(function)?300000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
-    public void dispose(){main.post(()->{closed=true;synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
+    public void dispose(){main.post(()->{closed=true;closePhoneDialog();synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
     private void ensureLoaded(Callback cb){
         if(closed){cb.done(false,"插件已关闭");return;}if(loaded){cb.done(true,"");return;}if(!loadError.isEmpty()){cb.done(false,loadError);return;}
         loading.add(cb);if(starting)return;starting=true;
@@ -96,47 +96,87 @@ public final class PluginRuntime {
     }
     private void hostResult(String request,boolean ok,String value){if(!closed&&web!=null)web.evaluateJavascript("window.__hostResult("+JSONObject.quote(request)+","+ok+","+JSONObject.quote(value)+");",null);}
     private void finishBrowserLogin(boolean ok,String value){
-        if(browserRequest.isEmpty())return;String request=browserRequest;browserRequest="";if(browserPoll!=null)main.removeCallbacks(browserPoll);if(browserDialog!=null){browserDialog.setOnDismissListener(null);browserDialog.dismiss();browserDialog=null;}if(browserView!=null){browserView.stopLoading();browserView.destroy();browserView=null;}
+        if(browserRequest.isEmpty())return;String request=browserRequest;browserRequest="";closePhoneDialog();if(browserPoll!=null)main.removeCallbacks(browserPoll);if(browserDialog!=null){browserDialog.setOnDismissListener(null);browserDialog.dismiss();browserDialog=null;}if(browserView!=null){browserView.stopLoading();browserView.destroy();browserView=null;}
         WebStorage.getInstance().deleteAllData();CookieManager.getInstance().removeAllCookies(removed->{if(browserOwner==this)browserOwner=null;hostResult(request,ok,value);});
     }
     private boolean secureLoginURL(URL address){return "https".equals(address.getProtocol())||((context.getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0&&"http".equals(address.getProtocol())&&"127.0.0.1".equals(address.getHost()));}
     private void showBrowserLogin(String request,String raw){
         try{JSONObject options=new JSONObject(raw);URL address=new URL(options.getString("url")),cookieAddress=new URL(options.getString("cookiesOf"));if(!secureLoginURL(address)||!secureLoginURL(cookieAddress))throw new IOException("登录页面和 Cookie 地址必须使用 HTTPS");requireNetwork(cookieAddress);JSONArray names=options.optJSONArray("until");if(names==null||names.length()==0)throw new IOException("插件未指定登录成功的 Cookie");if(!(context instanceof android.app.Activity)||((android.app.Activity)context).isFinishing())throw new IOException("请在播放器界面中登录");if(browserOwner!=null)throw new IOException("已有登录窗口，请先完成或关闭");browserOwner=this;browserRequest=request;cookiesOf=cookieAddress.toString();requiredCookies=names;
             WebStorage.getInstance().deleteAllData();CookieManager cookies=CookieManager.getInstance();cookies.setAcceptCookie(true);cookies.removeAllCookies(removed->{if(closed){finishBrowserLogin(false,"插件已关闭");return;}browserView=new WebView(context);browserView.setMinimumHeight((int)(context.getResources().getDisplayMetrics().heightPixels*.60));WebSettings settings=browserView.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setCacheMode(WebSettings.LOAD_NO_CACHE);String userAgent=options.optString("userAgent","");if(!userAgent.isEmpty())settings.setUserAgentString(userAgent);CookieManager.getInstance().setAcceptThirdPartyCookies(browserView,false);browserView.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest req){String scheme=req.getUrl().getScheme();return !"http".equals(scheme)&&!"https".equals(scheme);}});
-                browserDialog=new AlertDialog.Builder(context).setTitle("插件网页登录").setView(browserView).setNeutralButton("保存二维码",null).setNegativeButton("取消",(d,w)->finishBrowserLogin(false,"已取消登录")).create();browserDialog.setOnCancelListener(d->finishBrowserLogin(false,"已取消登录"));browserDialog.show();browserDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->saveBrowserQr());browserDialog.getWindow().setLayout((int)(context.getResources().getDisplayMetrics().widthPixels*0.92),(int)(context.getResources().getDisplayMetrics().heightPixels*0.90));browserView.loadUrl(address.toString());final long deadline=android.os.SystemClock.elapsedRealtime()+180000;
+                LinearLayout browserBox=new LinearLayout(context);browserBox.setOrientation(1);browserPhoneHint=new TextView(context);browserPhoneHint.setText("本机相册扫码：先保存二维码，再打开对应应用的扫一扫，从相册选择；确认后返回本页。");browserPhoneHint.setMaxLines(3);browserPhoneHint.setPadding(16,8,16,8);browserBox.addView(browserPhoneHint);browserBox.addView(browserView,new LinearLayout.LayoutParams(-1,0,1));browserDialog=new AlertDialog.Builder(context).setTitle("插件网页登录").setView(browserBox).setPositiveButton("保存并打开扫码 App",null).setNeutralButton("保存二维码",null).setNegativeButton("取消",(d,w)->finishBrowserLogin(false,"已取消登录")).create();browserDialog.setOnCancelListener(d->finishBrowserLogin(false,"已取消登录"));browserDialog.show();browserDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->saveBrowserQr(false));browserDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->saveBrowserQr(true));browserDialog.getWindow().setLayout((int)(context.getResources().getDisplayMetrics().widthPixels*0.92),(int)(context.getResources().getDisplayMetrics().heightPixels*0.90));browserView.loadUrl(address.toString());final long deadline=android.os.SystemClock.elapsedRealtime()+180000;
                 browserPoll=()->{if(browserRequest.isEmpty())return;if(android.os.SystemClock.elapsedRealtime()>deadline){finishBrowserLogin(false,"登录超时");return;}String cookie=CookieManager.getInstance().getCookie(cookiesOf);HashSet<String> present=new HashSet<>();if(cookie!=null)for(String pair:cookie.split(";")){int equals=pair.indexOf('=');if(equals>0)present.add(pair.substring(0,equals).trim());}boolean complete=true;for(int i=0;i<requiredCookies.length();i++)if(!present.contains(requiredCookies.optString(i)))complete=false;if(complete){try{finishBrowserLogin(true,new JSONObject().put("cookie",cookie).toString());}catch(Exception e){finishBrowserLogin(false,"无法读取登录结果");}}else main.postDelayed(browserPoll,500);};main.postDelayed(browserPoll,500);
             });
         }catch(Exception e){hostResult(request,false,e.getMessage()==null?"登录失败":e.getMessage());}
     }
-    private void saveBrowserQr(){
+    private void saveBrowserQr(boolean openApp){
         if(browserView==null||browserView.getWidth()<=0||browserView.getHeight()<=0){Toast.makeText(context,"登录页面正在加载，请稍后保存二维码",Toast.LENGTH_LONG).show();return;}
         WebView target=browserView;
-        Button button=browserDialog.getButton(AlertDialog.BUTTON_NEUTRAL);button.setEnabled(false);
-        target.postVisualStateCallback(0,new WebView.VisualStateCallback(){@Override public void onComplete(long request){if(closed||browserView!=target){button.setEnabled(true);return;}captureBrowserQr(target,button);}});
+        Button button=browserDialog.getButton(AlertDialog.BUTTON_NEUTRAL);browserQrEnabled(false);String request=browserRequest;
+        target.postVisualStateCallback(0,new WebView.VisualStateCallback(){@Override public void onComplete(long frame){if(closed||browserView!=target){browserQrEnabled(true);return;}captureBrowserQr(target,button,openApp,request);}});
     }
-    private void captureBrowserQr(WebView target,Button button){
+    private void captureBrowserQr(WebView target,Button button,boolean openApp,String request){
         float scale=Math.min(1,(float)Math.sqrt(2000000.0/(target.getWidth()*(double)target.getHeight())));
         Bitmap visible=Bitmap.createBitmap(Math.max(1,(int)(target.getWidth()*scale)),Math.max(1,(int)(target.getHeight()*scale)),Bitmap.Config.ARGB_8888);
         if(Build.VERSION.SDK_INT>=26){
             target.invalidate();target.postOnAnimation(()->target.postOnAnimation(()->{
-                if(closed||browserView!=target||browserDialog==null){visible.recycle();button.setEnabled(true);return;}
+                if(closed||browserView!=target||browserDialog==null){visible.recycle();browserQrEnabled(true);return;}
                 int[] location=new int[2];target.getLocationInWindow(location);android.graphics.Rect bounds=new android.graphics.Rect(location[0],location[1],location[0]+target.getWidth(),location[1]+target.getHeight());
-                try{android.view.PixelCopy.request(browserDialog.getWindow(),bounds,visible,status->{if(status==android.view.PixelCopy.SUCCESS)saveBrowserQrImage(visible,button);else{visible.recycle();button.setEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}},main);}
-                catch(IllegalArgumentException error){visible.recycle();button.setEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}
+                try{android.view.PixelCopy.request(browserDialog.getWindow(),bounds,visible,status->{if(status==android.view.PixelCopy.SUCCESS)saveBrowserQrImage(visible,button,openApp,request);else{visible.recycle();browserQrEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}},main);}
+                catch(IllegalArgumentException error){visible.recycle();browserQrEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}
             }));return;
         }
         android.graphics.Canvas canvas=new android.graphics.Canvas(visible);canvas.drawColor(android.graphics.Color.WHITE);canvas.scale(scale,scale);target.draw(canvas);
-        saveBrowserQrImage(visible,button);
+        saveBrowserQrImage(visible,button,openApp,request);
     }
-    private void saveBrowserQrImage(Bitmap visible,Button button){
+    private void saveBrowserQrImage(Bitmap visible,Button button,boolean openApp,String request){
         if(!submitHost("",()->{
             try{
-                Bitmap qr=PluginQrImage.extract(visible);
-                if(Build.VERSION.SDK_INT<29&&context instanceof MainActivity)main.post(()->((MainActivity)context).saveLoginQrDocument(qr));
-                else{try{PluginQrImage.save(context,qr);}finally{qr.recycle();}main.post(()->Toast.makeText(context,"二维码已保存到相册，请到对应 App 扫一扫中选择，再返回等待确认",Toast.LENGTH_LONG).show());}
+                String payload=PluginQrImage.payload(visible);Bitmap qr=PluginQrImage.create(payload);
+                if(Build.VERSION.SDK_INT<29&&context instanceof MainActivity)main.post(()->{((MainActivity)context).saveLoginQrDocument(qr,()->browserQrSaved(payload,openApp,request));qr.recycle();});
+                else{try{PluginQrImage.save(context,qr);}finally{qr.recycle();}main.post(()->browserQrSaved(payload,openApp,request));}
             }catch(Exception error){if((context.getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.util.Log.i("MyGoPlugin",id+": QR save failed: "+error.getClass().getSimpleName());String message=error instanceof com.google.zxing.ReaderException?"未识别到二维码，请让登录二维码完整显示后再保存":"二维码保存失败："+error.getMessage();main.post(()->Toast.makeText(context,message,Toast.LENGTH_LONG).show());}
-            finally{visible.recycle();main.post(()->button.setEnabled(true));}
-        })){visible.recycle();button.setEnabled(true);}
+            finally{visible.recycle();main.post(()->browserQrEnabled(true));}
+        })){visible.recycle();browserQrEnabled(true);}
+    }
+    private void closePhoneDialog(){if(phoneDialog!=null){phoneDialog.dismiss();phoneDialog=null;}}
+    private void finishSignInPrompt(String request){if(!request.equals(signInRequest))return;signInRequest="";closePhoneDialog();if(loginDialog!=null)loginDialog.dismiss();loginBitmap=null;}
+    private void browserQrEnabled(boolean enabled){if(browserDialog==null)return;for(int which:new int[]{AlertDialog.BUTTON_NEUTRAL,AlertDialog.BUTTON_POSITIVE}){Button button=browserDialog.getButton(which);if(button!=null)button.setEnabled(enabled);}}
+    private void browserQrSaved(String payload,boolean openApp,String request){
+        if(closed||browserRequest.isEmpty()||!browserRequest.equals(request))return;
+        if(browserPhoneHint!=null)browserPhoneHint.setText("二维码已保存到相册。在扫码应用的扫一扫中选择相册图片，确认后返回，本页自动更新。");
+        Toast.makeText(context,"二维码已保存到相册，登录等待仍在继续",Toast.LENGTH_LONG).show();
+        if(openApp){closePhoneDialog();phoneDialog=PhoneQrLogin.open(context,payload,"",()->!closed&&request.equals(browserRequest));}
+    }
+    private void updateLoginPrompt(String raw){
+        if(closed)return;try{JSONObject prompt=new JSONObject(raw);String qr=prompt.optString("qr",""),text=prompt.optString("text","");
+            if(loginDialog==null||!loginDialog.isShowing()){
+                LinearLayout box=new LinearLayout(context);box.setOrientation(1);box.setPadding(24,16,24,16);loginText=new TextView(context);box.addView(loginText);loginPhoneHint=new TextView(context);box.addView(loginPhoneHint);
+                loginOpenButton=new Button(context);loginOpenButton.setOnClickListener(view->saveNativeQr(true));box.addView(loginOpenButton);
+                loginSaveButton=new Button(context);loginSaveButton.setText("保存二维码");loginSaveButton.setOnClickListener(view->saveNativeQr(false));box.addView(loginSaveButton);
+                loginQr=new ImageView(context);int size=Math.max(128,Math.min(400,(int)(context.getResources().getDisplayMetrics().heightPixels*.5)));box.addView(loginQr,new LinearLayout.LayoutParams(size,size));ScrollView scroll=new ScrollView(context);scroll.addView(box);
+                loginDialog=new AlertDialog.Builder(context).setTitle("本机相册扫码登录").setView(scroll).setNegativeButton("取消",(dialog,which)->dispose()).create();loginDialog.setOnCancelListener(dialog->dispose());loginDialog.setCanceledOnTouchOutside(false);lastQr="";loginDialog.show();
+            }
+            loginPromptText=text;loginText.setText(text);
+            if(!qr.isEmpty()&&!qr.equals(lastQr)){loginBitmap=PluginQrImage.create(qr);loginQr.setImageBitmap(loginBitmap);lastQr=qr;closePhoneDialog();}
+            loginPhoneHint.setText(PhoneQrLogin.instructions(lastQr,text));loginOpenButton.setText(PhoneQrLogin.button(lastQr,text));nativeQrEnabled(!loginQrSaving);
+        }catch(Exception error){Toast.makeText(context,"登录提示失败："+error.getMessage(),Toast.LENGTH_LONG).show();}
+    }
+    private void nativeQrEnabled(boolean enabled){if(loginSaveButton!=null)loginSaveButton.setEnabled(enabled&&loginBitmap!=null);if(loginOpenButton!=null)loginOpenButton.setEnabled(enabled&&loginBitmap!=null);}
+    private void nativeQrSaved(String payload,String prompt,String request,boolean openApp){
+        if(closed||!request.equals(signInRequest)||loginDialog==null||!loginDialog.isShowing())return;
+        if(!payload.equals(lastQr)){Toast.makeText(context,"二维码已更新，请保存当前二维码",Toast.LENGTH_LONG).show();return;}
+        loginPhoneHint.setText("二维码已保存到相册。\n"+PhoneQrLogin.instructions(payload,prompt));
+        Toast.makeText(context,"二维码已保存到相册，登录等待仍在继续",Toast.LENGTH_LONG).show();
+        if(openApp){closePhoneDialog();phoneDialog=PhoneQrLogin.open(context,payload,prompt,()->!closed&&request.equals(signInRequest)&&payload.equals(lastQr));}
+    }
+    private void saveNativeQr(boolean openApp){
+        if(loginQrSaving)return;Bitmap current=loginBitmap;if(current==null){Toast.makeText(context,"二维码尚未生成",Toast.LENGTH_SHORT).show();return;}
+        String payload=lastQr,prompt=loginPromptText,request=signInRequest;Bitmap copy=current.copy(Bitmap.Config.ARGB_8888,false);if(copy==null)return;
+        if(Build.VERSION.SDK_INT<29&&context instanceof MainActivity){((MainActivity)context).saveLoginQrDocument(copy,()->nativeQrSaved(payload,prompt,request,openApp));copy.recycle();return;}
+        loginQrSaving=true;nativeQrEnabled(false);if(!submitHost("",()->{
+            try{PluginQrImage.save(context,copy);main.post(()->nativeQrSaved(payload,prompt,request,openApp));}catch(Exception error){main.post(()->{if(!closed)Toast.makeText(context,"二维码保存失败："+error.getMessage(),Toast.LENGTH_LONG).show();});}
+            finally{copy.recycle();main.post(()->{loginQrSaving=false;nativeQrEnabled(true);});}
+        })){copy.recycle();loginQrSaving=false;nativeQrEnabled(true);}
     }
     private String result(boolean ok,Object value){try{return new JSONObject().put("ok",ok).put(ok?"value":"error",value==null?JSONObject.NULL:value).toString();}catch(Exception e){return "{\"ok\":false,\"error\":\"辅助程序返回数据无效\"}";}}
     private void hostReply(String request,boolean ok,Object value){try{String raw;if(ok){String array=new JSONArray().put(value==null?JSONObject.NULL:value).toString();if(array==null)throw new IllegalArgumentException("invalid host value");raw=array.substring(1,array.length()-1);}else raw=String.valueOf(value);main.post(()->hostResult(request,ok,raw));}catch(Exception error){main.post(()->hostResult(request,false,"辅助程序返回数据无效"));}}
@@ -151,7 +191,7 @@ public final class PluginRuntime {
         @JavascriptInterface public String removeDataDir(String name){try{File root=new File(directory,"data"),target=new File(root,name);if(name.isEmpty()||name.contains("\\")||!root.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator)||!target.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator))throw new IOException("插件数据目录路径越界");PluginArchive.delete(target);return result(true,null);}catch(Exception e){return result(false,e.getMessage()==null?e.toString():e.getMessage());}}
         @JavascriptInterface public void webSignIn(String request,String raw){main.post(()->showBrowserLogin(request,raw));}
         @JavascriptInterface public void ready(boolean ok,String value){main.post(()->finishLoad(ok,value));}
-        @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{if(request.equals(signInRequest)){signInRequest="";if(loginDialog!=null)loginDialog.dismiss();loginBitmap=null;}Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
+        @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{finishSignInPrompt(request);Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
         @JavascriptInterface public String typescriptSource(String name){try{return typescript.source(name);}catch(Exception error){throw new IllegalArgumentException(error.getMessage());}}
         @JavascriptInterface public void typescriptComplete(String name,String code,String error){if(typescript!=null)typescript.complete(name,code,error);}
         @JavascriptInterface public String storageGet(String key){return storage.getString(key,"");}
@@ -164,12 +204,7 @@ public final class PluginRuntime {
         @JavascriptInterface public void request(String request,String address,String init){try{http.open(request,address,new JSONObject(init));}catch(Exception e){main.post(()->{if(!closed&&web!=null)web.evaluateJavascript("window.__networkResult("+JSONObject.quote(request)+",\"error\","+JSONObject.quote("{\"error\":\"无效网络请求\"}")+");",null);});}}
         @JavascriptInterface public void readResponse(String request){if(http!=null)http.read(request);}
         @JavascriptInterface public void cancelResponse(String request){if(http!=null)http.cancel(request);}
-        @JavascriptInterface public void signInPrompt(String raw){main.post(()->{
-            if(closed)return;try{JSONObject prompt=new JSONObject(raw);String qr=prompt.optString("qr","");String text=prompt.optString("text","");
-                if(loginDialog==null||!loginDialog.isShowing()){LinearLayout box=new LinearLayout(context);box.setOrientation(1);box.setPadding(24,16,24,16);loginText=new TextView(context);box.addView(loginText);TextView phoneHint=new TextView(context);phoneHint.setText("同一部手机登录：保存二维码后，到对应音乐应用的扫一扫中从相册选择，再返回这里等待确认。");box.addView(phoneHint);Button saveQr=new Button(context);saveQr.setText("保存二维码");saveQr.setOnClickListener(view->{Bitmap bitmap=loginBitmap;if(bitmap==null){Toast.makeText(context,"二维码尚未生成",Toast.LENGTH_SHORT).show();return;}if(Build.VERSION.SDK_INT<29&&context instanceof MainActivity){((MainActivity)context).saveLoginQrDocument(bitmap);return;}submitHost("",()->{try{PluginQrImage.save(context,bitmap);main.post(()->Toast.makeText(context,"二维码已保存到相册，请到对应应用扫一扫中选择",Toast.LENGTH_LONG).show());}catch(Exception error){main.post(()->Toast.makeText(context,"保存失败："+error.getMessage(),Toast.LENGTH_LONG).show());}});});box.addView(saveQr);loginQr=new ImageView(context);int qrSize=Math.max(128,Math.min(400,(int)(context.getResources().getDisplayMetrics().heightPixels*0.5)));box.addView(loginQr,new LinearLayout.LayoutParams(qrSize,qrSize));ScrollView loginScroll=new ScrollView(context);loginScroll.addView(box);loginDialog=new AlertDialog.Builder(context).setTitle("插件登录").setView(loginScroll).setNegativeButton("关闭",(dialog,which)->dispose()).create();loginDialog.setOnCancelListener(dialog->dispose());lastQr="";loginDialog.show();}
-                loginText.setText(text);if(!qr.isEmpty()&&!qr.equals(lastQr)){loginBitmap=PluginQrImage.create(qr);loginQr.setImageBitmap(loginBitmap);lastQr=qr;}
-            }catch(Exception e){Toast.makeText(context,"登录提示失败："+e.getMessage(),Toast.LENGTH_LONG).show();}
-        });}
+        @JavascriptInterface public void signInPrompt(String raw){main.post(()->updateLoginPrompt(raw));}
     }
     private static String architecture(){String abi=Build.SUPPORTED_ABIS[0];if(abi.equals("arm64-v8a"))return "arm64";if(abi.equals("x86_64"))return "amd64";if(abi.startsWith("armeabi"))return "arm";if(abi.equals("x86"))return "386";return abi;}
     private static String hex(byte[] bytes){StringBuilder b=new StringBuilder();for(byte x:bytes)b.append(String.format(Locale.US,"%02x",x&255));return b.toString();}
