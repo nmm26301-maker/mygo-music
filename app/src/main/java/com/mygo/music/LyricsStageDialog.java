@@ -14,16 +14,18 @@ final class LyricsStageDialog extends Dialog {
         long duration();void toggle();void previous();void next();void refresh();void importLyrics();
     }
     private final Host host;
+    final LyricsTiming timing;
     private final Handler handler=new Handler(Looper.getMainLooper());
     final LyricsStageView stage;
     final SeekBar progress;
     private final TextView title,badge,time;
     private final Button play;
     private boolean touching;
+    private AlertDialog timingDialog;
     String trackUri="";
     private final Runnable tick=new Runnable(){public void run(){if(!isShowing())return;long duration=host.duration(),position=host.position();if(!touching)progress.setProgress(duration>0?(int)Math.min(10000,position*10000/duration):0);time.setText(format(position)+" / "+format(duration));play.setText(host.playing()?"暂停":"播放");if(host.playing())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stage.invalidate();handler.postDelayed(this,100);}};
     LyricsStageDialog(Activity activity,Host host){
-        super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;stage=new LyricsStageView(activity,host);stage.setBackdrop(false);
+        super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;timing=new LyricsTiming(host,activity.getSharedPreferences("library",0));stage=new LyricsStageView(activity,timing);stage.setBackdrop(false);
         LinearLayout root=new LinearLayout(activity);root.setOrientation(1);root.setPadding(dp(16),dp(5),dp(16),dp(4));
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xff2c406a,0xff202744,0xff151627}));
         LinearLayout header=new LinearLayout(activity);header.setGravity(Gravity.CENTER_VERTICAL);
@@ -41,15 +43,28 @@ final class LyricsStageDialog extends Dialog {
     private int dp(float value){return (int)(value*getContext().getResources().getDisplayMetrics().density+.5f);}
     private TextView label(String text,int size){TextView view=new TextView(getContext());view.setText(text);view.setTextSize(size);view.setTextColor(Color.WHITE);view.setGravity(Gravity.CENTER_VERTICAL);return view;}
     private Button button(String text){Button button=new Button(getContext());button.setText(text);button.setTextSize(13);button.setTextColor(0xffe5eafa);button.setAllCaps(false);button.setPadding(0,0,0,0);button.setMinHeight(0);button.setMinimumHeight(0);button.setMinWidth(0);button.setMinimumWidth(0);button.setBackgroundColor(Color.TRANSPARENT);return button;}
-    void setTrack(String uri,String name){trackUri=uri;title.setText(name);setTimeline(LyricsTimeline.empty());setMessage("正在获取歌词");}
+    void setTrack(String uri,String name){if(!uri.equals(trackUri)&&timingDialog!=null)timingDialog.dismiss();trackUri=uri;timing.select(uri);title.setText(name);setTimeline(LyricsTimeline.empty());setMessage("正在获取歌词");}
     void setTimeline(LyricsTimeline value){stage.setTimeline(value);badge.setText(value.lines.isEmpty()?"暂无歌词":value.wordTimed?(value.estimatedWordTiming?"逐字歌词 · 部分时间按行推算":"逐字歌词 · 点击歌词可跳转"):value.timed?"逐行歌词 · 此来源未提供逐字时间":"文本歌词 · 此来源未提供时间轴");}
     void setMessage(String message){stage.setMessage(message);}
     private void applyEffect(int effect){stage.setEffect(effect);}
     private void showSettings(View anchor){
-        PopupMenu menu=new PopupMenu(getContext(),anchor);String[] labels={"发光律动","柔和高亮","简洁高亮","重新获取歌词","导入歌词文件","回到正在演唱的歌词"};
-        for(int i=0;i<labels.length;i++)menu.getMenu().add(0,i,i,labels[i]);menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(id<3){getContext().getSharedPreferences("library",0).edit().putInt("lyrics_effect",id).apply();applyEffect(id);}else if(id==3)host.refresh();else if(id==4)host.importLyrics();else stage.follow();return true;});menu.show();
+        PopupMenu menu=new PopupMenu(getContext(),anchor);String[] labels={"发光律动","柔和高亮","简洁高亮","重新获取歌词","导入歌词文件","回到正在演唱的歌词","调整歌词同步"};
+        for(int i=0;i<labels.length;i++)menu.getMenu().add(0,i,i,labels[i]);menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(id<3){getContext().getSharedPreferences("library",0).edit().putInt("lyrics_effect",id).apply();applyEffect(id);}else if(id==3)host.refresh();else if(id==4)host.importLyrics();else if(id==5)stage.follow();else showTiming();return true;});menu.show();
+    }
+    private String timingLabel(){int value=timing.offset();return value==0?"当前未调整":"歌词"+(value<0?"提前 ":"延后 ")+String.format(java.util.Locale.CHINA,"%.1f 秒",Math.abs(value)/1000.0);}
+    private void showTiming(){
+        final String selected=trackUri;
+        LinearLayout box=new LinearLayout(getContext());box.setOrientation(1);box.setPadding(dp(20),dp(8),dp(20),dp(8));
+        TextView value=label(timingLabel(),17);box.addView(value);
+        TextView hint=label("每次调整 0.2 秒，最多前后 10 秒。自动记住这首歌的设置。",13);hint.setPadding(0,dp(8),0,dp(8));box.addView(hint);
+        LinearLayout buttons=new LinearLayout(getContext());
+        Button earlier=button("提前 0.2 秒"),later=button("延后 0.2 秒"),reset=button("恢复同步");
+        for(Button button:new Button[]{earlier,later,reset})buttons.addView(button,new LinearLayout.LayoutParams(0,dp(48),1));box.addView(buttons);
+        AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("调整歌词同步").setView(box).setPositiveButton("完成",null).create();timingDialog=dialog;
+        View.OnClickListener adjust=view->{if(!selected.equals(trackUri)){dialog.dismiss();return;}if(view==reset)timing.set(0);else timing.adjust(view==earlier?-200:200);stage.follow();value.setText(timingLabel());};
+        earlier.setOnClickListener(adjust);later.setOnClickListener(adjust);reset.setOnClickListener(adjust);dialog.show();
     }
     private static String format(long time){return String.format(java.util.Locale.CHINA,"%02d:%02d",Math.max(0,time)/60000,Math.max(0,time)/1000%60);}
-    @Override public void dismiss(){handler.removeCallbacksAndMessages(null);super.dismiss();}
+    @Override public void dismiss(){handler.removeCallbacksAndMessages(null);if(timingDialog!=null)timingDialog.dismiss();super.dismiss();}
     @Override protected void onStop(){handler.removeCallbacksAndMessages(null);super.onStop();}
 }

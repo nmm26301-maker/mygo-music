@@ -24,7 +24,17 @@ final class LyricsChecks {
     private static String fixture()throws Exception{return new JSONObject().put("lines",new JSONArray()
         .put(new JSONObject().put("start",0).put("end",6000).put("translation","A source-provided timed phrase").put("words",new JSONArray().put(new JSONObject().put("text","让音乐慢慢亮起").put("start",1000).put("end",5000))))
         .put(new JSONObject().put("start",7000).put("end",14000).put("words",new JSONArray().put(new JSONObject().put("text","跟着声音向前").put("start",7000).put("end",12000))))).toString();}
-    void run()throws Exception{parser();pixels();servicePage();}
+    void run()throws Exception{parser();timing();pixels();servicePage();}
+    private void timing(){
+        SharedPreferences prefs=context.getSharedPreferences("lyrics_timing_test",0);prefs.edit().clear().commit();
+        Clock audio=new Clock();audio.position=7000;LyricsTiming timing=new LyricsTiming(audio,prefs);timing.select("first");timing.adjust(600);
+        check(timing.offset()==600&&timing.position()==6400&&audio.position==7000,"delaying lyrics changed the audio clock or used the wrong direction");
+        timing.seek(7000);check(audio.position==7600,"tapping delayed lyrics failed to compensate audio seek");
+        LyricsTiming restored=new LyricsTiming(audio,prefs);restored.select("first");check(restored.offset()==600,"song synchronization was not saved");
+        restored.select("second");check(restored.offset()==0,"timing leaked into another song");restored.adjust(-400);audio.position=0;check(restored.position()==400,"advancing lyrics used the wrong direction");restored.seek(100);check(audio.position==0,"advanced lyric seek passed a negative audio timestamp");
+        restored.set(10000);audio.position=0;check(restored.position()==-10000,"delayed first lyric was highlighted before its start");restored.adjust(Integer.MAX_VALUE);check(restored.offset()==10000,"maximum delay overflowed");restored.adjust(Integer.MIN_VALUE);check(restored.offset()==-10000,"maximum advance overflowed");
+        restored.set(0);restored.select("first");check(restored.offset()==600,"resetting one song deleted another song's timing");restored.select("second");check(restored.offset()==0,"reset was not persisted");prefs.edit().clear().commit();
+    }
     private void parser()throws Exception{
         LyricsTimeline parsed=LyricsTimeline.parse(fixture());check(parsed.wordTimed&&!parsed.estimatedWordTiming,"source word times were replaced with estimates");check(parsed.active(-1)==-1&&parsed.active(0)==0&&parsed.active(6999)==0&&parsed.active(7000)==1,"line boundary/intro lookup failed");
         LyricsTimeline.Word word=parsed.lines.get(0).words.get(0);check(word.fraction(999)==0&&word.fraction(1000)==0&&word.fraction(3000)==.5f&&word.fraction(5000)==1&&word.fraction(2000)==.25f,"absolute word clock/seek fraction failed");
@@ -72,7 +82,7 @@ final class LyricsChecks {
     @SuppressWarnings("unchecked") private void servicePage()throws Exception{
         File first=new File(context.getCacheDir(),"lyrics-stage-a.wav"),second=new File(context.getCacheDir(),"lyrics-stage-b.wav");try(FileOutputStream output=new FileOutputStream(first)){output.write(BackgroundPlaybackChecks.wav(20000));}try(FileOutputStream output=new FileOutputStream(second)){output.write(BackgroundPlaybackChecks.wav(20000));}
         MainActivity activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PlaybackService[] service={null};await(()->{service[0]=(PlaybackService)field(activity,"playbackService");return service[0]!=null;},"lyrics page did not bind to audio service");
-        String firstUri=Uri.fromFile(first).toString(),secondUri=Uri.fromFile(second).toString();String original=context.getSharedPreferences("library",0).getString("local_lyrics","{}");
+        String firstUri=Uri.fromFile(first).toString(),secondUri=Uri.fromFile(second).toString();String original=context.getSharedPreferences("library",0).getString("local_lyrics","{}"),originalOffsets=context.getSharedPreferences("library",0).getString("lyrics_offsets","{}");
         try{
             String raw=fixture();test.runOnMainSync(()->{try{HashMap<String,String> saved=(HashMap<String,String>)field(activity,"localLyrics");saved.put(firstUri,raw);saved.put(secondUri,"[00:00]新的歌曲歌词\n[00:03]切歌后不要显示旧词");JSONArray queue=new JSONArray().put(new JSONObject().put("uri",firstUri).put("title","逐字歌词实测")).put(new JSONObject().put("uri",secondUri).put("title","切歌实测"));PlaybackService.startQueue(activity,queue,0,0,60,false,false,"high");}catch(Exception error){throw new RuntimeException(error);}});
             await(()->service[0].snapshot().playing,"native audio fixture never played");test.runOnMainSync(()->{try{service[0].pause();service[0].seek(3000);invoke(activity,"showLyrics");}catch(Exception error){throw new RuntimeException(error);}});
@@ -85,9 +95,15 @@ final class LyricsChecks {
             SystemClock.sleep(600);test.runOnMainSync(()->{try{View title=(View)field(page[0],"title");Rect visible=new Rect();check(title.getGlobalVisibleRect(visible)&&visible.height()==title.getHeight()&&visible.top>=0,"full-screen lyric header is clipped by system insets");}catch(Exception error){throw new RuntimeException(error);}});
             File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();Bitmap image=test.getUiAutomation().takeScreenshot();check(image!=null,"actual Android lyric screenshot unavailable");try(FileOutputStream out=new FileOutputStream(new File(qa,"lyrics-stage.png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();
             sourceRefresh(activity,page[0],firstUri);
+            test.runOnMainSync(()->{try{service[0].pause();service[0].seek(7000);invoke(page[0],"showTiming");AlertDialog dialog=(AlertDialog)field(page[0],"timingDialog");View later=findText(dialog.getWindow().getDecorView(),"延后 0.2 秒");check(later!=null,"lyric synchronization controls are missing");later.performClick();later.performClick();later.performClick();check(page[0].timing.offset()==600,"visible delay button did not save 0.2-second steps");check(Math.abs(service[0].snapshot().position-7000)<100,"synchronization setting moved actual audio");check(page[0].stage.activeLine()==0,"stage ignored the selected synchronization offset");dialog.dismiss();page[0].timing.seek(7000);}catch(Exception error){throw new RuntimeException(error);}});
+            await(()->Math.abs(service[0].snapshot().position-7600)<200,"synchronized lyric seek did not reach actual audio timestamp");
+            test.runOnMainSync(()->{try{page[0].dismiss();invoke(activity,"showLyrics");}catch(Exception error){throw new RuntimeException(error);}});
+            await(()->{page[0]=(LyricsStageDialog)field(activity,"lyricsStage");return page[0]!=null&&page[0].stage.timeline().wordTimed&&page[0].timing.offset()==600;},"reopening lyrics lost saved song synchronization");
             test.runOnMainSync(service[0]::next);await(()->page[0].trackUri.equals(secondUri)&&page[0].stage.timeline().lines.size()==2&&page[0].stage.timeline().lines.get(0).text.equals("新的歌曲歌词"),"track change left the previous song's lyric timeline visible");
+            test.runOnMainSync(()->check(page[0].timing.offset()==0,"changing songs reused the previous song's synchronization"));
             await(()->service[0].snapshot().playing&&service[0].snapshot().uri.equals(secondUri),"new audio did not become ready before closing lyrics");
             test.runOnMainSync(()->{page[0].dismiss();check(service[0].snapshot().playing,"closing the lyric page paused the song");});
-        }finally{test.runOnMainSync(()->{try{LyricsStageDialog page=(LyricsStageDialog)field(activity,"lyricsStage");if(page!=null)page.dismiss();}catch(Exception ignored){}service[0].stopPlayback();activity.finish();});context.getSharedPreferences("library",0).edit().putString("local_lyrics",original).commit();first.delete();second.delete();}
+        }finally{test.runOnMainSync(()->{try{LyricsStageDialog page=(LyricsStageDialog)field(activity,"lyricsStage");if(page!=null)page.dismiss();}catch(Exception ignored){}service[0].stopPlayback();activity.finish();});context.getSharedPreferences("library",0).edit().putString("local_lyrics",original).putString("lyrics_offsets",originalOffsets).commit();first.delete();second.delete();}
     }
+    private static View findText(View view,String text){if(view instanceof android.widget.TextView&&text.contentEquals(((android.widget.TextView)view).getText()))return view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View match=findText(group.getChildAt(i),text);if(match!=null)return match;}}return null;}
 }

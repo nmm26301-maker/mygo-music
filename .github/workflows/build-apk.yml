@@ -92,7 +92,7 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=57'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=58'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |
