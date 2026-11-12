@@ -110,10 +110,14 @@ public final class PluginRuntime {
     }
     private void saveBrowserQr(){
         if(browserView==null||browserView.getWidth()<=0||browserView.getHeight()<=0)return;
-        float scale=Math.min(1,(float)Math.sqrt(2000000.0/(browserView.getWidth()*(double)browserView.getHeight())));
-        Bitmap visible=Bitmap.createBitmap(Math.max(1,(int)(browserView.getWidth()*scale)),Math.max(1,(int)(browserView.getHeight()*scale)),Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas canvas=new android.graphics.Canvas(visible);canvas.scale(scale,scale);browserView.draw(canvas);
+        WebView target=browserView;
         Button button=browserDialog.getButton(AlertDialog.BUTTON_NEUTRAL);button.setEnabled(false);
+        target.postVisualStateCallback(0,new WebView.VisualStateCallback(){@Override public void onComplete(long request){if(closed||browserView!=target){button.setEnabled(true);return;}captureBrowserQr(target,button);}});
+    }
+    private void captureBrowserQr(WebView target,Button button){
+        float scale=Math.min(1,(float)Math.sqrt(2000000.0/(target.getWidth()*(double)target.getHeight())));
+        Bitmap visible=Bitmap.createBitmap(Math.max(1,(int)(target.getWidth()*scale)),Math.max(1,(int)(target.getHeight()*scale)),Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas=new android.graphics.Canvas(visible);canvas.drawColor(android.graphics.Color.WHITE);canvas.scale(scale,scale);target.draw(canvas);
         if(!submitHost("",()->{
             try{
                 Bitmap qr=PluginQrImage.extract(visible);
