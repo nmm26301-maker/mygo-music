@@ -21,3 +21,5 @@
 ## 二维码
 
 继续使用已有 ZXing（Apache-2.0，仓库 2026-11-09 有更新）生成和识别二维码，并使用 Android MediaStore 保存到相册。原生提示及网页登录窗口均提供保存按钮。网页登录只在内存中识别当前可见二维码，重新生成带安静区的独立二维码图片，不保存完整登录页面。补充两种真实按钮测试，并从相册读回 PNG 解码核对原始二维码内容；保存后登录窗口保持等待。正式账号扫码确认由用户在对应 App 内完成。
+
+网页登录取图遵循 Android 官方 [postVisualStateCallback](https://developer.android.com/reference/android/webkit/WebView#postVisualStateCallback(long,android.webkit.WebView.VisualStateCallback)) 与 [PixelCopy](https://developer.android.com/reference/android/view/PixelCopy) 的绘制时序约定：等待当前 DOM 可绘制并经过帧提交后，从登录窗口可见网页区域复制像素，再用 ZXing 提取二维码。Android 8 以上采用 PixelCopy；较旧系统保留位图 Canvas 路径。

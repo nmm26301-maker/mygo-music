@@ -117,7 +117,18 @@ public final class PluginRuntime {
     private void captureBrowserQr(WebView target,Button button){
         float scale=Math.min(1,(float)Math.sqrt(2000000.0/(target.getWidth()*(double)target.getHeight())));
         Bitmap visible=Bitmap.createBitmap(Math.max(1,(int)(target.getWidth()*scale)),Math.max(1,(int)(target.getHeight()*scale)),Bitmap.Config.ARGB_8888);
+        if(Build.VERSION.SDK_INT>=26){
+            target.invalidate();target.postOnAnimation(()->target.postOnAnimation(()->{
+                if(closed||browserView!=target||browserDialog==null){visible.recycle();button.setEnabled(true);return;}
+                int[] location=new int[2];target.getLocationInWindow(location);android.graphics.Rect bounds=new android.graphics.Rect(location[0],location[1],location[0]+target.getWidth(),location[1]+target.getHeight());
+                try{android.view.PixelCopy.request(browserDialog.getWindow(),bounds,visible,status->{if(status==android.view.PixelCopy.SUCCESS)saveBrowserQrImage(visible,button);else{visible.recycle();button.setEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}},main);}
+                catch(IllegalArgumentException error){visible.recycle();button.setEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}
+            }));return;
+        }
         android.graphics.Canvas canvas=new android.graphics.Canvas(visible);canvas.drawColor(android.graphics.Color.WHITE);canvas.scale(scale,scale);target.draw(canvas);
+        saveBrowserQrImage(visible,button);
+    }
+    private void saveBrowserQrImage(Bitmap visible,Button button){
         if(!submitHost("",()->{
             try{
                 Bitmap qr=PluginQrImage.extract(visible);
