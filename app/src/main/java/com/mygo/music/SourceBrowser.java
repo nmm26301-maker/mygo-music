@@ -32,28 +32,28 @@ final class SourceBrowser {
         final String method,title;
         final JSONObject args;
         JSONObject result,summary;
-        int consumed;
+        int consumed,scroll;
         final IdentityHashMap<JSONArray,Integer> visible=new IdentityHashMap<>();
         Page(String method,JSONObject args,String title){this.method=method;this.args=args;this.title=title;}
     }
     SourceBrowser(Activity activity,PluginManager manager,LinearLayout container,Host host){this.activity=activity;this.manager=manager;this.container=container;this.host=host;}
     boolean active(){return !closed&&source!=null;}
     String sourceId(){return source==null?"":source.id;}
-    void clear(){request++;source=null;page=null;history.clear();container.removeAllViews();loading=false;}
+    void clear(){request++;source=null;page=null;history.clear();container.removeAllViews();loading=false;scrollTo(0);}
     void close(){clear();closed=true;}
     void select(PluginManager.PluginInfo next){clear();source=next;if(next.supports("home"))open("home",new JSONObject(),next.name);else{page=new Page("landing",new JSONObject(),next.name);page.result=new JSONObject();render();}}
     void open(PluginManager.PluginInfo next,String method,JSONObject args,String title){if(source==null||!source.id.equals(next.id)){clear();source=next;}open(method,args,title);}
     void showExternal(PluginManager.PluginInfo next,JSONObject result){if(source==null||!source.id.equals(next.id)){clear();source=next;}remember();page=new Page("external",new JSONObject(),result.optString("title",next.name));page.result=result;request++;loading=false;render();}
-    private void remember(){if(page!=null&&page.result!=null){history.addLast(page);if(history.size()>20)history.removeFirst();}}
+    private void remember(){if(page!=null&&page.result!=null){if(container.getParent() instanceof ScrollView)page.scroll=((ScrollView)container.getParent()).getScrollY();history.addLast(page);if(history.size()>20)history.removeFirst();}}
     private void open(String method,JSONObject args,String title){if(!active())return;remember();page=new Page(method,args,title);load(false);}
     void search(String query,String kind){if(!active())return;JSONObject args=new JSONObject();try{args.put("query",query).put("kind",kind).put("offset",0);}catch(JSONException ignored){}open("search",args,"搜索结果 · "+query);}
-    boolean back(){if(history.isEmpty()||!active())return false;request++;loading=false;page=history.removeLast();render();return true;}
+    boolean back(){if(history.isEmpty()||!active())return false;request++;loading=false;page=history.removeLast();render();scrollTo(page.scroll);return true;}
     void reload(){if(page!=null&&!page.method.equals("landing")&&!page.method.equals("external"))load(false);}
     private boolean current(PluginManager.PluginInfo selected,Page target,long ticket){if(closed||activity.isFinishing()||activity.isDestroyed()||source!=selected||page!=target||request!=ticket)return false;for(PluginManager.PluginInfo installed:manager.list())if(installed.enabled&&installed.id.equals(selected.id))return true;return false;}
     private void load(boolean append){
         if(!active()||page==null)return;
         final PluginManager.PluginInfo selected=source;final Page target=page;final long ticket=++request;
-        loading=true;if(!append){target.result=null;target.consumed=0;target.visible.clear();}render();
+        loading=true;if(!append){target.result=null;target.consumed=0;target.visible.clear();}render();if(!append)scrollTo(0);
         JSONObject args;try{args=new JSONObject(target.args.toString());if(append)args.put("offset",target.consumed);}catch(JSONException error){return;}
         manager.export(selected.id,target.method,args,(ok,raw)->activity.runOnUiThread(()->{
             if(!current(selected,target,ticket))return;loading=false;
@@ -63,7 +63,7 @@ final class SourceBrowser {
                 int count=countRows(result);
                 if(append&&target.result!=null){boolean added=false;for(String key:KINDS){JSONArray incoming=result.optJSONArray(key);if(incoming==null)continue;JSONArray previous=target.result.optJSONArray(key);if(previous==null)previous=new JSONArray();Set<String> seen=new HashSet<>();for(int i=0;i<previous.length();i++){JSONObject item=previous.optJSONObject(i);if(item!=null)seen.add(itemKey(key,item));}for(int i=0;i<incoming.length();i++){JSONObject item=incoming.optJSONObject(i);if(item!=null&&seen.add(itemKey(key,item))){previous.put(item);added=true;}}target.result.put(key,previous);}target.result.put("more",result.optBoolean("more")&&count>0&&added);}
                 else{target.result=result;if(count==0)target.result.put("more",false);}
-                target.consumed+=count;render();
+                target.consumed+=count;render();if(!append)scrollTo(0);
             }catch(Exception error){render();host.error(selected,"插件页面格式无效："+error.getMessage(),()->{if(current(selected,target,ticket))load(append);});}
         }));
     }
@@ -108,6 +108,7 @@ final class SourceBrowser {
         if(sections==null&&countRows(result)==0)container.addView(text(displayed.method.equals("landing")?"输入关键词，搜索此音乐源":"暂无内容",14,0xffb8adca));
         if(result.optBoolean("more")&&canPaginate(displayed.method)){Button more=button(loading?"正在加载更多":"加载更多",()->{if(!loading)load(true);});more.setEnabled(!loading);container.addView(more,new LinearLayout.LayoutParams(-1,dp(42)));}
     }
+    private void scrollTo(int y){Page expected=page;container.post(()->{if(closed||page!=expected)return;if(container.getParent() instanceof ScrollView)((ScrollView)container.getParent()).scrollTo(0,y);});}
     private static boolean canPaginate(String method){return method.equals("search")||method.equals("liked")||method.equals("savedAlbums")||method.equals("show");}
     private void addNavigation(LinearLayout navigation,Set<String> seen,String label,String target){
         if(target.isEmpty()||!seen.add(target))return;
@@ -123,7 +124,7 @@ final class SourceBrowser {
         String method=kind.equals("album")?"saveAlbum":kind.equals("artist")?"followArtist":kind.equals("show")?"subscribeShow":"savePlaylist";
         if(!source.supports(method)||entity.optString("id").isEmpty()||kind.equals("playlist")&&entity.optBoolean("mine"))return;
         String key=kind.equals("artist")?"following":kind.equals("show")?"subscribed":"saved";
-        String label=kind.equals("artist")?"关注歌手":kind.equals("show")?"订阅播客":kind.equals("album")?"收藏专辑":"收藏歌单";Button save=button((entity.optBoolean(key)?"取消":"")+label,()->{});save.setOnClickListener(v->{boolean desired=!entity.optBoolean(key);JSONObject args=arg("id",entity.optString("id"));try{args.put("on",desired);}catch(JSONException ignored){}save.setEnabled(false);PluginManager.PluginInfo selected=source;Page target=page;long ticket=request;manager.export(selected.id,method,args,(ok,raw)->activity.runOnUiThread(()->{if(!current(selected,target,ticket))return;if(ok){try{entity.put(key,desired);}catch(JSONException ignored){}render();}else{save.setEnabled(true);host.error(selected,raw,()->{if(current(selected,target,ticket))save.performClick();});}}));});container.addView(save,new LinearLayout.LayoutParams(-1,dp(38)));
+        String label=kind.equals("artist")?"关注此歌手":kind.equals("show")?"订阅此播客":kind.equals("album")?"收藏此专辑":"收藏此歌单";Button save=button((entity.optBoolean(key)?"取消":"")+label,()->{});save.setOnClickListener(v->{boolean desired=!entity.optBoolean(key);JSONObject args=arg("id",entity.optString("id"));try{args.put("on",desired);}catch(JSONException ignored){}save.setEnabled(false);PluginManager.PluginInfo selected=source;Page target=page;long ticket=request;manager.export(selected.id,method,args,(ok,raw)->activity.runOnUiThread(()->{if(!current(selected,target,request))return;if(ok){try{entity.put(key,desired);}catch(JSONException ignored){}render();}else{save.setEnabled(true);host.error(selected,raw,()->{if(current(selected,target,ticket))save.performClick();});}}));});container.addView(save,new LinearLayout.LayoutParams(-1,dp(38)));
     }
     private void renderItems(JSONObject result){for(String kind:KINDS){JSONArray items=result.optJSONArray(kind);if(items==null||items.length()==0)continue;if(kind.equals("tracks")||kind.equals("episodes"))tracks(items);else cards(kind,items);}}
     private void tracks(JSONArray items){
