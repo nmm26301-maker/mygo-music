@@ -33,6 +33,7 @@ final class SourceBrowser {
         final JSONObject args;
         JSONObject result,summary;
         int consumed;
+        final IdentityHashMap<JSONArray,Integer> visible=new IdentityHashMap<>();
         Page(String method,JSONObject args,String title){this.method=method;this.args=args;this.title=title;}
     }
     SourceBrowser(Activity activity,PluginManager manager,LinearLayout container,Host host){this.activity=activity;this.manager=manager;this.container=container;this.host=host;}
@@ -52,7 +53,7 @@ final class SourceBrowser {
     private void load(boolean append){
         if(!active()||page==null)return;
         final PluginManager.PluginInfo selected=source;final Page target=page;final long ticket=++request;
-        loading=true;if(!append){target.result=null;target.consumed=0;}render();
+        loading=true;if(!append){target.result=null;target.consumed=0;target.visible.clear();}render();
         JSONObject args;try{args=new JSONObject(target.args.toString());if(append)args.put("offset",target.consumed);}catch(JSONException error){return;}
         manager.export(selected.id,target.method,args,(ok,raw)->activity.runOnUiThread(()->{
             if(!current(selected,target,ticket))return;loading=false;
@@ -126,19 +127,21 @@ final class SourceBrowser {
     }
     private void renderItems(JSONObject result){for(String kind:KINDS){JSONArray items=result.optJSONArray(kind);if(items==null||items.length()==0)continue;if(kind.equals("tracks")||kind.equals("episodes"))tracks(items);else cards(kind,items);}}
     private void tracks(JSONArray items){
-        ArrayList<JSONObject> tracks=new ArrayList<>();for(int i=0;i<items.length()&&i<2000;i++){JSONObject item=items.optJSONObject(i);if(item!=null&&!item.optString("id").isEmpty())tracks.add(item);}
-        if(items.length()>2000)container.addView(text("此页仅显示前 2000 项，请缩小搜索范围",13,0xffb8adca));if(tracks.isEmpty())return;PluginManager.PluginInfo selected=source;
-        container.addView(button("播放全部 · "+tracks.size()+" 首",()->host.play(selected,tracks,0)),new LinearLayout.LayoutParams(-1,dp(36)));
-        for(int i=0;i<tracks.size();i++){JSONObject item=tracks.get(i);final int at=i;Button row=button(trackName(item),()->host.play(selected,tracks,at));row.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);row.setMaxLines(2);row.setEllipsize(android.text.TextUtils.TruncateAt.END);if(item.optBoolean("unavailable")){row.setEnabled(false);row.setTextColor(0xff777080);row.setText(trackName(item)+" · 暂不可播放");}container.addView(row,new LinearLayout.LayoutParams(-1,dp(50)));}
+        ArrayList<JSONObject> tracks=new ArrayList<>();for(int i=0;i<items.length();i++){JSONObject item=items.optJSONObject(i);if(item!=null&&!item.optString("id").isEmpty())tracks.add(item);}
+        if(tracks.isEmpty())return;PluginManager.PluginInfo selected=source;
+        container.addView(button((tracks.size()>500?"播放前 500 首 · 共 ":"播放全部 · ")+tracks.size()+" 首",()->host.play(selected,tracks,0)),new LinearLayout.LayoutParams(-1,dp(36)));
+        int visible=visibleCount(items,tracks.size());for(int i=0;i<visible;i++){JSONObject item=tracks.get(i);final int at=i;Button row=button(trackName(item),()->host.play(selected,tracks,at));row.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);row.setMaxLines(2);row.setEllipsize(android.text.TextUtils.TruncateAt.END);if(item.optBoolean("unavailable")){row.setEnabled(false);row.setTextColor(0xff777080);row.setText(trackName(item)+" · 暂不可播放");}container.addView(row,new LinearLayout.LayoutParams(-1,dp(50)));}showMoreLoaded(items,visible,tracks.size());
     }
     private void cards(String kind,JSONArray items){
         int columns=activity.getResources().getDisplayMetrics().widthPixels/activity.getResources().getDisplayMetrics().density>1000?4:3;LinearLayout row=null;int count=0;
-        for(int i=0;i<items.length()&&i<2000;i++){JSONObject item=items.optJSONObject(i);if(item==null)continue;if(count%columns==0){row=new LinearLayout(activity);container.addView(row,new LinearLayout.LayoutParams(-1,-2));}
+        int visible=visibleCount(items,items.length());for(int i=0;i<visible;i++){JSONObject item=items.optJSONObject(i);if(item==null)continue;if(count%columns==0){row=new LinearLayout(activity);container.addView(row,new LinearLayout.LayoutParams(-1,-2));}
             LinearLayout card=new LinearLayout(activity);card.setOrientation(1);card.setPadding(dp(6),dp(6),dp(6),dp(6));GradientDrawable background=new GradientDrawable();background.setColor(0xff25212a);background.setCornerRadius(dp(10));card.setBackground(background);
             ImageView image=new ImageView(activity);image.setImageResource(R.drawable.ic_launcher);image.setScaleType(ImageView.ScaleType.CENTER_CROP);card.addView(image,new LinearLayout.LayoutParams(-1,dp(82)));host.image(image,item.optString("imageUrl"));TextView label=text(item.optString("name",item.optString("title","内容")),13,Color.WHITE);label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(label,new LinearLayout.LayoutParams(-1,dp(42)));card.setOnClickListener(v->openItem(kind,item));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(136),1);params.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(card,params);count++;
         }
-        if(row!=null)while(count%columns!=0){row.addView(new View(activity),new LinearLayout.LayoutParams(0,dp(136),1));count++;}
+        if(row!=null)while(count%columns!=0){row.addView(new View(activity),new LinearLayout.LayoutParams(0,dp(136),1));count++;}showMoreLoaded(items,visible,items.length());
     }
+    private int visibleCount(JSONArray items,int count){Integer limit=page.visible.get(items);return Math.min(count,limit==null?60:limit);}
+    private void showMoreLoaded(JSONArray items,int visible,int count){if(visible>=count)return;Page displayed=page;container.addView(button("显示更多已加载内容 · "+visible+" / "+count,()->{if(page!=displayed)return;displayed.visible.put(items,visible+60);render();}),new LinearLayout.LayoutParams(-1,dp(42)));}
     private void openItem(String kind,JSONObject item){String id=item.optString("id"),title=item.optString("name",item.optString("title","内容"));if(kind.equals("links")){open("browse",arg("page",item.optString("page")),title);return;}if(id.isEmpty()){host.error(source,"内容缺少来源标识",()->{});return;}String method=kind.equals("albums")?"album":kind.equals("artists")?"artist":kind.equals("playlists")?"playlist":kind.equals("shows")?"show":"stationNext";if(!source.supports(method)){host.error(source,"此音乐源未提供这项内容接口",()->{});return;}JSONObject args=arg("id",id);if(method.equals("show"))try{args.put("offset",0);}catch(JSONException ignored){}open(method,args,title);if(page!=null)page.summary=item;}
     static JSONObject arg(String key,Object value){JSONObject args=new JSONObject();try{args.put(key,value);}catch(JSONException ignored){}return args;}
     static String trackName(JSONObject track){String name=track.optString("name",track.optString("title","歌曲")),artist=track.optString("artist");JSONArray artists=track.optJSONArray("artists");if(artist.isEmpty()&&artists!=null){ArrayList<String> names=new ArrayList<>();for(int i=0;i<artists.length();i++){JSONObject person=artists.optJSONObject(i);if(person!=null&&!person.optString("name").isEmpty())names.add(person.optString("name"));}artist=android.text.TextUtils.join("、",names);}return name+(artist.isEmpty()?"":"  ·  "+artist);}

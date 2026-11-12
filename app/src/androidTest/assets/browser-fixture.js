@@ -1,11 +1,11 @@
 const base = '__BASE__', label = '__LABEL__';
-function record(method, args = {}) { host.storage.set('lastCall', {method, args}); }
+function record(method, args = {}) { host.storage.set('lastCall', {method, args});host.storage.set('callCount',(host.storage.get('callCount')||0)+1); }
 function track(id) { return {id, name: label + ' ' + id, artists: [{id:'artist', name:'Browser artist'}], album:{id:'album', name:label+' album', imageUrl:base+'/cover.png'}}; }
 function albumCard() { return {id:'album', name:label+' album', imageUrl:base+'/cover.png', saved:!!host.storage.get('saved')}; }
 function artistCard() { return {id:'artist', name:label+' artist', imageUrl:base+'/cover.png', following:!!host.storage.get('following')}; }
 function showItem() { return {id:'show', name:label+' podcast', imageUrl:base+'/cover.png', publisher:'Browser publisher', publisherPage:'publisher', subscribed:!!host.storage.get('subscribed')}; }
-export function home() { record('home'); return {title:label+' source home', sections:[{title:'Albums', albums:[albumCard()]},{title:'Artists', artists:[artistCard()]},{title:'Podcasts', shows:[showItem()]},{title:'Stations', stations:[{id:'station', name:label+' station', imageUrl:base+'/cover.png'}]},{title:'Links', links:[{title:'Open custom page',page:'custom'}], morePage:'more'}]}; }
-export function browse(args) { record('browse',args);return {title:label+' '+args.page,sections:[{title:'Custom music',tracks:[track('a'),track('b')]}]}; }
+export function home() { record('home'); return {title:label+' source home', sections:[{title:'Albums', albums:[albumCard()]},{title:'Artists', artists:[artistCard()]},{title:'Podcasts', shows:[showItem()]},{title:'Stations', stations:[{id:'station', name:label+' station', imageUrl:base+'/cover.png'}]},{title:'Links', links:[{title:'Open custom page',page:'custom'},{title:'Long source page',page:'long'}], morePage:'more'}]}; }
+export function browse(args) { record('browse',args);if(args.page==='long')return {title:label+' long page',sections:[{tracks:Array.from({length:65},(_,i)=>track('loaded '+i))}]};return {title:label+' '+args.page,sections:[{title:'Custom music',tracks:[track('a'),track('b')]}]}; }
 export async function search(args) {
   record('search', args);
   if(args.query==='slow') { await new Promise(r=>setTimeout(r,1200));return {tracks:[track('stale slow')],more:false}; }

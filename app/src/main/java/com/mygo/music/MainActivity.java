@@ -152,11 +152,11 @@ public class MainActivity extends Activity {
     private void showLocalLibrary(){landscapeSource="";prefs.edit().remove("selected_source").apply();if(sourceBrowser!=null)sourceBrowser.clear();refreshSourceTabs();refreshLandscapeGrid();}
     private void playSourceQueue(PluginManager.PluginInfo source,ArrayList<JSONObject> items,int index){
         if(index<0||index>=items.size())return;final long request=++playRequest;final String quality=prefs.getString("play_quality","high");final JSONArray queue=new JSONArray();int selected=-1;
-        for(int i=0;i<items.size()&&queue.length()<500;i++){JSONObject item=items.get(i);String id=item.optString("id");if(id.isEmpty()||item.optBoolean("unavailable"))continue;
+        int first=(index/500)*500;for(int i=first;i<items.size()&&queue.length()<500;i++){JSONObject item=items.get(i);String id=item.optString("id");if(id.isEmpty()||item.optBoolean("unavailable"))continue;
             Uri uri=new Uri.Builder().scheme("plugin").authority(source.id).appendQueryParameter("id",id).build();String title=SourceBrowser.trackName(item);int found=tracks.indexOf(uri);if(found<0){tracks.add(uri);names.add(title);}else names.set(found,title);pluginTrackRefs.put(uri.toString(),source.id+"\n"+id);String art=SourceBrowser.artwork(item);if(!art.isEmpty())covers.put(uri.toString(),art);
             if(i==index)selected=queue.length();try{queue.put(new JSONObject().put("uri",uri.toString()).put("title",title));}catch(JSONException ignored){}
         }
-        if(selected<0&&index==0&&queue.length()>0)selected=0;if(selected<0){showPluginError("这首歌曲暂不可播放，或超过当前队列 500 首上限");return;}saveLibrary();saveCovers();if(adapter!=null)adapter.notifyDataSetChanged();final int start=selected;String uri=queue.optJSONObject(start).optString("uri");Runnable begin=()->{if(isDestroyed()||request!=playRequest)return;try{PlaybackService.startQueue(this,queue,start,0,volume.getProgress(),shuffle,repeat,quality);}catch(Exception error){showPluginError(error.getMessage());}};
+        if(selected<0&&index==0&&queue.length()>0)selected=0;if(selected<0){showPluginError("这首歌曲暂不可播放");return;}saveLibrary();saveCovers();if(adapter!=null)adapter.notifyDataSetChanged();final int start=selected;String uri=queue.optJSONObject(start).optString("uri");Runnable begin=()->{if(isDestroyed()||request!=playRequest)return;try{PlaybackService.startQueue(this,queue,start,0,volume.getProgress(),shuffle,repeat,quality);}catch(Exception error){showPluginError(error.getMessage());}};
         if(audioCache.find(uri,quality)!=null)begin.run();else pluginManager.authorizeSource(source.id,(ok,raw)->{if(request!=playRequest)return;if(ok)begin.run();else showPluginError(raw);});
     }
 
