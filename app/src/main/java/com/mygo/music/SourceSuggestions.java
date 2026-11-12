@@ -16,7 +16,7 @@ final class SourceSuggestions implements TextWatcher {
     void close(){closed=true;changed();input.removeTextChangedListener(this);}
     public void beforeTextChanged(CharSequence text,int start,int count,int after){}
     public void onTextChanged(CharSequence text,int start,int before,int count){}
-    public void afterTextChanged(Editable text){if(selecting||closed)return;changed();String query=text.toString().trim();PluginManager.PluginInfo source=host.source();if(query.isEmpty()||source==null||!source.enabled||!source.supports("suggest")||!manager.networkAllowed(source.id))return;long ticket=generation;
+    public void afterTextChanged(Editable text){if(selecting||closed||input.isPerformingCompletion())return;changed();String query=text.toString().trim();PluginManager.PluginInfo source=host.source();if(query.isEmpty()||source==null||!source.enabled||!source.supports("suggest")||!manager.networkAllowed(source.id))return;long ticket=generation;
         handler.postDelayed(()->manager.export(source.id,"suggest",SourceBrowser.arg("query",query),(ok,raw)->{PluginManager.PluginInfo selected=host.source();if(closed||activity.isDestroyed()||ticket!=generation||selected==null||!source.id.equals(selected.id)||!query.equals(input.getText().toString().trim()))return;if(!ok)return;try{JSONArray items=new JSONArray(raw);LinkedHashSet<String> values=new LinkedHashSet<>();for(int i=0;i<items.length()&&values.size()<12;i++){String value=items.optString(i).trim();if(!value.isEmpty()&&value.length()<=256)values.add(value);}input.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_dropdown_item_1line,new ArrayList<>(values)));if(!values.isEmpty()&&input.hasFocus())input.showDropDown();}catch(Exception ignored){}}),300);
     }
 }
