@@ -64,6 +64,8 @@ public class PlaybackService extends Service {
     void setVolume(int value){percent=Math.max(0,Math.min(100,value));if(remote.active())remote.volume(percent);else applyVolume();publish();}
     void setModes(boolean shuffled,boolean repeated){shuffle=shuffled;repeat=repeated;prefs.edit().putBoolean("shuffle",shuffle).putBoolean("repeat",repeat).apply();publish();}
     void toggle(){if(loading){if(wanted)pause();else resume();}else if(snapshot().playing)pause();else resume();}
+    JSONArray queueSnapshot(){JSONArray copy=new JSONArray();for(JSONObject item:queue)try{copy.put(new JSONObject(item.toString()));}catch(JSONException ignored){}return copy;}
+    void playQueueIndex(int target){if(!closed&&target>=0&&target<queue.size())resolve(target,0,true);}
     void next(){if(closed)return;if(queue.isEmpty())return;resolve(shuffle?random.nextInt(queue.size()):(index+1)%queue.size(),0,true);}
     void previous(){if(closed)return;if(queue.isEmpty())return;resolve(index<=0?queue.size()-1:index-1,0,true);}
     void stopPlayback(){if(closed)return;initialPosition=position();persist();++generation;wanted=false;loading=false;resumeAfterFocus=false;remote.clear(true);releasePlayer();cache.pin(null);abandonFocus();session.setActive(false);foreground=false;stopForeground(true);publish();stopSelf();}

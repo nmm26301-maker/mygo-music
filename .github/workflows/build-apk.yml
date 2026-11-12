@@ -47,6 +47,7 @@ jobs:
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee plugin-test-results.txt
             adb logcat -d > android-logcat.txt
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/source-browser.png source-browser.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-stage.png lyrics-stage.png || true
             grep -F MYGO_TESTS_OK plugin-test-results.txt
             adb shell am start -n com.mygo.music/.MainActivity
@@ -62,6 +63,7 @@ jobs:
             android-logcat.txt
             landscape.png
             lyrics-stage.png
+            source-browser.png
       - name: Decode stable release signing key
         run: |
           test -s signing/mygo-release.keystore.b64
@@ -79,7 +81,7 @@ jobs:
           unzip -t "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
           keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
-      - name: Verify upgrade from signed v5.5.0 on Android
+      - name: Verify upgrade from signed v5.6.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -88,9 +90,9 @@ jobs:
           disable-animations: true
           script: |
             adb uninstall com.mygo.music || true
-            adb install tests/baseline-v5.5.apk
+            adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=56'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=57'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |
