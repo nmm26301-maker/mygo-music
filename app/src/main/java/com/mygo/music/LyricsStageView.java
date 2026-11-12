@@ -110,7 +110,7 @@ final class LyricsStageView extends View {
     }
     private void interlude(Canvas canvas,long position,int active){
         if(!timeline.timed||timeline.lines.isEmpty())return;long from=0,to=timeline.lines.get(0).start;
-        if(active>=0){if(active+1>=timeline.lines.size())return;LyricsTimeline.Line line=timeline.lines.get(active);from=line.end;if(!line.words.isEmpty())from=Math.min(from,line.words.get(line.words.size()-1).end);to=timeline.lines.get(active+1).start;}
+        if(active>=0){if(active+1>=timeline.lines.size())return;LyricsTimeline.Line line=timeline.lines.get(active);if(line.estimated||line.words.isEmpty())return;from=line.end;if(!line.words.isEmpty())from=Math.min(from,line.words.get(line.words.size()-1).end);to=timeline.lines.get(active+1).start;}
         if(to-from<2800||position<from||position>=to)return;float progress=Math.max(0,Math.min(1,(position-from)/(float)(to-from)));
         paint.setShader(null);paint.clearShadowLayer();for(int i=0;i<3;i++){float pulse=appearance.quiet()?0:(float)(.5+.5*Math.sin(progress*Math.PI*4-i*.9));paint.setColor(progress>i/3f?accent():0xff6e7587);canvas.drawCircle(getWidth()/2f+dp((i-1)*20),getHeight()-dp(18),dp(3.5f+pulse),paint);}
     }
