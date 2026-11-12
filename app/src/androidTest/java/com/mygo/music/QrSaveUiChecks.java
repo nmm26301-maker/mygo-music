@@ -25,6 +25,7 @@ final class QrSaveUiChecks {
     QrSaveUiChecks(Instrumentation test){this.test=test;context=test.getTargetContext();}
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     private static Object field(Object object,String name)throws Exception{Field f=object.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(object);}
+    private static Object fieldUnchecked(Object target,String name){try{return field(target,name);}catch(Exception failure){throw new RuntimeException(failure);}}
     private static View find(View view,String text){if(view instanceof TextView&&text.contentEquals(((TextView)view).getText()))return view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View match=find(group.getChildAt(i),text);if(match!=null)return match;}}return null;}
     private Set<Long> gallery(){Set<Long> ids=new HashSet<>();try(Cursor cursor=context.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,new String[]{MediaStore.Images.Media._ID},MediaStore.Images.Media.DISPLAY_NAME+" LIKE ? AND "+MediaStore.Images.Media.IS_PENDING+"=0",new String[]{"MyGo-login-%"},null)){if(cursor!=null)while(cursor.moveToNext())ids.add(cursor.getLong(0));}return ids;}
     void run()throws Exception{nativeQr();webQr();}
@@ -64,12 +65,12 @@ final class QrSaveUiChecks {
         Activity activity=test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PluginRuntime runtime=new PluginRuntime(activity,directory);CountDownLatch completed=new CountDownLatch(1);Uri saved=null;
         try{
             runtime.call("signIn",new org.json.JSONObject().put("url",url),(ok,raw)->completed.countDown());AlertDialog[] dialog={null};int[] dimensions={0,0};boolean[] clicked={false};long deadline=SystemClock.elapsedRealtime()+12000;
-            while(!clicked[0]&&SystemClock.elapsedRealtime()<deadline){test.runOnMainSync(()->{try{WebView web=(WebView)field(runtime,"browserView");dialog[0]=(AlertDialog)field(runtime,"browserDialog");if(web!=null){dimensions[0]=web.getWidth();dimensions[1]=web.getHeight();}if(web!=null&&dialog[0]!=null&&dialog[0].isShowing()&&web.getHeight()>=140&&"qr-ready".equals(web.getTitle())){dialog[0].getButton(AlertDialog.BUTTON_NEUTRAL).performClick();clicked[0]=true;}}catch(Exception e){throw new RuntimeException(e);}});SystemClock.sleep(30);}
+            while(!clicked[0]&&SystemClock.elapsedRealtime()<deadline){test.runOnMainSync(()->{try{WebView web=(WebView)field(runtime,"browserView");dialog[0]=(AlertDialog)field(runtime,"browserDialog");if(web!=null){dimensions[0]=web.getWidth();dimensions[1]=web.getHeight();}if(web!=null&&dialog[0]!=null&&dialog[0].isShowing()&&web.getHeight()>=140&&"qr-ready".equals(web.getTitle())){dialog[0].getButton(AlertDialog.BUTTON_POSITIVE).performClick();clicked[0]=true;}}catch(Exception e){throw new RuntimeException(e);}});SystemClock.sleep(30);}
             check(clicked[0],"web login QR never became ready; size="+dimensions[0]+"x"+dimensions[1]);deadline=SystemClock.elapsedRealtime()+8000;
             while(saved==null&&SystemClock.elapsedRealtime()<deadline){Set<Long> after=gallery();after.removeAll(before);if(!after.isEmpty())saved=ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,after.iterator().next());else SystemClock.sleep(40);}
             if(saved==null){File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();Bitmap screen=test.getUiAutomation().takeScreenshot();if(screen!=null){try(FileOutputStream out=new FileOutputStream(new File(qa,"web-qr-test.png"))){screen.compress(Bitmap.CompressFormat.PNG,100,out);}screen.recycle();}}
             check(saved!=null,"web login save button did not publish a QR image; size="+dimensions[0]+"x"+dimensions[1]);assertSaved(saved,payload);
-            test.runOnMainSync(()->check(dialog[0].isShowing()&&completed.getCount()==1,"saving the page QR dismissed or completed login"));
+            test.runOnMainSync(()->check(dialog[0].isShowing()&&completed.getCount()==1&&fieldUnchecked(runtime,"phoneDialog")!=null,"same-phone web QR handoff dismissed or completed login"));
         }finally{runtime.dispose();cleanupSaved(saved);test.runOnMainSync(activity::finish);server.close();PluginArchive.delete(directory);context.getSharedPreferences("library",0).edit().remove("plugin_network_"+id).commit();}
     }
 }
