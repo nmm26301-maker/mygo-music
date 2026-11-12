@@ -292,13 +292,14 @@
     "repo": "SixWa12138/mygo-music-netease-music",
     "commit": "6954e261f2af2966cb43ec7e3ff0c0d3926b7dc0",
     "name": "网易云音乐",
-    "url": "https://codeload.github.com/SixWa12138/mygo-music-netease-music/zip/6954e261f2af2966cb43ec7e3ff0c0d3926b7dc0",
-    "sha256": "c835880e5e81c8fd567294f3cccdf9a9a2ac87f880d03f80d42bb9d715984399",
+    "url": "https://github.com/SixWa12138/mygo-music-netease-music/releases/download/v0.4.0/mygo-music-netease-music-v0.4.0.zip",
+    "sha256": "02d35ba205d3268608eb9c1688b25433c55a68ead0f6d7ed3a7d4f6b2aec0354",
     "licenseFiles": [],
     "main": "index.js",
     "declaredId": "netease-music",
     "programs": [],
-    "sourceBytes": 25642226
+    "sourceBytes": 25642226,
+    "release": "v0.4.0"
   },
   {
     "repo": "TengYangTuoHai/mygo-music-navidrome",

@@ -34,6 +34,8 @@ final class PluginProcesses implements Closeable {
     }
     private String absolute(String value)throws IOException {File file=new File(value);if(!file.isAbsolute()){file=new File(directory,value);if(!file.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("辅助程序路径越界");}return file.getCanonicalPath();}
     private File resolve(String command)throws IOException {
+        if(command.equals("osascript")||command.endsWith("/osascript"))throw new IOException("此插件通过 macOS Music.app 播放，当前播放方式不支持 Android；请改用提供 Android 播放方式的插件");
+        if(command.toLowerCase(Locale.ROOT).endsWith(".exe"))throw new IOException("此插件请求启动 Windows 辅助程序，Android 无法运行："+command);
         if(command.contains("/")){File file=new File(absolute(command));if(file.isFile()&&file.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))file.setExecutable(true,true);return file;}
         File bundled=new File(context.getApplicationInfo().nativeLibraryDir,"lib"+command+".so");if(bundled.isFile())return bundled;
         for(String path:new String[]{"/system/bin","/system/xbin","/vendor/bin"}){File file=new File(path,command);if(file.isFile())return file;}

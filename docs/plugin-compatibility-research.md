@@ -14,7 +14,7 @@ The missing host behavior affected six inspected manifests: Guyu23 QQ Music and 
 | --- | --- | --- | --- |
 | Upstream declarative media headers | Existing JSON, preferences, native HTTP | Must preserve domain restrictions and read current credentials on each request | Implement this documented protocol |
 | Patch credentials into every plugin URL | Changes third-party packages | Token exposure, brittle provider-specific behavior | Reject |
-| Add Babel or Sucrase for TypeScript | Extra parser/transform bundle | All 64 inspected current entries are JavaScript; 3 source archives instead require official built release ZIPs | No compiler added |
+| Add Babel or Sucrase for TypeScript | Extra parser/transform bundle | All 64 inspected current entries are JavaScript; 4 source archives instead require official built release ZIPs | No compiler added |
 | Run downloaded desktop helper binaries | Platform-specific processes and native dependencies | macOS AppleScript, Windows Soloist, desktop ffmpeg/yt-dlp cannot be treated as Android executables | Report concrete setup/platform conditions |
 
 ## Installer identity
@@ -23,7 +23,7 @@ The missing host behavior affected six inspected manifests: Guyu23 QQ Music and 
 
 ## Test scope
 
-`tests/market-pins.json` records commit, SHA-256, package URL, declared id, process declaration and root license-file presence for every catalog entry. Pinned author release ZIPs are used for AkinoKaede NetEase, LYJW131 Apple Music, and LYJW131 Emby/Jellyfin because their source archives omit `index.js`. Third-party code is fetched only into ignored test assets during CI; it is not added to production APK assets or this repository. Root license-file presence is a discovery aid, not an assertion of license compatibility or an authorization to copy code.
+`tests/market-pins.json` records commit, SHA-256, package URL, declared id, process declaration and root license-file presence for every catalog entry. Pinned author release ZIPs are used for AkinoKaede NetEase, LYJW131 Apple Music, and LYJW131 Emby/Jellyfin because their source archives omit `index.js`; SixWa NetEase uses its author-built ZIP because the source archive includes Windows application executables larger than the per-file extraction limit. Third-party code is fetched only into ignored test assets during CI; it is not added to production APK assets or this repository. The four author packages are also available as SHA-256-verified installer fallbacks if GitHub’s anonymous API rate limit prevents release discovery. Root license-file presence is a discovery aid, not an assertion of license compatibility or an authorization to copy code.
 
 The market audit performs the real Android ZIP installation and module validation, then anonymous search, one stream resolution, an HTTP redirect probe and Android decoder preparation where possible. It neither logs into user accounts nor changes playlists/likes nor executes desktop helpers. Unavailable credentials, subscriptions, private servers, remote devices, geographic restrictions, rate limits and upstream errors remain explicit unverified conditions. Decoder preparation does not certify an entire music catalog, every export, or authenticated playback.
 

@@ -1,0 +1,26 @@
+[
+  {
+    "repo": "AkinoKaede/mygo-music-netease-cloud-music",
+    "url": "https://github.com/AkinoKaede/mygo-music-netease-cloud-music/releases/download/v0.1.12/mygo-music-netease-cloud-music-v0.1.12.zip",
+    "sha256": "ab68efd90bc8c48b503b99d392877b505909243a097a312909bdab060d9448dc",
+    "release": "v0.1.12"
+  },
+  {
+    "repo": "LYJW131/mygo-music-apple-music",
+    "url": "https://github.com/LYJW131/mygo-music-apple-music/releases/download/v0.3.5/mygo-music-apple-music-v0.3.5.zip",
+    "sha256": "90219e8eecb23f764ee4f83dc44a20f4e3914fd5950579943a621c1c487dd576",
+    "release": "v0.3.5"
+  },
+  {
+    "repo": "LYJW131/mygo-music-emby-jellyfin",
+    "url": "https://github.com/LYJW131/mygo-music-emby-jellyfin/releases/download/v0.1.0/mygo-music-emby-jellyfin-v0.1.0.zip",
+    "sha256": "f306ad6980c3cdb953cf0c3dbba57a95a4229c2f6d500664a9859aa7acf56a58",
+    "release": "v0.1.0"
+  },
+  {
+    "repo": "SixWa12138/mygo-music-netease-music",
+    "url": "https://github.com/SixWa12138/mygo-music-netease-music/releases/download/v0.4.0/mygo-music-netease-music-v0.4.0.zip",
+    "sha256": "02d35ba205d3268608eb9c1688b25433c55a68ead0f6d7ed3a7d4f6b2aec0354",
+    "release": "v0.4.0"
+  }
+]

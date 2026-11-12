@@ -27,7 +27,7 @@ final class MarketAudit {
                 else{
                     PluginManager.PluginInfo source=null;for(PluginManager.PluginInfo item:installer.list())if(item.repository.equals(pin.getString("repo"))){source=item;break;}
                     if(source==null)throw new AssertionError("installed repository lost its identity: "+pin.getString("repo"));
-                    row.put("install","passed").put("instanceId",source.id).put("exports",new JSONArray(source.functions)).put("programs",source.programs).put("playback",source.playback);
+                    row.put("install","passed").put("version",source.version).put("instanceId",source.id).put("exports",new JSONArray(source.functions)).put("programs",source.programs).put("playback",source.playback);
                     context.getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+source.id,true).putBoolean("plugin_process_"+source.id,false).commit();installed.add(row);
                 }
                 android.util.Log.i("MyGoMarket",(i+1)+"/"+pins.length()+" "+pin.getString("repo")+" install="+row.getString("install"));save();
