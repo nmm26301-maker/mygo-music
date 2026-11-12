@@ -36,8 +36,12 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare verified offline TypeScript compiler
+        run: python3 tests/prepare-typescript.py
       - name: Prepare pinned upstream market packages for tests
         run: python3 tests/prepare-market-audit.py
+      - name: Prepare original provider and HLS fixtures
+        run: python3 tests/prepare-port-fixtures.py
       - name: Build Android runtime tests
         run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Execute actual WebView plugin tests on Android
@@ -99,11 +103,11 @@ jobs:
           unzip -t "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
           keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
-      - name: Download previously delivered signed v5.11.0 for upgrade verification
+      - name: Download previously delivered signed v5.12.0 for upgrade verification
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download 43172672411 --name mygo-music-android-release --dir tests/baseline-v511
-      - name: Verify upgrades from signed v5.6.0 and v5.10.0 on Android
+        run: gh run download 43176578276 --name mygo-music-android-release --dir tests/baseline-v512
+      - name: Verify upgrades from signed v5.6.0 and v5.12.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -114,14 +118,14 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=62'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=63'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
-            adb install tests/baseline-v511/mygo-music-v5.11.0.apk
+            adb install tests/baseline-v512/mygo-music-v5.12.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=62'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=63'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |

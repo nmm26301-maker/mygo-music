@@ -1,3 +1,9 @@
+## Android 5.13.0
+
+Continues the upstream 0.1.24 host port with offline TypeScript module compilation, debounced provider suggestions, paginated comments and source-acknowledged comment likes/posts, episode-aware favorites, continuous station fetching, rich track actions and native queue editing. Native setting types include masked passwords, booleans and validated selects. Provider login/settings changes invalidate other manager instances before their next call. A hash-pinned SoundGo adaptation uses Android's HLS player and optional in-app web sign-in while preserving the original provider authorization and installed source. The interface displays the installed Android version.
+
+This is protocol coverage and Android adaptation work, not a claim that every third-party plugin, authenticated account or desktop binary is fully supported. Detailed boundaries and checks are tracked in docs/full-port-status.md.
+
 ## Android 5.12.0
 
 Six saved native lyric display styles: character pop, immersive flow, two-line karaoke, large focus, classic scrolling, and neon gradient. Album-derived fluid/static backgrounds, font size, spacing, alignment, existing translation, accent palette and motion strength are adjustable. Reduced-motion mode keeps source-timed highlighting. Native Android tests export each preset and verify playback-position sampling, real settings controls, preference restoration and artwork ownership. Cover callbacks are matched to the current track.

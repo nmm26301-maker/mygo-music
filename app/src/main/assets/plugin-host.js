@@ -94,6 +94,13 @@
       nativeHost.complete(id, true, JSON.stringify(value === undefined ? null : value));
     } catch(e) { nativeHost.complete(id, false, JSON.stringify({__mygoError:true,code:String(e?.code || ''),message:String(e?.message || e)})); }
   };
+  window.__compilePluginModule = name => {
+    try {
+      if (!window.Babel) throw new Error('TypeScript 编译器未加载');
+      const output = Babel.transform(nativeHost.typescriptSource(name), {filename:name, presets:[['typescript',{allowDeclareFields:true}]], babelrc:false, configFile:false, sourceMaps:false}).code;
+      nativeHost.typescriptComplete(name, output, '');
+    } catch (error) { nativeHost.typescriptComplete(name, '', String(error?.message || error)); }
+  };
   import(__pluginConfig.module).then(module => {
     window.__plugin = module;
     nativeHost.ready(true, JSON.stringify(Object.keys(module).filter(k=>typeof module[k]==='function')));

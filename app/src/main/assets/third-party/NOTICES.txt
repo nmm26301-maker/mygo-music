@@ -10,3 +10,5 @@ See AGPL-3.0.txt for license terms.
 Per-character lyric rise and damped settle adapted from KaraokeText, Copyright (c) 2026 WillSuo, MIT License.
 Source: https://github.com/WillSuo-Github/KaraokeText/tree/08697a112d314aa360f9b2ebed3622181ab58ad8
 Android port: LyricsCharacterMotion.java. Full license: KaraokeText-MIT.txt.
+
+Babel standalone 7.29.13: MIT, offline TypeScript transform. Full license: Babel-MIT.txt.

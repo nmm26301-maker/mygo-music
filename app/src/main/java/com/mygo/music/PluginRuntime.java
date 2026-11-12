@@ -31,7 +31,7 @@ public final class PluginRuntime {
     private SharedPreferences storage, permissions;
     private JSONArray hosts=new JSONArray();
     private WebView web;
-    private PluginResources resources;
+    private PluginResources resources;private PluginTypeScript typescript;
     private boolean loaded, starting;
     private volatile boolean closed;
     private PluginProcesses processes;
@@ -61,28 +61,28 @@ public final class PluginRuntime {
         main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null)timeout.done(false,"插件接口超时："+function);},"signIn".equals(function)?300000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
-    public void dispose(){main.post(()->{closed=true;synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();});}
+    public void dispose(){main.post(()->{closed=true;synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
     private void ensureLoaded(Callback cb){
         if(closed){cb.done(false,"插件已关闭");return;}if(loaded){cb.done(true,"");return;}if(!loadError.isEmpty()){cb.done(false,loadError);return;}
         loading.add(cb);if(starting)return;starting=true;
         try{
             JSONObject manifest=new JSONObject(read(new FileInputStream(new File(directory,"plugin.json"))));
-            id=PluginIdentity.instance(directory,manifest);PluginMedia.validate(manifest);JSONObject p=manifest.optJSONObject("permissions");if(p!=null&&p.optJSONArray("network")!=null)hosts=p.getJSONArray("network");
+            id=PluginIdentity.instance(directory,manifest);PluginProtocol.validate(manifest);PluginMedia.validate(manifest);JSONObject p=manifest.optJSONObject("permissions");if(p!=null&&p.optJSONArray("network")!=null)hosts=p.getJSONArray("network");
             storage=context.getSharedPreferences("plugin_data_"+id,Context.MODE_PRIVATE);permissions=context.getSharedPreferences("library",Context.MODE_PRIVATE);processes=new PluginProcesses(context,directory,id,p==null?null:p.opt("process"));
             File entry=new File(directory,manifest.optString("main","index.js"));
             if(!entry.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("无效插件入口");
-            if(entry.getName().endsWith(".ts"))throw new IOException("此插件入口为 TypeScript，需要已编译的 JavaScript 版本");
-            resources=new PluginResources(directory);http=new PluginHttp(this::requireNetwork,(request,phase,result)->main.post(()->{if(!closed&&web!=null)web.evaluateJavascript("window.__networkResult("+JSONObject.quote(request)+","+JSONObject.quote(phase)+","+JSONObject.quote(result.toString())+");",null);}),resources);String module=resources.moduleURL(manifest.optString("main","index.js"));
+            typescript=new PluginTypeScript(context,directory);
+            resources=new PluginResources(directory,context,typescript);http=new PluginHttp(this::requireNetwork,(request,phase,result)->main.post(()->{if(!closed&&web!=null)web.evaluateJavascript("window.__networkResult("+JSONObject.quote(request)+","+JSONObject.quote(phase)+","+JSONObject.quote(result.toString())+");",null);}),resources);String module=resources.moduleURL(manifest.optString("main","index.js"));
             JSONObject locales=new JSONObject();File localeFile=new File(directory,"locales/zh-CN.json");if(localeFile.isFile())locales=new JSONObject(read(new FileInputStream(localeFile)));
-            JSONObject config=new JSONObject().put("translations",locales).put("module",module).put("arch",architecture()).put("dir",directory.getAbsolutePath());
+            JSONObject config=new JSONObject().put("typescript",typescript.needed()).put("translations",locales).put("module",module).put("arch",architecture()).put("dir",directory.getAbsolutePath());
             String bridge=read(context.getAssets().open("plugin-host.js"));
             web=new WebView(context);WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
             web.setWebChromeClient(new WebChromeClient(){@Override public boolean onConsoleMessage(ConsoleMessage message){if((context.getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.util.Log.i("MyGoPlugin",id+": "+message.message()+" @"+message.lineNumber());return true;}});
             web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}@Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){return resources.intercept(request.getUrl());}});
-            web.addJavascriptInterface(new NativeHost(),"nativeHost");
-            String html="<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self' 'unsafe-inline'; connect-src 'none'\"><script>window.__pluginConfig="+config+";</script><script>"+bridge.replace("</script","<\\/script")+"</script>";
+            web.addJavascriptInterface(new NativeHost(),"nativeHost");typescript.compiler(name->main.post(()->{if(closed||web==null){typescript.complete(name,"","插件已关闭");return;}web.evaluateJavascript("window.__compilePluginModule("+JSONObject.quote(name)+");",null);}));
+            String html="<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self' 'unsafe-inline'; connect-src 'none'\"><script>window.__pluginConfig="+config+";</script>"+(typescript.needed()?"<script src=\""+PluginResources.ORIGIN+"/.host/babel.js\"></script>":"")+"<script>"+bridge.replace("</script","<\\/script")+"</script>";
             resources.document(html);web.loadUrl(PluginResources.ORIGIN+"/");
-            main.postDelayed(()->{if(!loaded&&loadError.isEmpty())finishLoad(false,"插件初始化超时，请检查脚本和依赖文件");},15000);
+            main.postDelayed(()->{if(!loaded&&loadError.isEmpty())finishLoad(false,"插件初始化超时，请检查脚本和依赖文件");},typescript.needed()?45000:15000);
         }catch(Exception e){finishLoad(false,e.getMessage()==null?e.toString():e.getMessage());}
     }
     private void finishLoad(boolean ok,String message){if(closed)return;loaded=ok;loadError=ok?"":message;ArrayList<Callback> waiters=new ArrayList<>(loading);loading.clear();for(Callback cb:waiters)cb.done(ok,message);}
@@ -152,6 +152,8 @@ public final class PluginRuntime {
         @JavascriptInterface public void webSignIn(String request,String raw){main.post(()->showBrowserLogin(request,raw));}
         @JavascriptInterface public void ready(boolean ok,String value){main.post(()->finishLoad(ok,value));}
         @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{if(request.equals(signInRequest)){signInRequest="";if(loginDialog!=null)loginDialog.dismiss();loginBitmap=null;}Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
+        @JavascriptInterface public String typescriptSource(String name){try{return typescript.source(name);}catch(Exception error){throw new IllegalArgumentException(error.getMessage());}}
+        @JavascriptInterface public void typescriptComplete(String name,String code,String error){if(typescript!=null)typescript.complete(name,code,error);}
         @JavascriptInterface public String storageGet(String key){return storage.getString(key,"");}
         @JavascriptInterface public void storageSet(String key,String value){storage.edit().putString(key,value).commit();}
         @JavascriptInterface public void storageRemove(String key){storage.edit().remove(key).commit();}

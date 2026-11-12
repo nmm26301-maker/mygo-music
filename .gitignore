@@ -6,3 +6,7 @@ app/src/main/assets/plugin-audit.json
 **/__pycache__/
 tests/baseline-v510/
 tests/baseline-v511/
+app/src/main/assets/vendor/babel.min.js
+app/src/main/assets/third-party/Babel-MIT.txt
+app/src/androidTest/assets/port-fixtures/
+tests/baseline-v512/
