@@ -14,6 +14,7 @@ final class LyricsStageView extends View {
     private final TextPaint paint=new TextPaint(Paint.ANTI_ALIAS_FLAG|Paint.SUBPIXEL_TEXT_FLAG);
     private final Paint backdrop=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final LinkedHashMap<Integer,StaticLayout> layouts=new LinkedHashMap<>();
+    private final Map<Integer,List<Glyph>> glyphs=new HashMap<>();
     private final Map<Integer,Float> drawnCenters=new HashMap<>();
     private LyricsTimeline timeline=LyricsTimeline.empty();
     private int anchor=-1,effect=0;
@@ -25,19 +26,20 @@ final class LyricsStageView extends View {
     LyricsStageView(Context context,Clock clock){super(context);this.clock=clock;setLayerType(View.LAYER_TYPE_SOFTWARE,null);setContentDescription("全屏歌词，滑动浏览，点按歌词跳转播放");}
     private float dp(float value){return value*getResources().getDisplayMetrics().density;}
     void setBackdrop(boolean enabled){paintBackdrop=enabled;invalidate();}
-    void setTimeline(LyricsTimeline timeline){this.timeline=timeline;layouts.clear();anchor=-1;offset=0;following=true;lastPosition=-1;invalidate();}
+    void setTimeline(LyricsTimeline timeline){this.timeline=timeline;layouts.clear();glyphs.clear();anchor=-1;offset=0;following=true;lastPosition=-1;invalidate();}
     LyricsTimeline timeline(){return timeline;}
     int activeLine(){return timeline.active(clock.position());}
     void setMessage(String value){message=value;invalidate();}
-    void setEffect(int value){effect=value;invalidate();}
+    void setEffect(int value){if(effect!=value){effect=value;layouts.clear();glyphs.clear();anchor=-1;offset=0;}invalidate();}
+    int effect(){return effect;}
     void follow(){following=true;anchor=-1;offset=0;invalidate();}
     boolean following(){return following;}
-    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){layouts.clear();textSize=Math.max(dp(25),Math.min(dp(48),Math.min(w*.075f,h*.20f)));lineGap=Math.max(dp(28),h*.18f);backdrop.setShader(new LinearGradient(0,0,w,h,new int[]{Color.rgb(44,64,106),Color.rgb(32,39,68),Color.rgb(21,22,39)},null,Shader.TileMode.CLAMP));anchor=-1;offset=0;}
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){layouts.clear();glyphs.clear();textSize=Math.max(dp(25),Math.min(dp(48),Math.min(w*.075f,h*.20f)));lineGap=Math.max(dp(28),h*.18f);backdrop.setShader(new LinearGradient(0,0,w,h,new int[]{Color.rgb(44,64,106),Color.rgb(32,39,68),Color.rgb(21,22,39)},null,Shader.TileMode.CLAMP));anchor=-1;offset=0;}
     private StaticLayout layout(int index){
         StaticLayout value=layouts.get(index);if(value!=null)return value;
         paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
         value=StaticLayout.Builder.obtain(timeline.lines.get(index).text,0,timeline.lines.get(index).text.length(),paint,Math.max(1,(int)(getWidth()*.84f)))
-            .setIncludePad(false).setLineSpacing(dp(5),1).setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY).build();
+            .setIncludePad(false).setLineSpacing(dp(effect==0?12:5),1).setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY).build();
         layouts.put(index,value);return value;
     }
     private float distance(int from,int to){float result=0;if(from==to)return 0;int lo=Math.min(from,to),hi=Math.max(from,to);for(int i=lo;i<hi;i++)result+=(layout(i).getHeight()+layout(i+1).getHeight())/2f+lineGap;return from<to?result:-result;}
@@ -63,17 +65,63 @@ final class LyricsStageView extends View {
             canvas.save();canvas.translate(getWidth()*.08f,top);
             float scale=current?1:.86f+.06f*focus;canvas.scale(scale,scale,0,text.getHeight()/2f);
             paint.clearShadowLayer();paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
-            paint.setColor(current?0xff777f97:Color.argb((int)(50+65*focus),210,217,235));text.draw(canvas);
-            if(current){if(line.words.isEmpty()){paint.setColor(Color.WHITE);if(effect==0)paint.setShadowLayer(dp(5),0,0,0x80ffffff);text.draw(canvas);paint.clearShadowLayer();}
-                else for(LyricsTimeline.Word word:line.words){float fraction=word.fraction(position);if(fraction>0)highlight(canvas,text,line,word,fraction,position>=word.start&&position<word.end);}}
+            if(current&&effect==0&&!line.words.isEmpty()&&text.getParagraphDirection(0)>0&&!hasRtl(text,line.text))drawCharacters(canvas,text,line,i,position);
+            else{
+                paint.setColor(current?0xff777f97:Color.argb((int)(50+65*focus),210,217,235));text.draw(canvas);
+                if(current){if(line.words.isEmpty()){paint.setColor(Color.WHITE);if(effect==0)paint.setShadowLayer(dp(5),0,0,0x80ffffff);text.draw(canvas);paint.clearShadowLayer();}
+                    else for(LyricsTimeline.Word word:line.words){float fraction=word.fraction(position);if(fraction>0)highlight(canvas,text,line,word,fraction,position>=word.start&&position<word.end);}}
+            }
             if(!line.translation.isEmpty()){
                 paint.clearShadowLayer();paint.setTextSize(Math.max(dp(13),textSize*.40f));paint.setTypeface(Typeface.DEFAULT);paint.setColor(current?0xffc2c9df:0x668d97b1);
                 StaticLayout translation=StaticLayout.Builder.obtain(line.translation,0,line.translation.length(),paint,text.getWidth()).setIncludePad(false).build();canvas.save();canvas.translate(0,text.getHeight()+dp(10));translation.draw(canvas);canvas.restore();
             }
             canvas.restore();
         }
-        Iterator<Integer> keys=layouts.keySet().iterator();while(keys.hasNext()){int i=keys.next();if(i<lo-2||i>hi+2)keys.remove();}
+        Iterator<Integer> keys=layouts.keySet().iterator();while(keys.hasNext()){int i=keys.next();if(i<lo-2||i>hi+2){keys.remove();glyphs.remove(i);}}
         if(isShown()&&(clock.playing()||Math.abs(offset)>.3f))postInvalidateOnAnimation();
+    }
+    private static boolean hasRtl(StaticLayout layout,String text){for(int i=0;i<text.length();i++)if(layout.isRtlCharAt(i))return true;return false;}
+    private static final class Glyph {
+        int from,to,row;
+        float x,width;
+        long start,end;
+        Glyph(int from,int to,int row,float x,float width){this.from=from;this.to=to;this.row=row;this.x=x;this.width=width;}
+    }
+    private List<Glyph> characters(StaticLayout layout,LyricsTimeline.Line line,int index){
+        List<Glyph> cached=glyphs.get(index);if(cached!=null)return cached;
+        List<Glyph> result=new ArrayList<>();
+        for(LyricsTimeline.Word word:line.words){
+            List<Glyph> parts=new ArrayList<>();float total=0;
+            for(int[] cluster:LyricsCharacterMotion.clusters(word.text)){
+                int from=word.from+cluster[0],to=word.from+cluster[1],row=layout.getLineForOffset(from);
+                if(line.text.substring(from,to).trim().isEmpty())continue;
+                float x=layout.getPrimaryHorizontal(from),right=to>=layout.getLineEnd(row)?layout.getLineRight(row):layout.getPrimaryHorizontal(to);
+                float width=Math.abs(right-x);if(width<=0)continue;
+                Glyph glyph=new Glyph(from,to,row,Math.min(x,right),width);parts.add(glyph);total+=width;
+            }
+            float advance=0;
+            for(Glyph glyph:parts){glyph.start=word.start+(long)((word.end-word.start)*(advance/Math.max(1,total)));advance+=glyph.width;glyph.end=word.start+(long)((word.end-word.start)*(advance/Math.max(1,total)));result.add(glyph);}
+        }
+        glyphs.put(index,result);return result;
+    }
+    private void drawCharacters(Canvas canvas,StaticLayout text,LyricsTimeline.Line line,int index,long position){
+        for(Glyph glyph:characters(text,line,index)){
+            float lift=LyricsCharacterMotion.lift(position,glyph.start,glyph.end);
+            float baseline=text.getLineBaseline(glyph.row),pivot=glyph.x+glyph.width/2;
+            canvas.save();canvas.translate(0,-Math.min(dp(9),textSize*.20f)*lift);float scale=1+.14f*lift;canvas.scale(scale,scale,pivot,baseline);
+            paint.clearShadowLayer();paint.setColor(0xff777f97);
+            drawCharacter(canvas,line.text,text,glyph,baseline);
+            float fraction=position<glyph.start?0:glyph.end<=glyph.start?1:Math.max(0,Math.min(1,(position-glyph.start)/(float)(glyph.end-glyph.start)));
+            if(fraction>0){
+                canvas.save();canvas.clipRect(glyph.x-dp(1),text.getLineTop(glyph.row)-dp(16),glyph.x+glyph.width*fraction+dp(1),text.getLineBottom(glyph.row)+dp(8));
+                paint.setColor(Color.WHITE);if(lift>.02f)paint.setShadowLayer(dp(5)*Math.min(1,lift),0,0,0xaaffffff);
+                drawCharacter(canvas,line.text,text,glyph,baseline);paint.clearShadowLayer();canvas.restore();
+            }
+            canvas.restore();
+        }
+    }
+    private void drawCharacter(Canvas canvas,String text,StaticLayout layout,Glyph glyph,float baseline){
+        canvas.drawTextRun(text,glyph.from,glyph.to,layout.getLineStart(glyph.row),layout.getLineEnd(glyph.row),glyph.x,baseline,false,paint);
     }
     private void highlight(Canvas canvas,StaticLayout text,LyricsTimeline.Line line,LyricsTimeline.Word word,float fraction,boolean singing){
         float total=0;ArrayList<RectF> bounds=new ArrayList<>();ArrayList<int[]> ranges=new ArrayList<>();

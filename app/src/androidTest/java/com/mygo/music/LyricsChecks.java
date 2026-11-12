@@ -24,7 +24,37 @@ final class LyricsChecks {
     private static String fixture()throws Exception{return new JSONObject().put("lines",new JSONArray()
         .put(new JSONObject().put("start",0).put("end",6000).put("translation","A source-provided timed phrase").put("words",new JSONArray().put(new JSONObject().put("text","让音乐慢慢亮起").put("start",1000).put("end",5000))))
         .put(new JSONObject().put("start",7000).put("end",14000).put("words",new JSONArray().put(new JSONObject().put("text","跟着声音向前").put("start",7000).put("end",12000))))).toString();}
-    void run()throws Exception{parser();timing();pixels();servicePage();}
+    void run()throws Exception{parser();timing();pixels();characterMotion();servicePage();}
+    private static Rect ink(Bitmap image,int left,int right,boolean white){
+        Rect bounds=new Rect(image.getWidth(),image.getHeight(),0,0);
+        for(int y=0;y<image.getHeight()*.65;y++)for(int x=Math.max(0,left);x<Math.min(image.getWidth(),right);x++){
+            int c=image.getPixel(x,y);boolean match=white?Color.red(c)>230&&Color.green(c)>230&&Color.blue(c)>230:Color.red(c)>100&&Color.green(c)>105&&Color.blue(c)>130;
+            if(match){bounds.left=Math.min(bounds.left,x);bounds.top=Math.min(bounds.top,y);bounds.right=Math.max(bounds.right,x+1);bounds.bottom=Math.max(bounds.bottom,y+1);}
+        }
+        return bounds;
+    }
+    private void characterMotion()throws Exception{
+        check(LyricsCharacterMotion.clusters("A\u0301👨‍👩‍👧‍👦𠀀").size()==3,"character motion split an accent, emoji joiner sequence or surrogate pair");
+        test.runOnMainSync(()->{try{
+            Clock clock=new Clock();LyricsStageView view=new LyricsStageView(context,clock);view.layout(0,0,640,320);
+            String data=new JSONObject().put("lines",new JSONArray().put(new JSONObject().put("start",0).put("end",6000).put("words",new JSONArray()
+                .put(new JSONObject().put("text","唱 ").put("start",1000).put("end",1500))
+                .put(new JSONObject().put("text"," 跳").put("start",1500).put("end",2000))))).toString();
+            view.setTimeline(LyricsTimeline.parse(data));float size=(Float)field(view,"textSize");int left=(int)(640*.08),split=left+(int)size;
+            clock.position=999;Bitmap before=draw(view);clock.position=1499;Bitmap raised=draw(view),paused=draw(view);clock.position=3000;Bitmap settled=draw(view);
+            Rect raisedInk=ink(raised,left-10,split+5,true),settledInk=ink(settled,left-10,split+5,true);
+            check(raisedInk.top<settledInk.top-3,"sung character only changed color instead of rising");
+            check(raisedInk.width()>settledInk.width()+2,"sung character never enlarged");
+            check(Math.abs(ink(before,split+8,split+(int)size,false).top-ink(raised,split+8,split+(int)size,false).top)<=1,"the whole phrase moved together before the next character was sung");
+            check(raised.sameAs(paused),"paused character spring continued running on wall-clock time");clock.position=1499;Bitmap rewind=draw(view);check(raised.sameAs(rewind),"rewind replayed or retained a stale character animation");
+            before.recycle();raised.recycle();paused.recycle();settled.recycle();rewind.recycle();
+            String phrase="逐字弹起";JSONArray words=new JSONArray();for(int i=0;i<phrase.length();i++)words.put(new JSONObject().put("text",phrase.substring(i,i+1)).put("start",500+i*600).put("end",1000+i*600));
+            view.setTimeline(LyricsTimeline.parse(new JSONObject().put("lines",new JSONArray().put(new JSONObject().put("start",0).put("end",7000).put("words",words).put("translation","逐字上浮 · 缩放 · 弹性回落"))).toString()));
+            File frames=new File(context.getExternalFilesDir(null),"qa/lyrics-pop");frames.mkdirs();
+            for(int i=0;i<48;i++){clock.position=450+i*70;Bitmap frame=draw(view);try(FileOutputStream out=new FileOutputStream(new File(frames,String.format(Locale.US,"frame-%03d.png",i)))){frame.compress(Bitmap.CompressFormat.PNG,100,out);}frame.recycle();}
+            view.setTimeline(LyricsTimeline.parse(fixture()));clock.position=1500;Bitmap start=draw(view);clock.position=4500;Bitmap end=draw(view);check(bright(end)>bright(start)*2,"multi-character source word did not reveal characters over its real time range");start.recycle();end.recycle();
+        }catch(Exception error){throw new RuntimeException(error);}});
+    }
     private void timing(){
         SharedPreferences prefs=context.getSharedPreferences("lyrics_timing_test",0);prefs.edit().clear().commit();
         Clock audio=new Clock();audio.position=7000;LyricsTiming timing=new LyricsTiming(audio,prefs);timing.select("first");timing.adjust(600);

@@ -48,7 +48,7 @@ final class LyricsStageDialog extends Dialog {
     void setMessage(String message){stage.setMessage(message);}
     private void applyEffect(int effect){stage.setEffect(effect);}
     private void showSettings(View anchor){
-        PopupMenu menu=new PopupMenu(getContext(),anchor);String[] labels={"发光律动","柔和高亮","简洁高亮","重新获取歌词","导入歌词文件","回到正在演唱的歌词","调整歌词同步"};
+        PopupMenu menu=new PopupMenu(getContext(),anchor);String[] labels={"逐字弹起","柔和高亮","简洁高亮","重新获取歌词","导入歌词文件","回到正在演唱的歌词","调整歌词同步"};
         for(int i=0;i<labels.length;i++)menu.getMenu().add(0,i,i,labels[i]);menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(id<3){getContext().getSharedPreferences("library",0).edit().putInt("lyrics_effect",id).apply();applyEffect(id);}else if(id==3)host.refresh();else if(id==4)host.importLyrics();else if(id==5)stage.follow();else showTiming();return true;});menu.show();
     }
     private String timingLabel(){int value=timing.offset();return value==0?"当前未调整":"歌词"+(value<0?"提前 ":"延后 ")+String.format(java.util.Locale.CHINA,"%.1f 秒",Math.abs(value)/1000.0);}

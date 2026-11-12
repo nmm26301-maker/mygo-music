@@ -49,6 +49,7 @@ jobs:
             adb logcat -d > android-logcat.txt
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/source-browser.png source-browser.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-stage.png lyrics-stage.png || true
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-pop lyrics-pop || true
             grep -F MYGO_TESTS_OK plugin-test-results.txt
             adb shell am start -n com.mygo.music/.MainActivity
             adb shell input keyevent 82
@@ -63,6 +64,7 @@ jobs:
             android-logcat.txt
             landscape.png
             lyrics-stage.png
+            lyrics-pop/
             source-browser.png
       - name: Decode stable release signing key
         run: |
@@ -92,7 +94,7 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=59'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=60'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |
