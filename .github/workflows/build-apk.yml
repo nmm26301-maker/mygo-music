@@ -50,6 +50,7 @@ jobs:
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/source-browser.png source-browser.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-stage.png lyrics-stage.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-pop lyrics-pop || true
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/web-qr-test.png web-qr-test.png || true
             grep -F MYGO_TESTS_OK plugin-test-results.txt
             adb shell am start -n com.mygo.music/.MainActivity
             adb shell input keyevent 82
@@ -65,6 +66,7 @@ jobs:
             landscape.png
             lyrics-stage.png
             lyrics-pop/
+            web-qr-test.png
             source-browser.png
       - name: Decode stable release signing key
         run: |
