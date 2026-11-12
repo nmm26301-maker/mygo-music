@@ -204,7 +204,7 @@ public class MainActivity extends Activity {
     private void toggleLike(){
         if(current<0||current>=tracks.size())return;String key=tracks.get(current).toString();Uri uri=tracks.get(current);if(!"plugin".equals(uri.getScheme())){toggleLocalLike(key);return;}PluginManager.PluginInfo source=sourceInfo(uri.getAuthority());String method=episode(uri)?"likeEpisode":"like";
         if(source==null||!source.supports(method)){showPluginError("此来源未提供这项收藏接口");return;}if(likePending.contains(key))return;boolean desired=!liked.contains(key);likePending.add(key);updateLike();
-        pluginManager.export(source.id,method,likeArgs(uri.getQueryParameter("id"),desired),(ok,raw)->{likePending.remove(key);if(ok){if(desired)liked.add(key);else liked.remove(key);saveLiked();}else showSourceError(source.id,raw,"收藏操作失败",this::toggleLike);updateLike();});
+        pluginManager.export(source.id,method,likeArgs(uri.getQueryParameter("id"),desired),(ok,raw)->{likePending.remove(key);if(ok){if(desired)liked.add(key);else liked.remove(key);saveLiked();}else showSourceError(source.id,raw,"收藏操作失败",()->{if(current>=0&&current<tracks.size()&&tracks.get(current).toString().equals(key))toggleLike();});updateLike();});
     }
 
 

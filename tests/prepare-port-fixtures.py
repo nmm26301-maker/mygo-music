@@ -7,5 +7,8 @@ url='https://raw.githubusercontent.com/satyawikananda/soundgo/3a5b3e6bd2f6e5bb83
 with urllib.request.urlopen(url,timeout=45) as response:data=response.read()
 assert hashlib.sha256(data).hexdigest()=='bd256059a8be720df5b79db6a8da90d7a0aba0d660fd4057afba8dac97c0196e'
 (target/'soundgo.js').write_bytes(data)
+with urllib.request.urlopen('https://raw.githubusercontent.com/satyawikananda/soundgo/3a5b3e6bd2f6e5bb833be1f1a658a4e4095fc7fe/LICENSE',timeout=45) as response:license_text=response.read()
+assert b'GNU AFFERO GENERAL PUBLIC LICENSE' in license_text
+(target/'SoundGo-AGPL-3.0.txt').write_bytes(license_text)
 subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=440:duration=8','-c:a','aac','-b:a','96k','-f','hls','-hls_time','2','-hls_playlist_type','vod','-hls_segment_filename',str(target/'segment-%03d.ts'),str(target/'sample.m3u8')],check=True)
 print('Verified original SoundGo source and generated native HLS audio fixtures')
