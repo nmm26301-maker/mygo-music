@@ -70,7 +70,7 @@ final class QrSaveUiChecks {
             while(saved==null&&SystemClock.elapsedRealtime()<deadline){Set<Long> after=gallery();after.removeAll(before);if(!after.isEmpty())saved=ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,after.iterator().next());else SystemClock.sleep(40);}
             if(saved==null){File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();Bitmap screen=test.getUiAutomation().takeScreenshot();if(screen!=null){try(FileOutputStream out=new FileOutputStream(new File(qa,"web-qr-test.png"))){screen.compress(Bitmap.CompressFormat.PNG,100,out);}screen.recycle();}}
             check(saved!=null,"web login save button did not publish a QR image; size="+dimensions[0]+"x"+dimensions[1]);assertSaved(saved,payload);
-            test.runOnMainSync(()->check(dialog[0].isShowing()&&completed.getCount()==1&&fieldUnchecked(runtime,"phoneDialog")!=null,"same-phone web QR handoff dismissed or completed login"));
+            boolean[] waiting={false};long handoffDeadline=SystemClock.elapsedRealtime()+8000;while(!waiting[0]&&SystemClock.elapsedRealtime()<handoffDeadline){test.runOnMainSync(()->waiting[0]=dialog[0].isShowing()&&completed.getCount()==1&&fieldUnchecked(runtime,"phoneDialog")!=null);if(!waiting[0])SystemClock.sleep(40);}check(waiting[0],"same-phone web QR handoff dismissed or completed login");
         }finally{runtime.dispose();cleanupSaved(saved);test.runOnMainSync(activity::finish);server.close();PluginArchive.delete(directory);context.getSharedPreferences("library",0).edit().remove("plugin_network_"+id).commit();}
     }
 }
