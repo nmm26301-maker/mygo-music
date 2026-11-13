@@ -14,3 +14,5 @@ Android port: LyricsCharacterMotion.java. Full license: KaraokeText-MIT.txt.
 Babel standalone 7.29.13: MIT, offline TypeScript transform. Full license: Babel-MIT.txt.
 
 FFmpeg 9.0.2, LGPL-2.1-or-later, separate native Android audio process. GPL, nonfree and version3 components disabled. Full license: FFmpeg-LGPL-2.1.txt; credits: FFmpeg-CREDITS.txt; exact source/build: FFmpeg-build.json and the corresponding versioned sources ZIP distributed with the APK. Source: https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+
+Kugou device registration in kugou-device.mjs is adapted from bitbyte404/mygo-music-kugou-lite commit b964ac03274163d3bf64bb530a452332be244635, Copyright (c) 2026 sekai, with KuGouMusicApi attribution. Full corresponding MIT text is in Kugou-Device-MIT.txt. Source-pinned runtime adapters preserve original installed files. The account/song authorization request design was compared with MakcRe/KuGouMusicApi commit 7ac64e1 under its MIT license; no encrypted audio decryption or entitlement bypass is included.

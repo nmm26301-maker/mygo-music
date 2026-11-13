@@ -51,7 +51,7 @@ final class PluginHttp {
             if(transfer.cancelled||closed)throw new IOException("请求已取消");access.check(url);
             HttpURLConnection c=(HttpURLConnection)url.openConnection();transfer.connection=c;
             if(transfer.cancelled){c.disconnect();throw new IOException("请求已取消");}
-            c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setInstanceFollowRedirects(false);c.setRequestMethod(method);c.setRequestProperty("Accept-Encoding","identity");
+            c.setUseCaches(false);c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setInstanceFollowRedirects(false);c.setRequestMethod(method);c.setRequestProperty("Accept-Encoding","identity");
             if(headers!=null){Iterator<String> keys=headers.keys();while(keys.hasNext()){String key=keys.next();c.setRequestProperty(key,headers.optString(key));}}
             if(!body.isEmpty()&&!method.equals("GET")&&!method.equals("HEAD")){c.setDoOutput(true);try(OutputStream out=c.getOutputStream()){out.write(body.getBytes("UTF-8"));}}
             int status=c.getResponseCode();String location=c.getHeaderField("Location");
