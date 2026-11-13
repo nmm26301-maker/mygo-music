@@ -28,11 +28,13 @@ final class PhoneQrLogin {
     }
     static String names(List<App> apps){StringJoiner names=new StringJoiner("或");for(App app:apps)names.add(app.name);return names.toString();}
     static String button(String payload,String prompt){List<App> apps=apps(payload,prompt);return apps.isEmpty()?"保存并查看本机扫码步骤":"保存并打开"+names(apps);}
-    static String instructions(String payload,String prompt){List<App> apps=apps(payload,prompt);String target=apps.isEmpty()?"二维码要求的 App":names(apps);return "在这一部手机完成登录\n1. 保存当前二维码到相册。\n2. 打开"+target+"，进入扫一扫，在相册中选择刚保存的图片。\n3. 在该应用确认登录，再返回 MyGo Music，本页会自动更新。";}
+    static boolean cameraAuthorization(String payload,String prompt){List<App> candidates=apps(payload,prompt);return candidates.size()==1&&candidates.get(0).packageName.equals(QQ.packageName);}
+    static String cameraInstructions(){return "QQ授权可能被平台限制为摄像头扫码。相册识别或长按识别被拒绝后，保存图片和刷新二维码都不能解除该限制。请改用官网提供的其他登录方式；若继续扫码，需要另一块屏幕展示二维码。";}
+    static String instructions(String payload,String prompt){if(cameraAuthorization(payload,prompt))return cameraInstructions();List<App> apps=apps(payload,prompt);String target=apps.isEmpty()?"二维码要求的 App":names(apps);return "在这一部手机完成登录\n1. 保存当前二维码到相册。\n2. 打开"+target+"，进入扫一扫，在相册中选择刚保存的图片。\n3. 在该应用确认登录，再返回 MyGo Music，本页会自动更新。";}
     interface Current {boolean valid();}
     interface Launcher {Intent find(String packageName);void start(Intent intent);}
     static Launcher launcher(Context context){return new Launcher(){public Intent find(String name){return context.getPackageManager().getLaunchIntentForPackage(name);}public void start(Intent intent){context.startActivity(intent.addFlags(context instanceof Activity?0:Intent.FLAG_ACTIVITY_NEW_TASK));}};}
-    static AlertDialog open(Context context,String payload,String prompt,Current current){return open(context,apps(payload,prompt),current,launcher(context));}
+    static AlertDialog open(Context context,String payload,String prompt,Current current){if(!current.valid())return null;if(cameraAuthorization(payload,prompt)){if(context instanceof Activity)return new AlertDialog.Builder(context).setTitle("本次授权不能依靠相册扫码").setMessage(cameraInstructions()).setPositiveButton("知道了",null).show();Toast.makeText(context,cameraInstructions(),Toast.LENGTH_LONG).show();return null;}return open(context,apps(payload,prompt),current,launcher(context));}
     static AlertDialog open(Context context,List<App> requested,Current current,Launcher launcher){
         if(!current.valid())return null;ArrayList<App> available=new ArrayList<>();ArrayList<Intent> intents=new ArrayList<>();
         for(App app:requested){Intent intent=launcher.find(app.packageName);if(intent!=null){available.add(app);intents.add(intent);}}
