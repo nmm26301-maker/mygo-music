@@ -133,7 +133,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 43422287372 --name mygo-music-android-release --dir tests/baseline-v521
-      - name: Verify upgrades from signed v5.6.0 and v5.20.0 on Android
+      - name: Verify upgrades from signed v5.6.0 and v5.21.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33

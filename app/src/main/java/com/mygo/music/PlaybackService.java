@@ -135,12 +135,13 @@ public class PlaybackService extends Service {
     }
     private void adoptQualitySwitch(AudioQualitySwitch change){
         if(!currentQualitySwitch(change))return;
-        boolean play=wanted,acknowledged=trackReported||qualityReload;MediaPlayer replacement=change.player;
+        boolean play=wanted,acknowledged=trackReported||qualityReload;MediaPlayer replacement=change.player;int aligned;
+        try{aligned=replacement.getCurrentPosition();replacement.setVolume(0,0);play=play&&requestFocus();if(play)replacement.start();}catch(Exception error){change.listener.failed(change,error.getMessage());return;}
         replacement.setOnPreparedListener(null);replacement.setOnSeekCompleteListener(null);
         releasePlayer();player=replacement;decodedFile=change.temporary;audioInfo=change.info;streamKind=change.kind;stream=change.address.toString();headers=new HashMap<>(change.headers);currentCached=change.cached;sourceResolved=change.sourceResolved;codecAttempted=change.decoded;
-        activeQuality=change.quality;quality=activeQuality;initialPosition=replacement.getCurrentPosition();ready=true;loading=false;trackReported=false;qualityReload=acknowledged;qualityChange=null;
+        activeQuality=change.quality;quality=activeQuality;initialPosition=aligned;wanted=play;ready=true;loading=false;trackReported=false;qualityReload=acknowledged;qualityChange=null;
         cache.pin(currentCached?new File(change.address.getPath()):null);change.transferred();long request=++generation;attachPlaybackListeners(request,replacement,Uri.parse(stream),headers,currentCached);applyVolume();
-        if(play&&requestFocus())replacement.start();else wanted=false;if(safePlaying())recordAndCache();publish();
+        if(safePlaying())recordAndCache();publish();
     }
     void seek(int position){if(closed)return;seekRevision++;remoteCompletion.resume();initialPosition=Math.max(0,position);if(remote.active())remote.seek(initialPosition);else if(ready&&player!=null)player.seekTo(Math.min(initialPosition,Math.max(0,player.getDuration()-1)));publish();}
     void setVolume(int value){percent=Math.max(0,Math.min(100,value));if(remote.active())remote.volume(percent);else applyVolume();publish();}

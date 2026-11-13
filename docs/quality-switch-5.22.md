@@ -8,7 +8,7 @@
 
 全屏歌词页顶部新增音质按钮，可以直接使用现有三档选择。原有十种动效保持不变。
 
-Android 官方媒体状态与异步定位依据：https://developer.android.com/reference/android/media/MediaPlayer 。独立播放器不会启动第二路音频；实际采用后才启动。
+Android 官方媒体状态与异步定位依据：https://developer.android.com/reference/android/media/MediaPlayer 。交接时先以静音确认新播放器能够启动，再释放旧播放器并应用当前音量；不会同时输出两路音频。启动异常仍保留旧播放器。
 
 新增原生回归覆盖授权拒绝、HTTP 403、解码器拒绝、准备时暂停和拖动、快速选择、取消、切歌和停止，并检查实际播放器身份、时钟、偏好和来源上报。已有 ALAC 16/24 位及全套歌词、缓存、后台、登录、插件回归继续运行。
 
