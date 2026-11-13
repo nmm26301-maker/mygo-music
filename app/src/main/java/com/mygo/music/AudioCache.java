@@ -21,7 +21,7 @@ final class AudioCache implements Closeable {
     }
     private Context context;private final File root;private final HashMap<String,Entry> entries=new HashMap<>();private final HashSet<String> pending=new HashSet<>();
     private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16));
-    private String pinned="";
+    private String pinned="",switchPinned="";
     private long limit,generation;private volatile boolean closed;
     AudioCache(Context context){this(new File(context.getNoBackupFilesDir(),"audio-cache"),DEFAULT_LIMIT);this.context=context.getApplicationContext();}
     AudioCache(File root,long limit){this.root=root;this.limit=Math.max(1,limit);worker.allowCoreThreadTimeOut(true);root.mkdirs();load();}
@@ -34,6 +34,7 @@ final class AudioCache implements Closeable {
     synchronized boolean busy(){return !pending.isEmpty();}
     synchronized boolean owns(File file){if(file==null)return false;for(Entry entry:entries.values())if(entry.file.equals(file))return true;return false;}
     synchronized void pin(File file){pinned="";if(file!=null)for(Entry entry:entries.values())if(entry.file.equals(file)){pinned=entry.key;break;}trim(null);}
+    synchronized void pinSwitch(File file){switchPinned="";if(file!=null)for(Entry entry:entries.values())if(entry.file.equals(file)){switchPinned=entry.key;break;}trim(null);}
     void store(String track,String title,String quality,String address,Map<String,String> headers,Callback callback){
         String key=key(track,quality);final long epoch;final Map<String,String> requestHeaders=new HashMap<>(headers);
         synchronized(this){if(closed){callback.done(false,"缓存已关闭");return;}if(entries.containsKey(key)){callback.done(true,"已有缓存");return;}if(!pending.add(key)){callback.done(false,"正在缓存");return;}epoch=generation;}
@@ -78,8 +79,8 @@ final class AudioCache implements Closeable {
     }
     private void writeMetadata(Entry entry)throws Exception{JSONObject data=new JSONObject().put("track",entry.track).put("title",entry.title).put("quality",entry.quality).put("bytes",entry.bytes).put("used",entry.used).put("audioInfo",entry.info);File temporary=new File(root,entry.key+"-meta.part"),target=new File(root,entry.key+".json");try(FileOutputStream out=new FileOutputStream(temporary)){out.write(data.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));out.getFD().sync();}if(!temporary.renameTo(target)){temporary.delete();throw new IOException("无法保存缓存索引");}}
     private void removeEntry(Entry entry){entries.remove(entry.key);entry.file.delete();new File(root,entry.key+".json").delete();}
-    private void trim(String keep){ArrayList<Entry> sorted=new ArrayList<>(entries.values());Collections.sort(sorted,(a,b)->Long.compare(a.used,b.used));for(Entry entry:sorted){if(bytes()<=limit&&entries.size()<=512)break;if(!entry.key.equals(keep)&&!entry.key.equals(pinned))removeEntry(entry);}}
+    private void trim(String keep){ArrayList<Entry> sorted=new ArrayList<>(entries.values());Collections.sort(sorted,(a,b)->Long.compare(a.used,b.used));for(Entry entry:sorted){if(bytes()<=limit&&entries.size()<=512)break;if(!entry.key.equals(keep)&&!entry.key.equals(pinned)&&!entry.key.equals(switchPinned))removeEntry(entry);}}
     synchronized void remove(String track,String quality){Entry entry=entries.get(key(track,quality));if(entry!=null)removeEntry(entry);}
-    synchronized void clear(){generation++;pinned="";entries.clear();File[] files=root.listFiles();if(files!=null)for(File file:files)file.delete();}
+    synchronized void clear(){generation++;pinned="";switchPinned="";entries.clear();File[] files=root.listFiles();if(files!=null)for(File file:files)file.delete();}
     @Override public synchronized void close(){closed=true;generation++;worker.shutdownNow();}
 }

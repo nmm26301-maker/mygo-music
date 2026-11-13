@@ -11,7 +11,7 @@ import android.widget.*;
 /** Controls use the same service clock and transport as the notification and native player. */
 final class LyricsStageDialog extends Dialog {
     interface Host extends LyricsStageView.Clock {
-        long duration();void toggle();void previous();void next();void refresh();void importLyrics();
+        long duration();void toggle();void previous();void next();void refresh();void importLyrics();default void quality(){}
     }
     private final Host host;
     final LyricsTiming timing;
@@ -33,6 +33,7 @@ final class LyricsStageDialog extends Dialog {
         LinearLayout header=new LinearLayout(activity);header.setGravity(Gravity.CENTER_VERTICAL);
         Button back=button("返回");back.setContentDescription("返回播放器");header.addView(back,new LinearLayout.LayoutParams(dp(58),dp(40)));back.setOnClickListener(v->dismiss());
         LinearLayout info=new LinearLayout(activity);info.setOrientation(1);info.setPadding(dp(14),0,0,0);title=label("",15);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);badge=label("正在获取歌词",11);badge.setTextColor(0xffa8b7d8);info.addView(title);info.addView(badge);header.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+        Button quality=button("音质");quality.setContentDescription("歌词页播放音质");header.addView(quality,new LinearLayout.LayoutParams(dp(50),dp(40)));quality.setOnClickListener(v->host.quality());
         Button follow=button("跟随");header.addView(follow,new LinearLayout.LayoutParams(dp(58),dp(40)));follow.setOnClickListener(v->stage.follow());
         Button more=button("动效");more.setContentDescription("歌词动效与设置");header.addView(more,new LinearLayout.LayoutParams(dp(58),dp(40)));more.setOnClickListener(v->showSettings(more));root.addView(header,new LinearLayout.LayoutParams(-1,dp(44)));
         root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));

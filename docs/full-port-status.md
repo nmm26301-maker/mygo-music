@@ -1,6 +1,7 @@
-# Current work: Android 5.21.0 audio quality and two more lyric effects, versionCode 71
+# Current work: Android 5.22.0 failure-safe audio quality switching, versionCode 72
 
-Implemented immediate original-protocol audio quality changes with retained position/state, explicit source metadata and cache provenance, and two native presets (subtle character tilt and breathing glow). Existing high-quality default and saved settings remain intact. Last delivered validated release: 5.20.0, code 29fdd5d9b57f03e43de07d09f70fa8910ca56012, run 43417102202. Local 22 checks pass; complete Android tests, native quality switching, signing and upgrades await cloud verification. See audio-quality-motion-5.21.md. Resume current main without reinitializing.
+Staged native replacement keeps the original audible player until the new audio is prepared and aligned. Auth/HTTP/decoder failures preserve original audio and actionable errors. Rapid changes, pause/seek, next/stop cancellation and the full-screen lyric quality shortcut have native regressions queued in CI. Last delivered validated release is 5.21.0, code 548444273e694c7dfac5b65178f319ab3d0752f6, run 43422287372. Resume current main; do not reinitialize. See quality-switch-5.22.md.
+
 
 # Latest checkpoint: Android 5.20.0 validated, versionCode 70
 
