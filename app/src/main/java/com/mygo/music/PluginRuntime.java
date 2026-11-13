@@ -66,7 +66,7 @@ public final class PluginRuntime {
         main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null){finishSignInPrompt(request);timeout.done(false,"插件接口超时："+function);}},"signIn".equals(function)?300000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
-    public void dispose(){main.post(()->{closed=true;if(qrAge!=null)main.removeCallbacks(qrAge);closePhoneDialog();synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
+    public void dispose(){closed=true;main.post(()->{if(qrAge!=null)main.removeCallbacks(qrAge);closePhoneDialog();synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
     private void ensureLoaded(Callback cb){
         if(closed){cb.done(false,"插件已关闭");return;}if(loaded){cb.done(true,"");return;}if(!loadError.isEmpty()){cb.done(false,loadError);return;}
         loading.add(cb);if(starting)return;starting=true;
@@ -202,9 +202,9 @@ public final class PluginRuntime {
         @JavascriptInterface public void complete(String request,boolean ok,String value){main.post(()->{finishSignInPrompt(request);Callback cb=pending.remove(request);if(cb!=null)cb.done(ok,value);});}
         @JavascriptInterface public String typescriptSource(String name){try{return typescript.source(name);}catch(Exception error){throw new IllegalArgumentException(error.getMessage());}}
         @JavascriptInterface public void typescriptComplete(String name,String code,String error){if(typescript!=null)typescript.complete(name,code,error);}
-        @JavascriptInterface public String storageGet(String key){return storage.getString(key,"");}
-        @JavascriptInterface public void storageSet(String key,String value){storage.edit().putString(key,value).commit();}
-        @JavascriptInterface public void storageRemove(String key){storage.edit().remove(key).commit();}
+        @JavascriptInterface public String storageGet(String key){return closed?"":storage.getString(key,"");}
+        @JavascriptInterface public void storageSet(String key,String value){if(closed)return;storage.edit().putString(key,value).commit();}
+        @JavascriptInterface public void storageRemove(String key){if(closed)return;storage.edit().remove(key).commit();}
         @JavascriptInterface public String setting(String key){return context.getSharedPreferences("plugin_settings_"+id,Context.MODE_PRIVATE).getString(key,"");}
         @JavascriptInterface public String md5(String text){try{return hex(MessageDigest.getInstance("MD5").digest(text.getBytes("UTF-8")));}catch(Exception e){throw new IllegalStateException(e);}}
         @JavascriptInterface public String aesEcbEncrypt(String key,String text){try{Cipher c=Cipher.getInstance("AES/ECB/PKCS5Padding");c.init(Cipher.ENCRYPT_MODE,new SecretKeySpec(key.getBytes("UTF-8"),"AES"));return hex(c.doFinal(text.getBytes("UTF-8")));}catch(Exception e){throw new IllegalStateException(e);}}

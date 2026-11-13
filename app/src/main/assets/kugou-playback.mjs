@@ -23,7 +23,7 @@ function playable(data,requested){
   if(data.is_free_part===1||data.IsFreePart===1||/\/p_\d+_\d+\//.test(path))return null;
   let kbps=Number(data.bitRate||data.bitrate||0);if(kbps>10000)kbps=Math.round(kbps/1000);
   const result={url,type:ext,quality:ext==='flac'?'lossless':kbps>=300?'high':'standard',bitRate:kbps||undefined,size:Number(data.fileSize||data.filesize||0)||undefined};
-  for(const key of ['gain','peak']){const value=Number(data[key==='gain'?'volume_gain':'volume_peak']);if(Number.isFinite(value)&&data[key==='gain'?'volume_gain':'volume_peak']!=null)result[key]=value;}
+  // Preserve the original sources: do not infer ReplayGain units from vendor volume fields.
   return result;
 }
 export function createKugouPlayback(config){return async args=>{
