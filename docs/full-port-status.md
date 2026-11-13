@@ -1,11 +1,6 @@
-# Current work: Android 5.24.0 lyric visual polish, versionCode 74
+# Current work: Android 5.24.0 validated, versionCode 74
 
-Keeping fourteen stable preset IDs and saved choices. Refining continuous meteor gradients, soft ripple envelopes, gentler density-aware page entrance, viewport-edge row fading, bounded alpha layers, cached background destination and a quick menu with recent presets first. Existing native pixel/clock/quiet/RTL/menu regressions plus native cached-shader recoloring run in CI. Last delivered validated application is 5.23.0, code 1e17453de5b6dd352fb7845c79af635170a6d433, successful Actions run 43476371807. Resume main without initialization. See lyric-polish-5.24.md.
-
-
-
-
-
+Validated application code: 03b14850be5f72177d30599dec281b0bd1540d4a. Successful Actions: https://github.com/nmm26301-maker/mygo-music/actions/runs/43482710229 . Fourteen stable lyric preset IDs and saved choices remain intact. Continuous meteor gradients and soft halo, eased fading ripples, gentler density-aware page entrance, viewport-edge fading and bounded alpha layers polish the recent four styles. Quick menu lists those four first; full selector retains original ordering. Native shader/background objects are reused. All 22 local checks, full Android 13 native regressions including cached-gradient recoloring, stable signing, signed overwrite upgrades from 5.6.0 and 5.23.0, APK/source/backup/ABI/license checks passed. Actual native preview has 360 samples, encoded as 340 GIF frames across 19.8 seconds. Anonymous 64-source stages: 63 installations/loads, 41 successful search calls, 10 HTTP audio responses, 8 prepared decoders. This does not certify all sources or subscribed accounts. Physical-phone frame rate and battery have not been measured. Later documentation-only changes do not alter the tested application. Resume main without initialization. See lyric-polish-5.24.md for scope, evidence and hashes.
 
 # Latest checkpoint: Android 5.20.0 validated, versionCode 70
 

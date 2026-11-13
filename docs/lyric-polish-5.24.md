@@ -14,4 +14,28 @@
 
 Android 官方绘图依据：https://developer.android.com/reference/android/graphics/RadialGradient 、https://developer.android.com/reference/android/graphics/Canvas 、https://developer.android.com/reference/android/graphics/Camera 。新增柔光绘制使用现有原生渲染器，保留原有开源声明和文件。
 
-本地 22 项 Node 检查继续保留；完整云端像素、时间、菜单保存、渐变换色、背景与覆盖升级结果待构建完成后记录。实体手机帧率、电量及真实会员权限尚未实测。
+## 验证与交付
+
+已验证代码：03b14850be5f72177d30599dec281b0bd1540d4a。成功云端构建：https://github.com/nmm26301-maker/mygo-music/actions/runs/43482710229 。版本 5.24.0，versionCode 74，包名 com.mygo.music。
+
+- 本地 22 项 Node 回归通过。
+- Android 13 原生完整回归通过，含十四种样式差异、逐字像素、暂停与拖动重算、双行连续性、窄屏双向文字、减少动态效果、零强度、系统动画开关、纯文本回退、真实菜单点击和偏好保存。
+- 新增同一绘制器的柔光渐变换色像素检查通过，重复绘制颜色稳定；真实菜单滚动只处理一个可滚动根节点，避免重复滚动越过选项。
+- 原有播放、源质量切换、后台队列、登录与二维码等自动化回归通过。这些受控检查不等于真实用户会员账号全部服务通过。
+- 原签名 APK 完整性、zipalign 与签名校验通过；Android 13 模拟器从已签名 5.6.0 和 5.23.0 执行覆盖安装并启动成功。无需为本次升级卸载应用。
+- 下载文件的发布外层 ZIP 摘要与 Actions 元数据一致；备用 ZIP 内 APK 与直装 APK 字节一致。56 个对应源码文件与已验证工作树一致，FFmpeg 完整源码校验匹配；开源声明完整保留，发行 APK 不含测试类。
+- 四种原生架构已打包并核对 ELF：arm64-v8a、armeabi-v7a、x86_64、x86；运行回归环境为 x86_64 模拟器，未声称逐一在四种实体设备上实测。
+
+此次匿名 64 源审计分阶段结果为安装/加载 63、搜索调用通过 41、HTTP 音频响应 10、原生解码准备成功 8。搜索通过可能包括有效空结果。各阶段分开记录，不表示所有插件、会员歌曲或需桌面辅助程序的服务全部可用；结果随服务变化。
+
+预览使用最终测试运行原生渲染器在受控歌曲时间点导出的 360 帧；640×360、19.8 秒，GIF 合并相同画面后 340 帧。每段的顶部 34 像素复用该段首帧标题区，避免离场翻译遮住演示标题，歌词动效区域保持原生画面。它不是手机帧率或耗电测试。实体手机帧率、电量及真实会员权限尚未实测。
+
+原签名证书 SHA-256：ac76d91ee08f815376445024494bfbd723a3e59cbb20a14026da97f6647db75a。
+
+## 交付文件 SHA-256
+
+
+- mygo-music-v5.24.0-install.zip：2fabdc1da55738ad1e9b895a396e2c42a2fe95e5814c56a619c10bd6260f8f7a
+- mygo-music-v5.24.0-lyrics-preview.gif：9741e0108ee9486d1773c3a0cdebdeccd6195e5082f41cfc93717f9d0e038a5a
+- mygo-music-v5.24.0-sources.zip：ffb6c71bdaac783a2cc9b67169537e8a51b3e42b99842447b4f391e780ac542f
+- mygo-music-v5.24.0.apk：0a1e954d1b0cb3e60d6a1bf59e0dcac5c0a03d5a1a7a67fc5579277a67cbed06
