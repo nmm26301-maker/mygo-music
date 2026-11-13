@@ -1,3 +1,7 @@
+# Latest checkpoint: Android 5.16.0, versionCode 66
+
+Current validated application code: f0c5aeb55180a614e7892406bf39fee85a123417. Full run 43338583526 passed, including fresh QR sessions, rejected stale account writes, exact original Kugou/Concept authenticated protocol/native playback checks, all prior regressions, market audit, signature checks and signed 5.15.0 upgrade. See [login and playback repair](login-playback-repair.md) for the actual scope, corresponding-source checksums and remaining live-account conditions. Resume from current GitHub main; the following 5.15 migration map remains historical context.
+
 # Android migration checkpoint, 5.15.0
 
 Baseline: egoist/mygo-music v0.1.24, commit 552e25c04023aa00c551d77db69aaab16f60bf2d, reviewed 2026-11-12. Android package remains com.mygo.music; versionCode 65. This is a resumable migration checkpoint, not a claim that every third-party service or desktop-only helper works on Android.
