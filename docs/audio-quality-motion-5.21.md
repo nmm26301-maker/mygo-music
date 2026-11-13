@@ -31,6 +31,14 @@ Hi-Res、24 bit 等规格能否获得，取决于源接口、账户和音频本�
 
 新增受控音源使用真实 16/24 位 ALAC 文件与原生音频时钟，验证请求档位确实传到插件、暂停切换与播放切换的进度/状态、没有重复 played、本地文件不被重启、实际菜单可用、缓存保留来源参数且不把有损来源变成无损标签。原有 22 项本地检查已通过，七组 AMLL 原版参数对照及十种样式检查继续保留。
 
-完整 Android 回归、覆盖升级与最终文件校验待云端完成后补充。
+完整 Android 13 回归及十种歌词样式检查已通过，22 项 Node 检查通过。成功 Actions 为 https://github.com/nmm26301-maker/mygo-music/actions/runs/43422287372 ，对应应用代码 548444273e694c7dfac5b65178f319ab3d0752f6。正式签名 5.6.0 和 5.20.0 均已覆盖升级至 5.21.0 / versionCode 71 并成功启动。运行回归在 x86_64 模拟器完成，四种原生架构均已打包；未实测用户实体手机和会员账号。
+
+本轮匿名检查为 63 个安装加载成功、38 个搜索调用成功、7 个音频 HTTP 响应通过、5 个原生解码器准备成功，各阶段不等于全部来源真实账号可用。已核对原证书、APK 完整性、四个 ELF 架构、授权声明、测试类排除、备用安装 ZIP 与直接 APK 一致，以及对应源码包含固定 FFmpeg 源码且不含签名密钥。
+
+APK SHA-256：96008c5744f5a1a0612a936984cb8b749884e317b82bdcd4c9b18600c6e45508。
+安装 ZIP SHA-256：0a9293d413910b934d5ecbaceeec1465cec8b83ec9bb6e5d893825b43d7be286。
+源码 ZIP SHA-256：608f1e6938a8f500fbc636eae1e38ba8343c50527bfa844c85506fa681e5c10a。
+
+后续从最新 main 继续，不重复已完成迁移。本次文档提交不改变已测试应用实现。
 
 来源：https://github.com/egoist/mygo-music 、https://github.com/amll-dev/applemusic-like-lyrics 、https://developer.android.com/reference/android/media/MediaPlayer.TrackInfo 、https://developer.android.com/reference/android/media/MediaMetadataRetriever 。
