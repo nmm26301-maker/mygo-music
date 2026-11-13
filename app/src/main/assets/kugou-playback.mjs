@@ -28,7 +28,8 @@ function playable(data,requested){
 }
 export function createKugouPlayback(config){return async args=>{
   const account=host.storage.get('auth')||{};
-  if(!account.token||!account.userid||config.skip?.(args.id))return config.legacy(args);
+  if(config.skip?.(args.id))return config.legacy(args);
+  if(!account.token||!account.userid){try{return await config.legacy(args);}catch(error){if(error.code==='unavailable')throw failure('signIn','当前酷狗来源尚未保存有效登录凭据，请在播放器中登录此来源；官方 App 中的会员登录不会自动传入插件');throw error;}}
   // A stored badge is insufficient: all requests below carry the actual source token.
   const started=Date.now(),until=started+35000;let stage='设备',lastCode='';
   const session={token:utf(account.token),userid:utf(account.userid)};let bits=config.device();
