@@ -1,6 +1,6 @@
-# Latest checkpoint: Android 5.16.0, versionCode 66
+# Latest checkpoint: Android 5.19.0 development, versionCode 69
 
-Current validated application code: f0c5aeb55180a614e7892406bf39fee85a123417. Full run 43338583526 passed, including fresh QR sessions, rejected stale account writes, exact original Kugou/Concept authenticated protocol/native playback checks, all prior regressions, market audit, signature checks and signed 5.15.0 upgrade. See [login and playback repair](login-playback-repair.md) for the actual scope, corresponding-source checksums and remaining live-account conditions. Resume from current GitHub main; the following 5.15 migration map remains historical context.
+Current work adds pull-based native response bodies for real plugins that call response.body.getReader(). Local 21 checks pass; the complete Android run, signing and upgrade checks are pending. The last delivered validated code remains 794fe3895b269050a01b8ec321c40cbede438565, Android 5.18.0, run 43371762017. See stream-body-5.19.md for current implementation, pinned original Qishui proof and verification boundaries. Resume from current main without reinitializing. The following migration map is historical context.
 
 # Android migration checkpoint, 5.15.0
 

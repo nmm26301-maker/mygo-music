@@ -12,6 +12,7 @@ subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-
 print('Verified original Kugou source, corresponding MIT license and lossless playback fixture')
 
 for name,repo,commit,digest in [
+ ('qishui-original.js','DaviRain-Su/mygo-music-qishui','68ff332fe60eaa869f4a9afc55cc2144e151e312','d004a53dc1e6a63546919cbb92a662121dd6691b5cfe296d54bd6f7ab8cbe1c5'),
  ('bilibili-original.js','GentleM4dman/mygo-music-bilibili','43d15cca5f2eb3616bb7718a752b8e240b6c5cc5','d2f013c26929710d2185975a078a5844b9c41f9c704df6995951127c270a8f28'),
  ('ximalaya-original.js','specialhua/mygo-ximalaya','5084fa6ed17ff2b698fb7ccd554d028c6630bc1c','6a09ce6438ebc3787213f4c3319b7ee933576d104853878edf836db78e631abb')]:
  with urllib.request.urlopen(f'https://raw.githubusercontent.com/{repo}/{commit}/index.js',timeout=45) as response:data=response.read()

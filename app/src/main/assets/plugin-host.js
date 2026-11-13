@@ -1,6 +1,16 @@
 // Android implementation of MyGo's documented host interface.
 (() => {
   const requests = new Map(); let seq = 0;
+  const NativeResponse = window.Response, NativeStream = window.ReadableStream;
+  const streamBodies = (() => { try { const probe = new NativeStream({start(c){c.close();}}, {highWaterMark:0}); return new NativeResponse(probe).body === probe; } catch (_) { return false; } })();
+  const bytes = value => Uint8Array.from(atob(value || ''), c => c.charCodeAt(0));
+  const failTask = (id, task, error) => {
+    task.error = error; requests.delete(id); task.cleanup();
+    if (!task.resolved) task.reject(error);
+    else { try { task.controller?.error(error); } catch (_) {} task.pullReject?.(error); task.bodyReject?.(error); }
+    task.pullResolve = task.pullReject = null;
+    try { nativeHost.cancelResponse(id); } catch (_) {}
+  };
   window.__networkResult = (id, phase, raw) => {
     const task = requests.get(id); if (!task) return;
     try {
@@ -10,43 +20,63 @@
         task.headersDone = true;
         const headers = new Headers(result.headers || {});
         headers.getSetCookie = () => result.cookies || [];
-        const consume = async () => {
-          if (task.bodyUsed) throw new TypeError('Body has already been consumed');
-          task.bodyUsed = true;
-          if (task.error) throw task.error;
-          return new Promise((resolve, reject) => {
-            task.bodyResolve = resolve; task.bodyReject = reject;
-            nativeHost.readResponse(id);
-          });
-        };
-        task.resolve({ok:result.status >= 200 && result.status < 300, status:result.status,
-          url:result.url, headers, get bodyUsed(){return !!task.bodyUsed;},
-          text:async () => (await consume()).body || '',
-          json:async () => JSON.parse((await consume()).body || ''),
-          arrayBuffer:async () => Uint8Array.from(atob((await consume()).base64 || ''), c => c.charCodeAt(0)).buffer});
-      } else if (phase === 'body') {
-        requests.delete(id); task.cleanup(); task.bodyResolve?.(result);
-      }
-    } catch (error) {
-      task.error = error; requests.delete(id); task.cleanup();
-      if (!task.headersDone) task.reject(error); else task.bodyReject?.(error);
-    }
+        if (streamBodies) {
+          const noBody = task.method === 'HEAD' || [204, 205, 304].includes(result.status);
+          const stream = noBody ? null : new NativeStream({
+            start(controller) { task.controller = controller; },
+            pull() {
+              if (task.error) return Promise.reject(task.error);
+              return new Promise((resolve, reject) => {
+                task.pullResolve = resolve; task.pullReject = reject;
+                try { nativeHost.readResponseChunk(id); } catch (error) { failTask(id, task, error); }
+              });
+            },
+            cancel() {
+              requests.delete(id); task.cleanup(); task.pullResolve?.();
+              task.pullResolve = task.pullReject = null;
+              try { nativeHost.cancelResponse(id); } catch (_) {}
+            }
+          }, {highWaterMark: 0});
+          const response = new NativeResponse(stream, {status:result.status, statusText:result.statusText || '', headers});
+          const decorate = value => {
+            Object.defineProperty(value, 'url', {value:result.url});
+            Object.defineProperty(value, 'redirected', {value:!!result.redirected});
+            value.headers.getSetCookie = () => result.cookies || [];
+            const clone = value.clone.bind(value); value.clone = () => decorate(clone());
+            return value;
+          };
+          const resultResponse = decorate(response); task.resolved = true; task.resolve(resultResponse);
+          if (noBody) { requests.delete(id); task.cleanup(); nativeHost.cancelResponse(id); }
+        } else {
+          // Preserve the bounded text/binary path on old system WebViews without stream primitives.
+          const consume = async () => {
+            if (task.bodyUsed) throw new TypeError('Body has already been consumed');
+            task.bodyUsed = true; if (task.error) throw task.error;
+            return new Promise((resolve, reject) => { task.bodyResolve = resolve; task.bodyReject = reject; nativeHost.readResponse(id); });
+          };
+          task.resolved = true;
+          task.resolve({ok:result.status >= 200 && result.status < 300, status:result.status, url:result.url, headers,
+            get bodyUsed(){return !!task.bodyUsed;}, text:async () => (await consume()).body || '',
+            json:async () => JSON.parse((await consume()).body || ''), arrayBuffer:async () => bytes((await consume()).base64).buffer});
+        }
+      } else if (phase === 'chunk') {
+        const resolve = task.pullResolve; task.pullResolve = task.pullReject = null;
+        if (result.done) { task.controller.close(); requests.delete(id); task.cleanup(); }
+        else task.controller.enqueue(bytes(result.base64));
+        resolve?.();
+      } else if (phase === 'body') { requests.delete(id); task.cleanup(); task.bodyResolve?.(result); }
+    } catch (error) { failTask(id, task, error); }
   };
   window.fetch = (input, init = {}) => new Promise((resolve, reject) => {
     const id = String(++seq), signal = init.signal;
-    const task = {resolve, reject, cleanup:() => signal?.removeEventListener('abort', abort)};
-    const abort = () => {
-      const error = new DOMException('Aborted', 'AbortError'); task.error = error;
-      requests.delete(id); task.cleanup();
-      if (!task.headersDone) reject(error); else task.bodyReject?.(error);
-      try { nativeHost.cancelResponse(id); } catch (_) {}
-    };
+    const method = String(init.method || 'GET').toUpperCase();
+    const task = {resolve, reject, method, cleanup:() => signal?.removeEventListener('abort', abort)};
+    const abort = () => failTask(id, task, new DOMException('Aborted', 'AbortError'));
     if (signal?.aborted) { abort(); return; }
     const headers = {}; new Headers(init.headers || {}).forEach((v, k) => headers[k] = v);
-    requests.set(id, task);
-    signal?.addEventListener('abort', abort, {once:true});
-    nativeHost.request(id, String(input.url || input), JSON.stringify({method:init.method || 'GET',
-      headers, body:init.body == null ? '' : String(init.body), redirect:init.redirect || 'follow'}));
+    requests.set(id, task); signal?.addEventListener('abort', abort, {once:true});
+    try { nativeHost.request(id, String(input.url || input), JSON.stringify({method, headers, body:init.body == null ? '' : String(init.body), redirect:init.redirect || 'follow'})); }
+    catch (error) { failTask(id, task, error); }
   });
   const hostTasks = new Map(); let hostSequence = 0;
   window.__hostResult = (id, ok, raw) => {

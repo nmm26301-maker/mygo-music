@@ -219,6 +219,7 @@ public final class PluginRuntime {
         @JavascriptInterface public String aesEcbEncrypt(String key,String text){try{Cipher c=Cipher.getInstance("AES/ECB/PKCS5Padding");c.init(Cipher.ENCRYPT_MODE,new SecretKeySpec(key.getBytes("UTF-8"),"AES"));return hex(c.doFinal(text.getBytes("UTF-8")));}catch(Exception e){throw new IllegalStateException(e);}}
         @JavascriptInterface public void openURL(String address){main.post(()->{if(closed)return;Uri uri=Uri.parse(address);if("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))context.startActivity(new Intent(Intent.ACTION_VIEW,uri).addFlags(context instanceof android.app.Activity?0:Intent.FLAG_ACTIVITY_NEW_TASK));});}
         @JavascriptInterface public void request(String request,String address,String init){try{http.open(request,address,new JSONObject(init));}catch(Exception e){main.post(()->{if(!closed&&web!=null)web.evaluateJavascript("window.__networkResult("+JSONObject.quote(request)+",\"error\","+JSONObject.quote("{\"error\":\"无效网络请求\"}")+");",null);});}}
+        @JavascriptInterface public void readResponseChunk(String request){if(http!=null)http.readChunk(request);}
         @JavascriptInterface public void readResponse(String request){if(http!=null)http.read(request);}
         @JavascriptInterface public void cancelResponse(String request){if(http!=null)http.cancel(request);}
         @JavascriptInterface public void signInPrompt(String raw){main.post(()->updateLoginPrompt(raw));}

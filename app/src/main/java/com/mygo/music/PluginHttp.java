@@ -23,13 +23,14 @@ final class PluginHttp {
     private static final class Transfer {
         volatile HttpURLConnection connection;
         volatile boolean cancelled;
-        boolean reading;
+        volatile boolean reading;boolean streaming,queued;InputStream input;int consumed;
         String method;
         File local;
         Runnable expiry;
-        // Disconnect cancels the socket. The reading worker alone owns InputStream.close():
+        // Disconnect cancels the socket. During an active read the worker owns InputStream.close():
         // Android's buffered stream cannot be closed concurrently with its read operation.
-        void close(){cancelled=true;HttpURLConnection c=connection;if(c!=null)try{c.disconnect();}catch(RuntimeException ignored){}}
+        void closeInput(){if(input!=null)try{input.close();}catch(IOException ignored){}finally{input=null;}}
+        void close(){cancelled=true;HttpURLConnection c=connection;if(c!=null)try{c.disconnect();}catch(RuntimeException ignored){}synchronized(this){if(!reading)closeInput();}}
     }
     PluginHttp(Access access,Reply reply,PluginResources resources){this.access=access;this.reply=reply;this.resources=resources;}
     void open(String id,String address,JSONObject init){
@@ -61,13 +62,13 @@ final class PluginHttp {
             }
             JSONObject responseHeaders=new JSONObject();JSONArray cookies=new JSONArray();
             for(Map.Entry<String,List<String>> entry:c.getHeaderFields().entrySet())if(entry.getKey()!=null){if("set-cookie".equalsIgnoreCase(entry.getKey()))for(String value:entry.getValue())cookies.put(value);else responseHeaders.put(entry.getKey(),String.join(", ",entry.getValue()));}
-            transfer.method=method;return envelope(status,url.toString(),responseHeaders,cookies);
+            transfer.method=method;return envelope(status,url.toString(),responseHeaders,cookies).put("redirected",redirects>0).put("statusText",c.getResponseMessage()==null?"":c.getResponseMessage());
         }
         throw new IOException("重定向次数过多");
     }
     private static boolean sameOrigin(URL a,URL b){return a.getProtocol().equalsIgnoreCase(b.getProtocol())&&a.getHost().equalsIgnoreCase(b.getHost())&&a.getPort()==b.getPort();}
     private static JSONObject envelope(int status,String url,JSONObject headers,JSONArray cookies)throws JSONException{return new JSONObject().put("status",status).put("url",url).put("headers",headers).put("cookies",cookies);}
-    void read(String id){Transfer transfer=active.get(id);if(transfer==null){error(id,"响应已关闭或请求已取消");return;}synchronized(transfer){if(transfer.reading){error(id,"响应内容已读取");return;}transfer.reading=true;}
+    void read(String id){Transfer transfer=active.get(id);if(transfer==null){error(id,"响应已关闭或请求已取消");return;}synchronized(transfer){if(transfer.reading||transfer.streaming){error(id,"响应内容已读取");return;}transfer.reading=true;}
         submit(id,()->{try{
             byte[] bytes=new byte[0];
             if(!transfer.method.equals("HEAD")){
@@ -79,6 +80,19 @@ final class PluginHttp {
             if(!transfer.cancelled)reply.send(id,"body",new JSONObject().put("body",new String(bytes,"UTF-8")).put("base64",Base64.encodeToString(bytes,Base64.NO_WRAP)));
             cancel(id);
         }catch(Exception e){fail(id,transfer,e);}});
+    }
+    /** One bounded socket read per pull. Cancel never closes a stream concurrently with its owner. */
+    void readChunk(String id){Transfer transfer=active.get(id);if(transfer==null){error(id,"响应已关闭或请求已取消");return;}synchronized(transfer){if(transfer.reading||transfer.queued){error(id,"响应内容正在读取");return;}transfer.streaming=true;transfer.queued=true;}
+        submit(id,()->{synchronized(transfer){transfer.queued=false;if(transfer.cancelled||closed)return;transfer.reading=true;}JSONObject answer;boolean done=false;try{
+            main.removeCallbacks(transfer.expiry);if(transfer.cancelled||closed)return;
+            if(transfer.input==null&&!transfer.method.equals("HEAD")){HttpURLConnection c=transfer.connection;transfer.input=transfer.local!=null?new FileInputStream(transfer.local):c.getResponseCode()>=400?c.getErrorStream():c.getInputStream();}
+            byte[] block=new byte[32768];int count=transfer.input==null?-1:transfer.input.read(block);done=count<0;
+            if(transfer.cancelled||closed)return;if(count>0){if(transfer.consumed+count>LIMIT)throw new IOException("插件响应超过 8 MB");transfer.consumed+=count;}
+            answer=new JSONObject().put("done",done).put("base64",count>0?Base64.encodeToString(block,0,count,Base64.NO_WRAP):"");
+        }catch(Exception error){fail(id,transfer,error);return;}finally{synchronized(transfer){transfer.reading=false;if(transfer.cancelled||done)transfer.closeInput();}}
+            if(transfer.cancelled||closed)return;reply.send(id,"chunk",answer);
+            if(done)cancel(id);else main.post(()->{if(active.get(id)==transfer&&!transfer.cancelled&&!transfer.reading&&!transfer.queued){main.removeCallbacks(transfer.expiry);main.postDelayed(transfer.expiry,30000);}});
+        });
     }
     private void error(String id,String message){try{reply.send(id,"error",new JSONObject().put("error",message));}catch(JSONException ignored){}}
     private void fail(String id,Transfer transfer,Exception error){if(!transfer.cancelled&&!closed)error(id,error.getMessage()==null?"插件网络请求失败":error.getMessage());cancel(id);}

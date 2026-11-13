@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 
 android { namespace 'com.mygo.music'; compileSdk 35
-    defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 68; versionName '5.18.0'; testInstrumentationRunner 'com.mygo.music.PluginInstrumentation' }
+    defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 69; versionName '5.19.0'; testInstrumentationRunner 'com.mygo.music.PluginInstrumentation' }
     signingConfigs { release { storeFile file('../signing/mygo-release.keystore'); storePassword 'mygo-store-2026'; keyAlias 'mygo'; keyPassword 'mygo-store-2026' } }
     packaging { jniLibs { useLegacyPackaging = true } }
     buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } }
