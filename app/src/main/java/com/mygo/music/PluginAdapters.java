@@ -11,7 +11,7 @@ final class PluginAdapters {
     static final String SOUNDGO_SHA="bd256059a8be720df5b79db6a8da90d7a0aba0d660fd4057afba8dac97c0196e";
     private File entry;private byte[] adapted;boolean deviceNetwork;
     PluginAdapters(File root){try{
-        JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");
+        JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");if(!identity.equals("soundgo")&&!identity.equals("kugou")&&!identity.equals("kugou-lite"))return;
         File file=new File(root,"index.js");if(!file.isFile())return;String source=PluginIdentity.read(file);StringBuilder hash=new StringBuilder();for(byte value:MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)))hash.append(String.format(Locale.ROOT,"%02x",value&255));String digest=hash.toString();
         if(identity.equals("kugou")&&digest.equals("4c463558265aa8a7a41606ad2ada7a50512d68ed791f462ed8de0ce515d14e24")){
             String marker="export async function stream({ id, quality })";String point="  const duration = Number(track.duration";
