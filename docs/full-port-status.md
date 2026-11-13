@@ -1,6 +1,7 @@
-# Current work: Android 5.22.0 failure-safe audio quality switching, versionCode 72
+# Current work: validated Android 5.22.0, versionCode 72
 
-Staged native replacement keeps the original audible player until the new audio is prepared and aligned. Auth/HTTP/decoder failures preserve original audio and actionable errors. Rapid changes, pause/seek, next/stop cancellation and the full-screen lyric quality shortcut have native regressions queued in CI. Last delivered validated release is 5.21.0, code 548444273e694c7dfac5b65178f319ab3d0752f6, run 43422287372. Resume current main; do not reinitialize. See quality-switch-5.22.md.
+Delivered application code c65b50d9a62b285dce348103bbba2c6d1f1c7443. Actions run 43471075893 (successful retry) passed 22 Node checks, complete Android 13 instrumentation, the 64-source anonymous audit, stable signing, and overwrite upgrades from signed 5.6.0 and 5.21.0. Staged audio quality replacement retains the original player on preparation failure and keeps current controls and request ordering; the full-screen lyrics quality entry, explicit native cookie isolation, initial website QR capture and subsequent navigation/save checks passed. Audit stages: 63 installs/loads, 42 search calls, 10 HTTP audio responses, 8 prepared native decoders. These are separate stages, not certification of every real account. See quality-switch-5.22.md for exact evidence and hashes. Resume latest main without initialization or repeating verified migration stages. Final documentation commits do not alter tested application code.
+
 
 
 # Latest checkpoint: Android 5.20.0 validated, versionCode 70
