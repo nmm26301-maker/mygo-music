@@ -6,6 +6,7 @@ import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.os.SystemClock;
 import android.webkit.*;
+import android.webkit.CookieManager;
 import org.json.*;
 import java.io.*;
 import java.net.*;
