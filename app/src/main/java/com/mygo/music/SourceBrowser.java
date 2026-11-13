@@ -93,7 +93,7 @@ final class SourceBrowser {
         Button back=button("返回",this::back);back.setEnabled(!history.isEmpty());toolbar.addView(back,new LinearLayout.LayoutParams(dp(compact()?44:60),dp(36)));
         TextView title=text(displayed.result==null?displayed.title:displayed.result.optString("title",displayed.title),16,Color.WHITE);title.setMaxLines(compact()?1:2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);toolbar.addView(title,new LinearLayout.LayoutParams(0,dp(compact()?36:44),1));
         if(!displayed.method.equals("external")&&!displayed.method.equals("landing"))toolbar.addView(button("刷新",this::reload),new LinearLayout.LayoutParams(dp(55),dp(36)));
-        if(source.supports("account")||source.supports("signIn")){PluginManager.PluginInfo accountSource=source;toolbar.addView(button("账号",()->host.account(accountSource)),new LinearLayout.LayoutParams(dp(55),dp(36)));}
+        if(source.supports("account")||source.supports("signIn")){PluginManager.PluginInfo accountSource=source;toolbar.addView(button("账号登录",()->host.account(accountSource)),new LinearLayout.LayoutParams(dp(86),dp(36)));}
         container.addView(toolbar);
         LinearLayout navigation=new LinearLayout(activity);Set<String> entries=new HashSet<>();
         for(Map.Entry<String,String> entry:source.navigationPages.entrySet())addNavigation(navigation,entries,entry.getKey(),entry.getValue());

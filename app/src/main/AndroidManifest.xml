@@ -11,6 +11,7 @@
         <package android:name="com.kugou.android" />
         <package android:name="com.kugou.android.lite" />
         <package android:name="tv.danmaku.bili" />
+        <package android:name="com.ximalaya.ting.android" />
     </queries>
     <application android:extractNativeLibs="true" android:usesCleartextTraffic="true" android:icon="@drawable/ic_launcher" android:theme="@style/AppTheme" android:label="MyGo Music" android:allowBackup="true" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:screenOrientation="landscape" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout" android:exported="true">

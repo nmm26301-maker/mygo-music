@@ -74,6 +74,7 @@ jobs:
             adb shell am instrument -w com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee plugin-test-results.txt
             adb logcat -d > android-logcat.txt
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/qq-official-login.png qq-official-login.png || true
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/login-repair login-repair || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/source-browser.png source-browser.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-stage.png lyrics-stage.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyrics-pop lyrics-pop || true
@@ -103,6 +104,7 @@ jobs:
             web-qr-test.png
             source-browser.png
             qq-official-login.png
+            login-repair/
       - name: Include per-source Android check results in the release
         run: cp market-audit.json app/src/main/assets/plugin-audit.json
       - name: Decode stable release signing key
@@ -122,11 +124,11 @@ jobs:
           unzip -t "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
           keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
-      - name: Download previously delivered signed v5.16.0 for upgrade verification
+      - name: Download previously delivered signed v5.17.0 for upgrade verification
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download 43338583526 --name mygo-music-android-release --dir tests/baseline-v516
-      - name: Verify upgrades from signed v5.6.0 and v5.16.0 on Android
+        run: gh run download 43350969606 --name mygo-music-android-release --dir tests/baseline-v517
+      - name: Verify upgrades from signed v5.6.0 and v5.17.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -137,14 +139,14 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=67'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=68'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
-            adb install tests/baseline-v516/mygo-music-v5.16.0.apk
+            adb install tests/baseline-v517/mygo-music-v5.17.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=67'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=68'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Prepare direct install files
         run: |

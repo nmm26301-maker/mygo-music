@@ -11,8 +11,18 @@ final class PluginAdapters {
     static final String SOUNDGO_SHA="bd256059a8be720df5b79db6a8da90d7a0aba0d660fd4057afba8dac97c0196e";
     private File entry;private byte[] adapted;boolean deviceNetwork,qqWebLogin;
     PluginAdapters(File root){try{
-        JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");if(!identity.equals("soundgo")&&!identity.equals("kugou")&&!identity.equals("kugou-lite")&&!identity.equals("qqmusic"))return;
+        JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");if(!identity.equals("soundgo")&&!identity.equals("kugou")&&!identity.equals("kugou-lite")&&!identity.equals("qqmusic")&&!identity.equals("bilibili"))return;
         File file=new File(root,identity.equals("qqmusic")?manifest.optString("main","index.js"):"index.js");if(!file.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator)||!file.isFile())return;String source=PluginIdentity.read(file);StringBuilder hash=new StringBuilder();for(byte value:MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)))hash.append(String.format(Locale.ROOT,"%02x",value&255));String digest=hash.toString();
+        if(identity.equals("bilibili")&&digest.equals("d2f013c26929710d2185975a078a5844b9c41f9c704df6995951127c270a8f28")){
+            String route="if (typeof host.webSignIn === \"function\") return signInOnPage();";
+            if(source.indexOf(route)<0||source.indexOf(route)!=source.lastIndexOf(route))return;
+            source=source.replace(route,"if (host.platform !== 'android' && typeof host.webSignIn === 'function') return signInOnPage();");
+            source=source.replace("    host.storage.set(\"cookie\", cookie);","    // Candidate cookie is validated before replacing the saved source session.");
+            source=source.replace("fetch(`${API}/x/web-interface/nav`, { headers: await headers() });\n    const body", "fetch(`${API}/x/web-interface/nav`, { headers: await headers({Cookie:[await visitor(),cookie].filter(Boolean).join('; ')}) });\n    const body");
+            source=source.replace("      host.storage.set(\"account\", me);", "      host.storage.set('cookie',cookie);\n      host.storage.set(\"account\", me);");
+            source=source.replace("  endSession();\n  throw new Error(`${t(\"Bilibili didn't take that sign-in: try again\")}","  throw new Error(`${t(\"Bilibili didn't take that sign-in: try again\")}");
+            adapted=source.getBytes(StandardCharsets.UTF_8);entry=file.getCanonicalFile();return;
+        }
         if(identity.equals("qqmusic")&&digest.equals("cf6fdcb57ac32da865e6cc4d6d34bfecdfa2970e33da8659dba5a40de384f8bc")){
             String marker="async function signIn() {",comm="...session3.device ?";if(source.indexOf(marker)<0||source.indexOf(marker)!=source.lastIndexOf(marker)||source.indexOf(comm)<0||source.indexOf(comm)!=source.lastIndexOf(comm))return;
             source="import {qqWebsiteLogin as __androidQQWebLogin} from 'https://plugin.invalid/.host/qq-web-login.mjs';\n"+source.replace(marker,"async function __androidQQOriginalSignIn() {").replace(comm,"...session3.web ? {ct:24,cv:0,uin:session3.musicid,platform:'yqq.json'} : session3.device ?");

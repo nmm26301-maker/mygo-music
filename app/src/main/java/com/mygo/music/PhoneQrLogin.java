@@ -12,7 +12,7 @@ final class PhoneQrLogin {
         final String name,packageName;
         App(String name,String packageName){this.name=name;this.packageName=packageName;}
     }
-    private static final App QQ=new App("手机 QQ","com.tencent.mobileqq"),WECHAT=new App("微信","com.tencent.mm"),NETEASE=new App("网易云音乐","com.netease.cloudmusic"),KUGOU=new App("酷狗音乐","com.kugou.android"),KUGOU_LITE=new App("酷狗概念版","com.kugou.android.lite"),QQMUSIC=new App("QQ 音乐","com.tencent.qqmusic"),BILI=new App("哔哩哔哩","tv.danmaku.bili");
+    private static final App QQ=new App("手机 QQ","com.tencent.mobileqq"),WECHAT=new App("微信","com.tencent.mm"),NETEASE=new App("网易云音乐","com.netease.cloudmusic"),KUGOU=new App("酷狗音乐","com.kugou.android"),KUGOU_LITE=new App("酷狗概念版","com.kugou.android.lite"),QQMUSIC=new App("QQ 音乐","com.tencent.qqmusic"),BILI=new App("哔哩哔哩","tv.danmaku.bili"),XIMALAYA=new App("喜马拉雅","com.ximalaya.ting.android");
     private static boolean domain(String host,String domain){return host.equals(domain)||host.endsWith("."+domain);}
     static List<App> apps(String payload,String prompt){
         Uri uri=Uri.parse(payload==null?"":payload);String host=uri.getHost()==null?"":uri.getHost().toLowerCase(Locale.ROOT),scheme=uri.getScheme()==null?"":uri.getScheme().toLowerCase(Locale.ROOT);String text=prompt==null?"":prompt.toLowerCase(Locale.ROOT);
@@ -20,6 +20,7 @@ final class PhoneQrLogin {
         if(domain(host,"ptlogin2.qq.com")||domain(host,"qrlogin.qq.com")||domain(host,"qm.qq.com")||domain(host,"qu.qq.com")||scheme.equals("mqq")||scheme.equals("mqqapi"))return Collections.singletonList(QQ);
         if(domain(host,"music.163.com")||scheme.equals("orpheus"))return Collections.singletonList(NETEASE);
         if(domain(host,"kugou.com")||scheme.equals("kugou"))return Arrays.asList(KUGOU,KUGOU_LITE);
+        if(domain(host,"ximalaya.com")||scheme.equals("iting"))return Collections.singletonList(XIMALAYA);
         if(domain(host,"bilibili.com")||domain(host,"b23.tv")||scheme.equals("bilibili"))return Collections.singletonList(BILI);
         if(text.contains("微信")||text.contains("wechat"))return Collections.singletonList(WECHAT);
         if(text.contains("手机 qq")||text.contains("qq 扫")||text.contains("qq扫码")||text.contains("mobile qq"))return Collections.singletonList(QQ);
