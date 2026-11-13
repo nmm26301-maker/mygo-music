@@ -4,9 +4,9 @@ export async function probe({url}) {
   try {
     const response = await fetch(url + '/probe', {headers:{Range:'bytes=0-0'}, signal:controller.signal});
     controller.abort();
-    let aborted = false;
-    try { await response.text(); } catch (error) { aborted = error.name === 'AbortError'; }
-    return {status:response.status, length:response.headers.get('content-length'), aborted};
+    let aborted = false, abortName = "", abortMessage = "";
+    try { await response.text(); } catch (error) { abortName = error.name; abortMessage = error.message; aborted = error.name === 'AbortError'; }
+    return {status:response.status, length:response.headers.get('content-length'), aborted, abortName, abortMessage};
   } finally { clearTimeout(timer); }
 }
 let pendingAbort;

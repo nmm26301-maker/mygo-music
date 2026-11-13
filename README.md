@@ -24,9 +24,13 @@ Six saved native lyric display styles: character pop, immersive flow, two-line k
 
 # MyGo Music Android
 
-基于 MyGo Music 插件协议的 Android 横屏适配版，当前开发版本 5.18.0。
+基于 MyGo Music 插件协议的 Android 横屏适配版，当前开发版本 5.19.0。
 
 ## 本版更新
+
+- 5.19：补齐插件 response.body.getReader() 按需读取，兼容跨块中文解码、取消、克隆和单次消费。固定指纹的原版汽水响应解析函数用于验证，账号与验证码错误继续保留。
+- 5.19：关闭未读完的响应改为后台清理，避免退出插件时触发 Android 界面线程网络异常。
+- [流式响应实现、开源方案比较与验证范围](docs/stream-body-5.19.md)。这项兼容修复不代表汽水桌面辅助程序、真实账号或会员播放已全部移植。
 
 - 5.18：原生二维码前置显示，支持点击全屏放大；网页二维码可放大和刷新，保存/打开操作保持可见。
 - 5.18：B站已核验版本优先使用原插件扫码生成与轮询；喜马拉雅补齐官方 App 路由和包可见性，官网登录页使用更大的竖屏窗口。

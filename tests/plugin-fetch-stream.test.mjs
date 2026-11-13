@@ -5,14 +5,14 @@ import fs from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 const source=await fs.readFile(new URL('../app/src/main/assets/plugin-host.js',import.meta.url),'utf8');
 const network=source.slice(source.indexOf('  const requests = new Map();'),source.indexOf('  const hostTasks = new Map();'));
-function environment(routes={},legacy=false){
+function environment(routes={},legacy=false,ResponseType=Response){
  const active=new Map(),cancelled=[],reads=[];let ctx;
  const emit=(id,phase,value)=>ctx.__networkResult(id,phase,JSON.stringify(value));
  const nativeHost={request(id,url,raw){const route=routes[url]||{};active.set(id,{route,chunks:[...(route.chunks||[])]});if(!route.holdHeaders)queueMicrotask(()=>emit(id,'headers',{status:route.status||200,url:route.finalURL||url,redirected:!!route.finalURL,statusText:'OK',headers:{'content-type':'application/json'},cookies:['session=fixture; HttpOnly']}));},
   readResponseChunk(id){reads.push(id);const state=active.get(id);if(!state||state.route.holdBody)return;queueMicrotask(()=>{if(!active.has(id))return;if(state.chunks.length)emit(id,'chunk',{done:false,base64:Buffer.from(state.chunks.shift()).toString('base64')});else{active.delete(id);emit(id,'chunk',{done:true,base64:''});}});},
   readResponse(id){const state=active.get(id);if(!state)return;const all=Buffer.concat(state.chunks.map(v=>Buffer.from(v)));active.delete(id);queueMicrotask(()=>emit(id,'body',{body:all.toString(),base64:all.toString('base64')}));},
   cancelResponse(id){cancelled.push(id);active.delete(id);}};
- ctx=vm.createContext({Response:legacy?undefined:Response,ReadableStream:legacy?undefined:ReadableStream,Headers,DOMException,Uint8Array,atob,Promise,nativeHost});ctx.window=ctx;vm.runInContext(`(()=>{${network}})()`,ctx);
+ ctx=vm.createContext({Response:legacy?undefined:ResponseType,ReadableStream:legacy?undefined:ReadableStream,Headers,DOMException,Uint8Array,atob,Promise,nativeHost});ctx.window=ctx;vm.runInContext(`(()=>{${network}})()`,ctx);
  return {fetch:ctx.fetch,active,cancelled,reads};
 }
 test('headers stay lazy; standard reader delivers byte chunks, locks and consumes once',async()=>{
@@ -34,6 +34,13 @@ test('abort rejects waiting headers and active reader with AbortError',async()=>
 });
 test('HEAD and 204 have null bodies and release the native connection',async()=>{
  const env=environment({'https://fixture/empty':{status:204}});const head=await env.fetch('https://fixture/head',{method:'HEAD'});const empty=await env.fetch('https://fixture/empty');assert.equal(head.body,null);assert.equal(empty.body,null);assert.equal(await empty.text(),'');assert.equal(env.active.size,0);
+});
+test('body consumers keep abort reasons on older WebViews while locked and consumed bodies retain TypeError',async()=>{
+ class OldResponse extends Response {text(){return super.text().catch(()=>{throw new TypeError('Failed to fetch');});}}
+ const env=environment({'https://fixture/held':{holdBody:true}},false,OldResponse);
+ const first=new AbortController(),r=await env.fetch('https://fixture/held',{signal:first.signal});first.abort();await assert.rejects(r.text(),{name:'AbortError'});await assert.rejects(r.text(),{name:'TypeError'});
+ const second=new AbortController(),pendingResponse=await env.fetch('https://fixture/held',{signal:second.signal}),pending=pendingResponse.text();second.abort();await assert.rejects(pending,{name:'AbortError'});
+ const third=new AbortController(),locked=await env.fetch('https://fixture/held',{signal:third.signal}),reader=locked.body.getReader();third.abort();await assert.rejects(locked.text(),{name:'TypeError'});reader.releaseLock();await assert.rejects(locked.text(),{name:'AbortError'});assert.equal(env.active.size,0);
 });
 
 test('older WebViews retain lazy bounded-body behavior without native stream primitives',async()=>{

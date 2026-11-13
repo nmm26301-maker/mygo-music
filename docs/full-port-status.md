@@ -1,6 +1,6 @@
 # Latest checkpoint: Android 5.19.0 development, versionCode 69
 
-Current work adds pull-based native response bodies for real plugins that call response.body.getReader(). Local 21 checks pass; the complete Android run, signing and upgrade checks are pending. The last delivered validated code remains 794fe3895b269050a01b8ec321c40cbede438565, Android 5.18.0, run 43371762017. See stream-body-5.19.md for current implementation, pinned original Qishui proof and verification boundaries. Resume from current main without reinitializing. The following migration map is historical context.
+Current work adds pull-based native response bodies for real plugins that call response.body.getReader(). Local 22 checks pass; the complete Android run, signing and upgrade checks are pending. The last delivered validated code remains 794fe3895b269050a01b8ec321c40cbede438565, Android 5.18.0, run 43371762017. See stream-body-5.19.md for current implementation, pinned original Qishui proof and verification boundaries. Resume from current main without reinitializing. The following migration map is historical context.
 
 # Android migration checkpoint, 5.15.0
 

@@ -43,7 +43,7 @@ final class PluginHttpChecks {
         context.getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+id,true).commit();context.getSharedPreferences("plugin_data_"+id,0).edit().clear().commit();
         PluginRuntime runtime=new PluginRuntime(context,dir);JSONObject args=new JSONObject().put("url","http://127.0.0.1:"+server.getLocalPort());
         try{
-            JSONObject probe=new JSONObject(call(runtime,"probe",args,true));check(probe.getInt("status")==200&&probe.getString("length").equals("64000000")&&probe.getBoolean("aborted"),"fetch waited for an ignored Range body or lost abort after headers");
+            JSONObject probe=new JSONObject(call(runtime,"probe",args,true));check(probe.getInt("status")==200&&probe.getString("length").equals("64000000")&&probe.getBoolean("aborted"),"fetch waited for an ignored Range body or lost abort after headers: "+probe);
             cancelConnected(runtime,args,"/before",false);
             cancelConnected(runtime,args,"/slow",true);
             JSONObject body=new JSONObject(call(runtime,"body",args,true));check(!body.getBoolean("before")&&body.getBoolean("after")&&body.getBoolean("twice")&&body.getJSONObject("value").getInt("ok")==42&&body.getJSONArray("binary").getInt(2)==255,"lazy JSON/binary or single body consumption failed");

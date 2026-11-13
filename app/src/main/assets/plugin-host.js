@@ -42,6 +42,20 @@
             Object.defineProperty(value, 'url', {value:result.url});
             Object.defineProperty(value, 'redirected', {value:!!result.redirected});
             value.headers.getSetCookie = () => result.cookies || [];
+            // Older Android WebViews can replace a stream's stored failure with a generic
+            // TypeError in Response consumers. Keep the request's reason without hiding
+            // the standard locked/already-consumed body error.
+            for (const name of ['text', 'json', 'arrayBuffer', 'blob', 'formData']) {
+              if (typeof value[name] !== 'function') continue;
+              const consume = value[name].bind(value);
+              value[name] = (...args) => {
+                const unusable = value.bodyUsed || !!value.body?.locked;
+                return consume(...args).then(result => {
+                  if (!unusable && task.error) throw task.error;
+                  return result;
+                }, error => { throw !unusable && task.error ? task.error : error; });
+              };
+            }
             const clone = value.clone.bind(value); value.clone = () => decorate(clone());
             return value;
           };
