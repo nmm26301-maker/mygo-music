@@ -34,7 +34,7 @@ final class LyricsStageDialog extends Dialog {
         Button back=button("返回");back.setContentDescription("返回播放器");header.addView(back,new LinearLayout.LayoutParams(dp(58),dp(40)));back.setOnClickListener(v->dismiss());
         LinearLayout info=new LinearLayout(activity);info.setOrientation(1);info.setPadding(dp(14),0,0,0);title=label("",15);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);badge=label("正在获取歌词",11);badge.setTextColor(0xffa8b7d8);info.addView(title);info.addView(badge);header.addView(info,new LinearLayout.LayoutParams(0,-2,1));
         Button follow=button("跟随");header.addView(follow,new LinearLayout.LayoutParams(dp(58),dp(40)));follow.setOnClickListener(v->stage.follow());
-        Button more=button("设置");header.addView(more,new LinearLayout.LayoutParams(dp(58),dp(40)));more.setOnClickListener(v->showSettings(more));root.addView(header,new LinearLayout.LayoutParams(-1,dp(44)));
+        Button more=button("动效");more.setContentDescription("歌词动效与设置");header.addView(more,new LinearLayout.LayoutParams(dp(58),dp(40)));more.setOnClickListener(v->showSettings(more));root.addView(header,new LinearLayout.LayoutParams(-1,dp(44)));
         root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
         progress=new SeekBar(activity);progress.setContentDescription("歌词播放进度");progress.setMax(10000);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xffd7def2));progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x446c7593));progress.setThumbTintList(android.content.res.ColorStateList.valueOf(0xffe9edfb));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(22)));
         progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar bar,int value,boolean user){if(user){host.seek(host.duration()*value/10000);stage.follow();stage.invalidate();}}public void onStartTrackingTouch(SeekBar bar){touching=true;}public void onStopTrackingTouch(SeekBar bar){touching=false;}});
@@ -52,9 +52,9 @@ final class LyricsStageDialog extends Dialog {
     void applyAppearance(LyricsAppearance value){appearance=value.copy();appearance.save(getContext().getSharedPreferences("library",0));stage.setAppearance(appearance);}
     private void showSettings(View anchor){
         PopupMenu menu=new PopupMenu(getContext(),anchor);
-        for(int i=0;i<LyricsAppearance.STYLES.length;i++)menu.getMenu().add(0,i,i,LyricsAppearance.STYLES[i]).setCheckable(true).setChecked(appearance.style==i);
-        String[] extra={"歌词外观与动效","重新获取歌词","导入歌词文件","回到正在演唱的歌词","调整歌词同步"};for(int i=0;i<extra.length;i++)menu.getMenu().add(1,6+i,6+i,extra[i]);
-        menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(id<6){LyricsAppearance next=appearance.copy();next.style=id;applyAppearance(next);}else if(id==6)showAppearance();else if(id==7)host.refresh();else if(id==8)host.importLyrics();else if(id==9)stage.follow();else showTiming();return true;});menu.show();
+        int added=LyricsAppearance.STYLES.length-6;for(int order=0;order<LyricsAppearance.STYLES.length;order++){int i=order<added?6+order:order-added;menu.getMenu().add(0,i,order,LyricsAppearance.STYLES[i]).setCheckable(true).setChecked(appearance.style==i);}
+        String[] extra={"歌词外观与动效","重新获取歌词","导入歌词文件","回到正在演唱的歌词","调整歌词同步"};for(int i=0;i<extra.length;i++)menu.getMenu().add(1,i,100+i,extra[i]);
+        menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(item.getGroupId()==0){LyricsAppearance next=appearance.copy();next.style=id;applyAppearance(next);}else if(id==0)showAppearance();else if(id==1)host.refresh();else if(id==2)host.importLyrics();else if(id==3)stage.follow();else showTiming();return true;});menu.show();
     }
     private interface NumberChange {void set(int value);}
     private void slider(LinearLayout box,String name,int value,int low,int high,NumberChange change){
@@ -72,7 +72,7 @@ final class LyricsStageDialog extends Dialog {
         choices(box,"高亮配色",LyricsAppearance.COLORS,appearance.color,value->appearance.color=value);
         slider(box,"歌词字号",appearance.size,80,135,value->appearance.size=value);slider(box,"行间距",appearance.spacing,75,150,value->appearance.spacing=value);slider(box,"动效强度",appearance.strength,0,140,value->appearance.strength=value);
         option(box,"歌词居中排列",appearance.centered,value->appearance.centered=value);option(box,"显示已有译文",appearance.translation,value->appearance.translation=value);option(box,"减少动态效果",appearance.reduceMotion,value->appearance.reduceMotion=value);
-        TextView note=label("双色卡拉OK和大字专注使用居中布局。减少动态效果保留逐字进度，关闭弹动和背景流动，也会跟随系统动画设置。",12);box.addView(note);
+        TextView note=label("弹簧聚焦使用错峰跟随；长音波浪按来源字词时长起伏，不分析鼓点。双色卡拉OK和大字专注使用居中布局。减少动态效果保留逐字进度，关闭弹动和背景流动，也会跟随系统动画设置。",12);box.addView(note);
         ScrollView scroll=new ScrollView(getContext());scroll.addView(box);AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("歌词外观与动效").setView(scroll).setPositiveButton("完成",null).setNeutralButton("恢复默认",(ignored,which)->{LyricsAppearance defaults=new LyricsAppearance();defaults.systemReduceMotion=appearance.systemReduceMotion;applyAppearance(defaults);}).create();appearanceDialog=dialog;dialog.show();
     }
     private String timingLabel(){int value=timing.offset();return value==0?"当前未调整":"歌词"+(value<0?"提前 ":"延后 ")+String.format(java.util.Locale.CHINA,"%.1f 秒",Math.abs(value)/1000.0);}

@@ -1,0 +1,18 @@
+Apple Music Like Lyrics (AMLL)
+https://github.com/amll-dev/applemusic-like-lyrics
+Pinned revision: 832bad5f16ec2a7f96d06707ef927c9a4d3713d3
+License: AGPL-3.0-only. Full license: AGPL-3.0.txt in this directory.
+
+LyricsExpressiveMotion.java adapts the normal-playback stiffness and damping
+policy from packages/core/src/lyric-player/base/spring.ts. Its original source
+is retained unchanged at third-party/amll/pos-y-spring.ts in the corresponding
+source archive and public repository. Attribution: the AMLL project contributors.
+
+The native time sampler, Canvas geometry, bounded visible-row cascade and
+duration emphasis envelope are implemented for this Android application.
+AMLL's DOM player, Web Animations, Pixi, React and Vue are not bundled.
+Its utils/spring.ts solver carries a separate upstream MIT provenance note;
+that file and solver were not copied into this application.
+
+Modified Android source and build instructions:
+https://github.com/nmm26301-maker/mygo-music

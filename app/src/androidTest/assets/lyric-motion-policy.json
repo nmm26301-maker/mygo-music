@@ -1,0 +1,37 @@
+[
+  {
+    "interval": 0,
+    "stiffness": 220,
+    "damping": 32.63127334322092
+  },
+  {
+    "interval": 100,
+    "stiffness": 220,
+    "damping": 32.63127334322092
+  },
+  {
+    "interval": 250,
+    "stiffness": 217.64561468471777,
+    "damping": 32.45619779139316
+  },
+  {
+    "interval": 500,
+    "stiffness": 212.2060439922055,
+    "damping": 32.04804600786567
+  },
+  {
+    "interval": 799,
+    "stiffness": 183.48808817350184,
+    "damping": 29.80071050763302
+  },
+  {
+    "interval": 800,
+    "stiffness": 170,
+    "damping": 28.68449058289166
+  },
+  {
+    "interval": 8000,
+    "stiffness": 170,
+    "damping": 28.68449058289166
+  }
+]
