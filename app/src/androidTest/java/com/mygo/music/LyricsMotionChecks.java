@@ -6,6 +6,7 @@ import android.graphics.*;
 import android.os.SystemClock;
 import android.view.*;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.*;
 import org.json.*;
 import java.io.*;
