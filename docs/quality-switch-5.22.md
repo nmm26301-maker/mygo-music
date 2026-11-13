@@ -19,3 +19,7 @@ Android 官方媒体状态与异步定位依据：https://developer.android.com/
 新的 HTTP 音频回归提前初始化了系统 MediaPlayer 网络层，暴露出 java.net 的全局自动 Cookie 容器会重用其他插件响应 Cookie，并覆盖 B 站候选登录请求的显式 Cookie。原生来源会话一直由各插件显式保存和附带，WebView 登录使用独立的 android.webkit.CookieManager。现在在应用启动时为 java.net 安装不自动存取 Cookie 的处理器，保留插件显式请求头和 Set-Cookie 返回值，阻止媒体初始化创建跨来源的隐式容器。没有在请求间临时切换全局处理器。
 
 原生回归在媒体初始化后检查响应 Cookie 不自动复用、显式 Cookie 原样送达、不同插件实例不继承会话；B 站候选校验与喜马拉雅、QQ 网页登录回归继续保留。Android 实现依据：https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android13-release/media/java/android/media/MediaHTTPService.java 。
+
+## 网页二维码首次加载
+
+旧版 WebView 的可视帧回调可能先于首次 onPageStarted 到达，导致已经显示二维码时点击放大，却被迟到的首次回调当成旧页面取消。现在在发起首次加载时计入页面身份，首次同地址的加载回调不重复更换身份；后续刷新、跳转、关闭和旧 WebView 回调仍使旧捕获失效。继续从真实可见像素解码，不读取网页隐藏凭据。
