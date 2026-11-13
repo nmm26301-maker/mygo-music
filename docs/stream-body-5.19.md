@@ -18,7 +18,7 @@ DaviRain-Su/mygo-music-qishui 原版目录读取会调用 response.body.getReade
 
 响应仍在收到 HTTP 头后返回，默认不预读正文。每次 reader 请求最多拉取 32 KiB，累计仍限制 8 MiB；取消或关闭插件会中止真实套接字，读取线程负责关闭正在使用的输入流，空闲流在独立后台清理池释放。Android 的 HTTP 关闭操作可能读取剩余字节，不能在界面线程执行，也不能等待被读取任务占满的工作池。未读取的响应仍有过期清理，不会无限占用连接。请求头、Cookie、网络域名权限与跨源重定向规则继续保留。
 
-现代 WebView 的 Response 提供 text/json/arrayBuffer/blob、标准 body 所有权和克隆，克隆保留宿主 URL、重定向及 getSetCookie 元数据。HEAD 和无正文状态不创建正文流。没有流原语的旧系统 WebView 保留此前的有界整包路径，不承诺其提供 getReader。此轮不宣称完整实现所有 Request/流上传/BYOB 等 Fetch 能力。
+现代 WebView 的 Response 提供 text/json/arrayBuffer/blob、标准 body 所有权和克隆，克隆保留宿主 URL、重定向及 getSetCookie 元数据。对会把响应读取异常改为通用错误的旧 WebView，正文消费方法保留请求的取消和网络失败原因；已经消费或锁定的正文仍报标准 TypeError。HEAD 和无正文状态不创建正文流。没有流原语的旧系统 WebView 保留此前的有界整包路径，不承诺其提供 getReader。此轮不宣称完整实现所有 Request/流上传/BYOB 等 Fetch 能力。
 
 ## 验证与范围
 

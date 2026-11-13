@@ -125,8 +125,13 @@ public final class PluginRuntime {
         if(browserView==null||browserView.getWidth()<=0||browserView.getHeight()<=0){Toast.makeText(context,"登录页面正在加载，请稍后保存二维码",Toast.LENGTH_LONG).show();return;}
         WebView target=browserView;
         Button button=browserDialog.getButton(AlertDialog.BUTTON_NEUTRAL);browserQrEnabled(false);String request=browserRequest;final int page=browserGeneration;
-        target.postVisualStateCallback(0,new WebView.VisualStateCallback(){@Override public void onComplete(long frame){if(closed||browserView!=target||page!=browserGeneration){browserQrEnabled(true);return;}captureBrowserQr(target,button,openApp,request,zoom,page);}});
+        // A renderer can miss the visual-state callback during a window/orientation change.
+        // PixelCopy still captures the actual visible window after two animation frames,
+        // and decoding must succeed before anything is enlarged or saved.
+        boolean[] captured={false};Runnable capture=()->{if(captured[0])return;captured[0]=true;if(closed||browserView!=target||page!=browserGeneration||!request.equals(browserRequest)||browserDialog==null||!browserDialog.isShowing()){qrDebug("capture superseded");browserQrEnabled(true);return;}qrDebug("capture visible frame "+target.getWidth()+"x"+target.getHeight());captureBrowserQr(target,button,openApp,request,zoom,page);};
+        main.postDelayed(capture,1000);qrDebug("capture requested");target.postVisualStateCallback(0,new WebView.VisualStateCallback(){@Override public void onComplete(long frame){main.removeCallbacks(capture);capture.run();}});
     }
+    private void qrDebug(String message){if((context.getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.util.Log.i("MyGoPlugin",id+": QR "+message);}
     private void captureBrowserQr(WebView target,Button button,boolean openApp,String request,boolean zoom,int page){
         float scale=Math.min(1,(float)Math.sqrt(2000000.0/(target.getWidth()*(double)target.getHeight())));
         Bitmap visible=Bitmap.createBitmap(Math.max(1,(int)(target.getWidth()*scale)),Math.max(1,(int)(target.getHeight()*scale)),Bitmap.Config.ARGB_8888);
@@ -134,7 +139,7 @@ public final class PluginRuntime {
             target.invalidate();target.postOnAnimation(()->target.postOnAnimation(()->{
                 if(closed||browserView!=target||browserDialog==null||page!=browserGeneration){visible.recycle();browserQrEnabled(true);return;}
                 int[] location=new int[2];target.getLocationInWindow(location);android.graphics.Rect bounds=new android.graphics.Rect(location[0],location[1],location[0]+target.getWidth(),location[1]+target.getHeight());
-                try{android.view.PixelCopy.request(browserDialog.getWindow(),bounds,visible,status->{if(status==android.view.PixelCopy.SUCCESS)saveBrowserQrImage(visible,button,openApp,request,zoom,page);else{visible.recycle();browserQrEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}},main);}
+                try{android.view.PixelCopy.request(browserDialog.getWindow(),bounds,visible,status->{qrDebug("pixel copy status "+status);if(status==android.view.PixelCopy.SUCCESS)saveBrowserQrImage(visible,button,openApp,request,zoom,page);else{visible.recycle();browserQrEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}},main);}
                 catch(IllegalArgumentException error){visible.recycle();browserQrEnabled(true);Toast.makeText(context,"页面暂未绘制完成，请稍后再保存二维码",Toast.LENGTH_LONG).show();}
             }));return;
         }
