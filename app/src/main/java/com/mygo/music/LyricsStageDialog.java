@@ -73,7 +73,7 @@ final class LyricsStageDialog extends Dialog {
         choices(box,"高亮配色",LyricsAppearance.COLORS,appearance.color,value->appearance.color=value);
         slider(box,"歌词字号",appearance.size,80,135,value->appearance.size=value);slider(box,"行间距",appearance.spacing,75,150,value->appearance.spacing=value);slider(box,"动效强度",appearance.strength,0,140,value->appearance.strength=value);
         option(box,"歌词居中排列",appearance.centered,value->appearance.centered=value);option(box,"显示已有译文",appearance.translation,value->appearance.translation=value);option(box,"减少动态效果",appearance.reduceMotion,value->appearance.reduceMotion=value);
-        TextView note=label("弹簧聚焦使用错峰跟随；长音波浪按来源字词时长起伏，不分析鼓点。双色卡拉OK和大字专注使用居中布局。减少动态效果保留逐字进度，关闭弹动和背景流动，也会跟随系统动画设置。",12);box.addView(note);
+        TextView note=label("流星拖尾跟随演唱位置，翻页入场带轻微透视，涟漪扩散环绕当前字，双行交接显示当前和下一行。长音波浪按来源字词时长起伏，不分析鼓点。双色卡拉OK和大字专注使用居中布局。减少动态效果保留逐字进度，关闭弹动和背景流动，也会跟随系统动画设置。",12);box.addView(note);
         ScrollView scroll=new ScrollView(getContext());scroll.addView(box);AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("歌词外观与动效").setView(scroll).setPositiveButton("完成",null).setNeutralButton("恢复默认",(ignored,which)->{LyricsAppearance defaults=new LyricsAppearance();defaults.systemReduceMotion=appearance.systemReduceMotion;applyAppearance(defaults);}).create();appearanceDialog=dialog;dialog.show();
     }
     private String timingLabel(){int value=timing.offset();return value==0?"当前未调整":"歌词"+(value<0?"提前 ":"延后 ")+String.format(java.util.Locale.CHINA,"%.1f 秒",Math.abs(value)/1000.0);}

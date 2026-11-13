@@ -13,6 +13,7 @@ final class LyricsStageView extends View {
     private final Clock clock;
     private final TextPaint paint=new TextPaint(Paint.ANTI_ALIAS_FLAG|Paint.SUBPIXEL_TEXT_FLAG);
     private final LyricsBackdrop backdrop=new LyricsBackdrop();
+    private final LyricsStageEffects stageEffects=new LyricsStageEffects();
     private LyricsAppearance appearance=new LyricsAppearance();
     private static final int[] THEME_COLORS={Color.WHITE,Color.WHITE,0xffa3ffe0,0xffffdf91,0xffffb7d7,0xffb9c5ff};
     private Shader highlightShader;
@@ -37,7 +38,7 @@ final class LyricsStageView extends View {
     void setAppearance(LyricsAppearance value){appearance=value.copy();effect=(value.style==0||value.style>=6)?0:(value.style==2||value.style==4?2:1);clearLayouts();metrics();anchor=-1;offset=0;following=true;invalidate();if(getParent() instanceof View)((View)getParent()).invalidate();}
     private void clearLayouts(){layouts.clear();glyphs.clear();translations.clear();highlightShader=null;}
     private boolean expressive(){return appearance.style>=6;}
-    private boolean compactStage(){return appearance.style==2||appearance.style==3;}
+    private boolean compactStage(){return appearance.style==2||appearance.style==3||appearance.style==13;}
     private float focusY(){return compactStage()?getHeight()*.33f:getHeight()*((appearance.style==1||expressive())?.43f:.48f);}
     private int accent(){return appearance.color==0?backdrop.accent:THEME_COLORS[appearance.color];}
     private void lit(int width){paint.setColor(accent());if((appearance.style==5||appearance.style==7)&&highlightShader==null)highlightShader=new LinearGradient(0,0,Math.max(1,width),0,new int[]{accent(),0xffffffff,0xffb0cfff},null,Shader.TileMode.CLAMP);paint.setShader((appearance.style==5||appearance.style==7)?highlightShader:null);}
@@ -81,17 +82,21 @@ final class LyricsStageView extends View {
         if(!dragging){offset=appearance.quiet()?0:(float)(offset*Math.exp(-elapsed/(appearance.style==1?200.0:130.0)));if(Math.abs(offset)<.3f)offset=0;}
         drawnCenters.clear();int lo=compactStage()?target:Math.max(0,anchor-5),hi=Math.min(timeline.lines.size()-1,compactStage()?target+1:anchor+5);
         for(int i=lo;i<=hi;i++){
-            StaticLayout text=layout(i);float block=blockHeight(i);float center=compactStage()?(i==target?focusY():getHeight()*.77f):focusY()+offset+distance(anchor,i);if(expressive()&&following&&active>0&&!appearance.quiet()){
+            StaticLayout text=layout(i);float block=blockHeight(i);float center=compactStage()?(i==target?focusY():getHeight()*.77f):focusY()+offset+distance(anchor,i);if(expressive()&&appearance.style!=11&&appearance.style!=13&&following&&active>0&&!appearance.quiet()){
                 LyricsTimeline.Line entered=timeline.lines.get(active);long interval=entered.start-timeline.lines.get(active-1).start;
                 center+=distance(active-1,active)*LyricsExpressiveMotion.cascade(position-entered.start,interval,i-active);
             }float top=center-block/2f;
             if(top>getHeight()+dp(60)||top+text.getHeight()< -dp(60))continue;
             drawnCenters.put(i,center);LyricsTimeline.Line line=timeline.lines.get(i);boolean current=timeline.timed?i==active:i==target;
             float focus=1-Math.min(1,Math.abs(center-focusY())/Math.max(1,getHeight()*.7f));
-            canvas.save();canvas.translate(getWidth()*.08f,top);
+            float handoff=appearance.style==13&&timeline.timed&&active>=0&&active+1<timeline.lines.size()&&!appearance.quiet()?LyricsStageEffects.handoff(position,timeline.lines.get(active).start,timeline.lines.get(active+1).start)*appearance.strength/100f:0;
+            int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top-dp(22)*handoff);
+            if(handoff>0)canvas.saveLayerAlpha(-dp(40),-dp(40),text.getWidth()+dp(40),block+dp(40),(int)(current?255-70*Math.min(1,handoff):220+35*Math.min(1,handoff)));
             float scale=appearance.style==4?1:current?(expressive()?1.04f:1):compactStage()?.70f:expressive()?.80f+.09f*focus:.86f+.06f*focus;
+            if(appearance.style==13)scale=current?1.04f-.10f*handoff:.70f+.17f*handoff;
             if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:.30f))/Math.max(1,block));
             float pivot=(appearance.centered||compactStage())?text.getWidth()/2f:0;canvas.scale(scale,scale,pivot,block/2f);
+            if(current&&appearance.style==11&&timeline.timed&&!appearance.quiet())stageEffects.page(canvas,text.getWidth(),block,LyricsStageEffects.entrance(position,line.start,line.end)*appearance.strength/100f,getResources().getDisplayMetrics().density);
             paint.setShader(null);paint.clearShadowLayer();paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
             if(current&&effect==0&&!line.words.isEmpty()&&text.getParagraphDirection(0)>0&&!hasRtl(text,line.text))drawCharacters(canvas,text,line,i,position);
             else{
@@ -105,7 +110,7 @@ final class LyricsStageView extends View {
                 canvas.save();canvas.translate(0,text.getHeight()+dp(10));translated.draw(canvas);canvas.restore();
             }
             if(current&&appearance.style==5){paint.setShader(null);paint.setColor(accent());paint.setAlpha(150);float fraction=line.end<=line.start?0:Math.max(0,Math.min(1,(position-line.start)/(float)(line.end-line.start)));canvas.drawRoundRect(0,block+dp(12),Math.max(dp(3),text.getWidth()*fraction),block+dp(14),dp(2),dp(2),paint);paint.setAlpha(255);}
-            canvas.restore();
+            canvas.restoreToCount(rowSave);
         }
         Iterator<Integer> keys=layouts.keySet().iterator();while(keys.hasNext()){int i=keys.next();if(i<lo-2||i>hi+2){keys.remove();glyphs.remove(i);translations.remove(i);}}
         interlude(canvas,position,active);
@@ -148,8 +153,10 @@ final class LyricsStageView extends View {
             float lift=appearance.quiet()?0:LyricsCharacterMotion.lift(position,glyph.start,glyph.end)*appearance.strength/100f;
             if(appearance.style==7&&!appearance.quiet()&&glyph.emphasize&&position>=glyph.start)lift+=.85f*LyricsExpressiveMotion.wave(position,glyph.sourceStart,glyph.sourceEnd,glyph.phase)*appearance.strength/100f;
             float breath=appearance.style==9&&!appearance.quiet()?LyricsExpressiveMotion.breathe(position,line.start,line.end)*appearance.strength/100f:0;
-            if(appearance.style==9)lift=0;
+            if(appearance.style==9||appearance.style>=10)lift=0;
             float baseline=text.getLineBaseline(glyph.row),pivot=glyph.x+glyph.width/2;
+            float progress=LyricsStageEffects.unit(position,glyph.start,glyph.end);
+            if(!appearance.quiet()&&appearance.style==12)stageEffects.ripple(canvas,pivot,baseline,textSize,accent(),LyricsStageEffects.unit(position,glyph.start,glyph.end+220),appearance.strength/100f);
             canvas.save();canvas.translate(0,-Math.min(dp(9),textSize*.20f)*lift);float scale=1+.14f*lift+.035f*breath;canvas.scale(scale,scale,pivot,baseline);if(appearance.style==8&&!appearance.quiet())canvas.rotate(LyricsExpressiveMotion.tilt(position,glyph.start,glyph.end)*(1-2*glyph.phase)*appearance.strength/100f,pivot,baseline-textSize*.45f);
             paint.setShader(null);paint.clearShadowLayer();paint.setColor(0xff777f97);
             drawCharacter(canvas,line.text,text,glyph,baseline);
@@ -160,6 +167,7 @@ final class LyricsStageView extends View {
                 drawCharacter(canvas,line.text,text,glyph,baseline);paint.setShader(null);paint.clearShadowLayer();canvas.restore();
             }
             canvas.restore();
+            if(!appearance.quiet()&&appearance.style==10&&position>=glyph.start&&position<glyph.end)stageEffects.meteor(canvas,glyph.x+glyph.width*progress,baseline,textSize,accent(),progress,appearance.strength/100f);
         }
     }
     private void drawCharacter(Canvas canvas,String text,StaticLayout layout,Glyph glyph,float baseline){
