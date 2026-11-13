@@ -7,6 +7,7 @@ final class LyricsBackdrop {
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final int[] colors={0xff4c427b,0xff204c63,0xff693e61};
     private final Shader[] gradients=new Shader[3];
+    private final Rect destination=new Rect();
     private Bitmap texture;private int width,height;int accent=Color.WHITE;
     void artwork(Bitmap artwork){
         if(texture!=null){texture.recycle();texture=null;}accent=Color.WHITE;
@@ -20,11 +21,11 @@ final class LyricsBackdrop {
         }
         resize(width,height);
     }
-    void resize(int width,int height){this.width=width;this.height=height;float radius=Math.max(1,Math.max(width,height)*.83f);for(int i=0;i<3;i++)gradients[i]=new RadialGradient(0,0,radius,new int[]{colors[i],colors[i]&0x00ffffff},null,Shader.TileMode.CLAMP);}
+    void resize(int width,int height){this.width=width;this.height=height;destination.set(0,0,width,height);float radius=Math.max(1,Math.max(width,height)*.83f);for(int i=0;i<3;i++)gradients[i]=new RadialGradient(0,0,radius,new int[]{colors[i],colors[i]&0x00ffffff},null,Shader.TileMode.CLAMP);}
     void draw(Canvas canvas,long position,LyricsAppearance options,int width,int height){
         if(width!=this.width||height!=this.height)resize(width,height);
         canvas.drawColor(0xff11131b);if(options.background==2)return;
-        if(texture!=null){paint.setShader(null);paint.setAlpha(80);canvas.drawBitmap(texture,null,new Rect(0,0,width,height),paint);paint.setAlpha(255);}
+        if(texture!=null){paint.setShader(null);paint.setAlpha(80);canvas.drawBitmap(texture,null,destination,paint);paint.setAlpha(255);}
         float phase=options.background==0&&!options.quiet()?Math.max(0,position)/18000f:0;
         for(int i=0;i<3;i++){float angle=phase+i*2.094f;float x=width*(.5f+.34f*(float)Math.cos(angle)),y=height*(.5f+.42f*(float)Math.sin(angle*.83f+i));canvas.save();canvas.translate(x,y);paint.setShader(gradients[i]);paint.setAlpha(185);canvas.drawRect(-x,-y,width-x,height-y,paint);canvas.restore();}
         paint.setShader(null);paint.setColor(0x66101420);paint.setAlpha(102);canvas.drawRect(0,0,width,height,paint);paint.setAlpha(255);

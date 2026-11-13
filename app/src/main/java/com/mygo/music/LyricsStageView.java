@@ -89,11 +89,13 @@ final class LyricsStageView extends View {
             float handoff=appearance.style==13&&following&&target==active&&timeline.timed&&active>=0&&active+1<timeline.lines.size()&&!appearance.quiet()?LyricsStageEffects.handoff(position,timeline.lines.get(active).start,timeline.lines.get(active+1).start,appearance.strength/100f):0;
             if(appearance.style==13)center-=(getHeight()*.77f-focusY())*handoff;
             float top=center-block/2f;
-            if(top>getHeight()+dp(60)||top+text.getHeight()< -dp(60))continue;
-            drawnCenters.put(i,center);LyricsTimeline.Line line=timeline.lines.get(i);boolean current=timeline.timed?i==active:i==target;
+            if(top>getHeight()+dp(60)||top+block< -dp(60))continue;
+            LyricsTimeline.Line line=timeline.lines.get(i);boolean current=timeline.timed?i==active:i==target;
             float focus=1-Math.min(1,Math.abs(center-focusY())/Math.max(1,getHeight()*.7f));
-            int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top);
-            if(handoff>0)canvas.saveLayerAlpha(-dp(40),-dp(40),text.getWidth()+dp(40),block+dp(40),(int)(current?255*(1-handoff):220+35*handoff));
+            float opacity=appearance.style>=10?LyricsStageEffects.edgeFade(center,block,getHeight()):1;
+            int rowAlpha=(int)((handoff>0?(current?255*(1-handoff):220+35*handoff):255)*opacity);if(rowAlpha<=0)continue;
+            drawnCenters.put(i,center);int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top);
+            if(rowAlpha<255){float layerTop=Math.max(-dp(40),-top),layerBottom=Math.min(block+dp(40),getHeight()-top);if(layerBottom<=layerTop){canvas.restoreToCount(rowSave);continue;}canvas.saveLayerAlpha(-dp(40),layerTop,text.getWidth()+dp(40),layerBottom,rowAlpha);}
             float scale=appearance.style==4?1:current?(expressive()?1.04f:1):compactStage()?.70f:expressive()?.80f+.09f*focus:.86f+.06f*focus;
             if(appearance.style==13)scale=current?1.04f-.10f*handoff:.70f+.34f*handoff;
             if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:appearance.style==13?.30f+.27f*handoff:.30f))/Math.max(1,block));
@@ -169,7 +171,7 @@ final class LyricsStageView extends View {
                 drawCharacter(canvas,line.text,text,glyph,baseline);paint.setShader(null);paint.clearShadowLayer();canvas.restore();
             }
             canvas.restore();
-            if(!appearance.quiet()&&appearance.style==10&&position>=glyph.start&&position<glyph.end)stageEffects.meteor(canvas,glyph.x+glyph.width*progress,baseline,textSize,accent(),progress,appearance.strength/100f);
+            if(!appearance.quiet()&&appearance.style==10&&position>=glyph.start&&position<glyph.end)stageEffects.meteor(canvas,glyph.x+glyph.width*progress,baseline,textSize,accent(),appearance.strength/100f);
         }
     }
     private void drawCharacter(Canvas canvas,String text,StaticLayout layout,Glyph glyph,float baseline){

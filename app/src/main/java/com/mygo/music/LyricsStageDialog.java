@@ -53,7 +53,8 @@ final class LyricsStageDialog extends Dialog {
     void applyAppearance(LyricsAppearance value){appearance=value.copy();appearance.save(getContext().getSharedPreferences("library",0));stage.setAppearance(appearance);}
     private void showSettings(View anchor){
         PopupMenu menu=new PopupMenu(getContext(),anchor);
-        int added=LyricsAppearance.STYLES.length-6;for(int order=0;order<LyricsAppearance.STYLES.length;order++){int i=order<added?6+order:order-added;menu.getMenu().add(0,i,order,LyricsAppearance.STYLES[i]).setCheckable(true).setChecked(appearance.style==i);}
+        java.util.ArrayList<Integer> order=new java.util.ArrayList<>();for(int recent:new int[]{13,10,11,12})if(recent<LyricsAppearance.STYLES.length)order.add(recent);for(int i=0;i<LyricsAppearance.STYLES.length;i++)if(!order.contains(i))order.add(i);
+        for(int rank=0;rank<order.size();rank++){int i=order.get(rank);menu.getMenu().add(0,i,rank,LyricsAppearance.STYLES[i]).setCheckable(true).setChecked(appearance.style==i);}
         String[] extra={"歌词外观与动效","重新获取歌词","导入歌词文件","回到正在演唱的歌词","调整歌词同步"};for(int i=0;i<extra.length;i++)menu.getMenu().add(1,i,100+i,extra[i]);
         menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(item.getGroupId()==0){LyricsAppearance next=appearance.copy();next.style=id;applyAppearance(next);}else if(id==0)showAppearance();else if(id==1)host.refresh();else if(id==2)host.importLyrics();else if(id==3)stage.follow();else showTiming();return true;});menu.show();
     }
