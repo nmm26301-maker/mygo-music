@@ -11,8 +11,8 @@ final class LyricsStageEffects {
     static float entrance(long position,long start,long end){
         long duration=Math.min(700,Math.max(260,(end-start)/3));float p=unit(position,start,start+duration);return (1-p)*(1-p)*(1-p);
     }
-    static float handoff(long position,long start,long next){
-        long duration=Math.min(700,Math.max(200,(next-start)/4));float p=unit(position,next-duration,next);return p*p*(3-2*p);
+    static float handoff(long position,long start,long next,float strength){
+        long duration=Math.round(Math.min(700,Math.max(200,(next-start)/4))*Math.max(.2f,Math.min(1.4f,strength)));float p=unit(position,next-duration,next);return p*p*(3-2*p);
     }
     void page(Canvas canvas,float width,float height,float amount,float density){
         if(amount<=0)return;

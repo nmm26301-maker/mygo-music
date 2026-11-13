@@ -85,16 +85,18 @@ final class LyricsStageView extends View {
             StaticLayout text=layout(i);float block=blockHeight(i);float center=compactStage()?(i==target?focusY():getHeight()*.77f):focusY()+offset+distance(anchor,i);if(expressive()&&appearance.style!=11&&appearance.style!=13&&following&&active>0&&!appearance.quiet()){
                 LyricsTimeline.Line entered=timeline.lines.get(active);long interval=entered.start-timeline.lines.get(active-1).start;
                 center+=distance(active-1,active)*LyricsExpressiveMotion.cascade(position-entered.start,interval,i-active);
-            }float top=center-block/2f;
+            }
+            float handoff=appearance.style==13&&following&&target==active&&timeline.timed&&active>=0&&active+1<timeline.lines.size()&&!appearance.quiet()?LyricsStageEffects.handoff(position,timeline.lines.get(active).start,timeline.lines.get(active+1).start,appearance.strength/100f):0;
+            if(appearance.style==13)center-=(getHeight()*.77f-focusY())*handoff;
+            float top=center-block/2f;
             if(top>getHeight()+dp(60)||top+text.getHeight()< -dp(60))continue;
             drawnCenters.put(i,center);LyricsTimeline.Line line=timeline.lines.get(i);boolean current=timeline.timed?i==active:i==target;
             float focus=1-Math.min(1,Math.abs(center-focusY())/Math.max(1,getHeight()*.7f));
-            float handoff=appearance.style==13&&timeline.timed&&active>=0&&active+1<timeline.lines.size()&&!appearance.quiet()?LyricsStageEffects.handoff(position,timeline.lines.get(active).start,timeline.lines.get(active+1).start)*appearance.strength/100f:0;
-            int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top-dp(22)*handoff);
-            if(handoff>0)canvas.saveLayerAlpha(-dp(40),-dp(40),text.getWidth()+dp(40),block+dp(40),(int)(current?255-70*Math.min(1,handoff):220+35*Math.min(1,handoff)));
+            int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top);
+            if(handoff>0)canvas.saveLayerAlpha(-dp(40),-dp(40),text.getWidth()+dp(40),block+dp(40),(int)(current?255*(1-handoff):220+35*handoff));
             float scale=appearance.style==4?1:current?(expressive()?1.04f:1):compactStage()?.70f:expressive()?.80f+.09f*focus:.86f+.06f*focus;
-            if(appearance.style==13)scale=current?1.04f-.10f*handoff:.70f+.17f*handoff;
-            if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:.30f))/Math.max(1,block));
+            if(appearance.style==13)scale=current?1.04f-.10f*handoff:.70f+.34f*handoff;
+            if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:appearance.style==13?.30f+.27f*handoff:.30f))/Math.max(1,block));
             float pivot=(appearance.centered||compactStage())?text.getWidth()/2f:0;canvas.scale(scale,scale,pivot,block/2f);
             if(current&&appearance.style==11&&timeline.timed&&!appearance.quiet())stageEffects.page(canvas,text.getWidth(),block,LyricsStageEffects.entrance(position,line.start,line.end)*appearance.strength/100f,getResources().getDisplayMetrics().density);
             paint.setShader(null);paint.clearShadowLayer();paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
