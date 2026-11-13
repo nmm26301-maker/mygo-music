@@ -1,3 +1,7 @@
+# Current work: Android 5.21.0 audio quality and two more lyric effects, versionCode 71
+
+Implemented immediate original-protocol audio quality changes with retained position/state, explicit source metadata and cache provenance, and two native presets (subtle character tilt and breathing glow). Existing high-quality default and saved settings remain intact. Last delivered validated release: 5.20.0, code 29fdd5d9b57f03e43de07d09f70fa8910ca56012, run 43417102202. Local 22 checks pass; complete Android tests, native quality switching, signing and upgrades await cloud verification. See audio-quality-motion-5.21.md. Resume current main without reinitializing.
+
 # Latest checkpoint: Android 5.20.0 validated, versionCode 70
 
 Validated application code: 29fdd5d9b57f03e43de07d09f70fa8910ca56012. Successful Actions: https://github.com/nmm26301-maker/mygo-music/actions/runs/43417102202 . All 22 local checks, 7 original AMLL policy cases, full Android regression, stable signing, signed overwrite upgrades from 5.6.0 and 5.19.0, and delivered-file checks passed. Two additional native presets bring the total to eight: AMLL-policy spring focus with visible-row cascade, and source-duration word waves. Actual menu actions, persistence, unchanged refresh action, pause/rewind pixels, quiet mode and plain lyrics passed. Original policy and AGPL attribution are retained; no DOM/Compose runtime was added. See lyric-motion-5.20.md for project/license comparison, precise scope and hashes.

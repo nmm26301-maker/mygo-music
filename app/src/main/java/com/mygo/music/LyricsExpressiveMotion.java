@@ -21,6 +21,8 @@ final class LyricsExpressiveMotion {
         return (float)Math.max(0,Math.min(1,(-r2*Math.exp(r1*t)+r1*Math.exp(r2*t))/(r1-r2)));
     }
     static float cascade(long elapsed,long interval,int row){return remaining(elapsed-Math.min(4,Math.max(0,row))*42L,interval);}
+    static float tilt(long position,long start,long end){if(position<=start||position>=end+240)return 0;double p=(position-start)/(double)Math.max(1,end-start+240);return (float)(3.5*Math.sin(Math.PI*p));}
+    static float breathe(long position,long start,long end){if(end<=start||position<=start||position>=end)return 0;double p=(position-start)/(double)(end-start);return (float)Math.pow(Math.sin(Math.PI*p),2);}
     /** Duration emphasis, not a pitch/beat detector. Apply only to source-timed short words. */
     static float wave(long position,long start,long end,float characterPhase){
         if(end-start<1000||position<=start||position>=end)return 0;

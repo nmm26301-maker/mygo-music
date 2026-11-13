@@ -22,7 +22,7 @@ function playable(data,requested){
   if(requested==='high'&&ext!=='flac')return null;
   if(data.is_free_part===1||data.IsFreePart===1||/\/p_\d+_\d+\//.test(path))return null;
   let kbps=Number(data.bitRate||data.bitrate||0);if(kbps>10000)kbps=Math.round(kbps/1000);
-  const result={url,type:ext,quality:ext==='flac'?'lossless':kbps>=300?'high':'standard',bitRate:kbps||undefined,size:Number(data.fileSize||data.filesize||0)||undefined};
+  const result={url,type:ext,quality:ext==='flac'?'lossless':kbps>=300?'high':'standard',bitRate:kbps||undefined,bitRateUnit:kbps?'kbps':undefined,size:Number(data.fileSize||data.filesize||0)||undefined};
   // Preserve the original sources: do not infer ReplayGain units from vendor volume fields.
   return result;
 }

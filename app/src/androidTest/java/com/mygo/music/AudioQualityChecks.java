@@ -1,0 +1,45 @@
+package com.mygo.music;
+
+import android.app.*;
+import android.content.*;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.SystemClock;
+import android.view.*;
+import android.widget.*;
+import org.json.*;
+import java.io.*;
+
+/** Real tier requests and native audio clocks, including paused changes and cache provenance. */
+final class AudioQualityChecks {
+    final Instrumentation test;final Context context;final CompletionChecks helper;
+    AudioQualityChecks(Instrumentation test){this.test=test;context=test.getTargetContext();helper=new CompletionChecks(test);}
+    void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
+    View description(View view,String label){if(view.getContentDescription()!=null&&label.contentEquals(view.getContentDescription()))return view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View found=description(group.getChildAt(i),label);if(found!=null)return found;}}return null;}
+    void run()throws Exception{
+        check(AudioQuality.normalize("hires").equals("high"),"unsupported quality escaped into the original plugin protocol");
+        JSONObject raw=new JSONObject().put("quality","standard").put("type","aac").put("bitRate",96000).put("bitRateUnit","bps").put("sampleRate",44100).put("bitsPerSample",24).put("gain",-8).put("url","https://private.invalid/token");
+        JSONObject info=AudioQuality.info(raw);check(!info.has("url")&&info.getString("sourceCodec").equals("aac")&&AudioQuality.describe(info).contains("96 kbps"),"source metadata was lost or private URL persisted");check(AudioQuality.describe(new JSONObject().put("bitRate",320)).contains("单位未说明"),"an ambiguous provider bitrate was relabeled as a measurement");check(AudioQuality.describe(new JSONObject()).equals("音源未报告音质参数"),"missing metadata invented a lossless badge");
+        SharedPreferences prefs=context.getSharedPreferences("library",0);String oldQuality=prefs.getString("play_quality",AudioQuality.DEFAULT);boolean oldCache=prefs.getBoolean("auto_cache",true);prefs.edit().putBoolean("auto_cache",true).commit();String id="audio-quality-fixture",track="plugin://"+id+"?id=song";helper.cleanup(id);
+        MainActivity activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PlaybackService[] service={null};helper.await(()->{service[0]=(PlaybackService)FullPortChecks.field(activity,"playbackService");return service[0]!=null;},"quality test service did not bind");AudioCache shared=AudioCache.shared(context);for(String q:AudioQuality.VALUES)shared.remove(track,q);
+        NativeAudioChecks transport=new NativeAudioChecks(test);File directory=new File(context.getCacheDir(),"quality-metadata-cache");PluginArchive.delete(directory);
+        try(NativeAudioChecks.Server server=transport.new Server(false)){
+            PluginManager manager=new PluginManager(activity);String script="export function stream({quality}){host.storage.set('requested',quality);const lossless=quality==='lossless';return {url:'"+server.base()+"/alac-'+(lossless?'24':'16')+'.m4a',type:'alac',quality:lossless?'lossless':'high',sampleRate:44100,bitDepth:lossless?24:16,gain:-8};}export function played(){host.storage.set('played',(host.storage.get('played')||0)+1);}";
+            helper.install(manager,id,"stream",new JSONArray(),script);JSONArray queue=new JSONArray().put(new JSONObject().put("uri",track).put("title","音质切换实测"));
+            test.runOnMainSync(()->{try{PlaybackService.startQueue(context,queue,0,0,80,false,false,"high");}catch(Exception e){throw new RuntimeException(e);}});helper.await(()->service[0].snapshot().playing&&service[0].snapshot().position>200,"initial quality audio never advanced: "+service[0].snapshot().error);helper.await(()->context.getSharedPreferences("plugin_data_"+id,0).getString("played","").equals("1"),"initial source play acknowledgement missing");
+            test.runOnMainSync(()->{service[0].pause();service[0].seek(1800);});helper.await(()->Math.abs(service[0].snapshot().position-1800)<150,"quality baseline seek did not settle");
+            test.runOnMainSync(()->{View button=description(activity.getWindow().getDecorView(),"播放音质与音源信息");check(button!=null&&button.isShown(),"persistent landscape quality button missing");button.performClick();});AlertDialog[] dialog={null};helper.await(()->{dialog[0]=(AlertDialog)FullPortChecks.field(activity,"qualityDialog");return dialog[0]!=null&&dialog[0].isShowing()&&dialog[0].getListView().getChildCount()>0;},"real quality dialog did not open");
+            Bitmap screen=test.getUiAutomation().takeScreenshot();if(screen!=null){File qa=new File(context.getExternalFilesDir(null),"qa");qa.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(qa,"audio-quality.png"))){screen.compress(Bitmap.CompressFormat.PNG,100,out);}finally{screen.recycle();}}
+            test.runOnMainSync(()->dialog[0].getListView().setSelection(2));helper.await(()->dialog[0].getListView().getLastVisiblePosition()>=2,"lossless option is outside the usable dialog");test.runOnMainSync(()->{ListView list=dialog[0].getListView();View option=list.getChildAt(2-list.getFirstVisiblePosition());check(option!=null,"visible lossless row missing");list.performItemClick(option,2,list.getAdapter().getItemId(2));});
+            helper.await(()->{PlaybackService.Snapshot s=service[0].snapshot();return s.ready&&!s.playing&&s.requestedQuality.equals("lossless")&&Math.abs(s.position-1800)<250;},"quality change lost paused position: "+service[0].snapshot().error);
+            check(context.getSharedPreferences("plugin_data_"+id,0).getString("requested","").equals("\"lossless\""),"new quality was only a UI label");check(service[0].snapshot().qualityInfo.contains("24 bit")&&service[0].snapshot().qualityInfo.contains("ALAC"),"returned source quality was not shown");
+            test.runOnMainSync(service[0]::resume);helper.await(()->service[0].snapshot().playing&&service[0].snapshot().position>2200,"paused quality replacement did not resume actual audio");test.runOnMainSync(service[0]::pause);
+            check(context.getSharedPreferences("plugin_data_"+id,0).getString("played","").equals("1"),"quality switching counted the same track as another source play");
+            JSONObject stored=shared.metadata(track,"lossless");File lossless=shared.find(track,"lossless");check(lossless!=null&&stored.optInt("sourceBitDepth")==24,"quality metadata did not survive decoded caching");
+            AudioCache isolated=new AudioCache(directory,1024*1024*8);try{isolated.importFile("fixture","source provenance","lossless",info,lossless,isolated.epoch());isolated.close();isolated=new AudioCache(directory,1024*1024*8);JSONObject restored=isolated.metadata("fixture","lossless");check(restored.getString("sourceQuality").equals("standard")&&restored.getString("sourceCodec").equals("aac")&&restored.getDouble("gain")==-8&&AudioQuality.describe(restored).contains("96 kbps"),"FLAC cache container was mistaken for original lossless audio");}finally{isolated.close();}
+            test.runOnMainSync(()->{service[0].resume();service[0].changeQuality("standard");});helper.await(()->{PlaybackService.Snapshot s=service[0].snapshot();return s.ready&&s.playing&&s.requestedQuality.equals("standard")&&s.position>1800;},"playing quality switch lost playback state");test.runOnMainSync(service[0]::pause);check(service[0].snapshot().qualityInfo.contains("高品质")&&!service[0].snapshot().qualityInfo.contains("音源报告：无损"),"requested tier overwrote the source's returned tier");
+            File local=shared.find(track,"high");check(local!=null,"local quality check fixture missing");JSONArray localQueue=new JSONArray().put(new JSONObject().put("uri",Uri.fromFile(local).toString()).put("title","原始本地文件"));test.runOnMainSync(()->{try{PlaybackService.startQueue(context,localQueue,0,0,80,false,false,"high");}catch(Exception e){throw new RuntimeException(e);}});helper.await(()->service[0].snapshot().playing&&service[0].snapshot().position>150,"local fixture did not play");test.runOnMainSync(()->{PlaybackService.Snapshot before=service[0].snapshot();check(!service[0].changeQuality("lossless"),"local audio was needlessly re-encoded");PlaybackService.Snapshot after=service[0].snapshot();check(after.player==before.player&&after.generation==before.generation&&after.playing,"quality preference restarted a fixed local file");});
+            System.out.println("MYGO_AUDIO_QUALITY_OK: actual original-protocol tier request, real ALAC 16/24 native playback, paused/live position retention, no duplicate source play, local files unchanged, metadata provenance and persisted cache, real landscape quality menu");
+        }finally{test.runOnMainSync(()->{service[0].stopPlayback();activity.finish();});for(String q:AudioQuality.VALUES)shared.remove(track,q);prefs.edit().putString("play_quality",oldQuality).putBoolean("auto_cache",oldCache).commit();helper.cleanup(id);PluginArchive.delete(directory);}
+    }
+}

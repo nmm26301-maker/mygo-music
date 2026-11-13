@@ -4,7 +4,7 @@ import android.content.SharedPreferences;
 
 /** Saved display choices are independent of the source's lyric timing. */
 final class LyricsAppearance {
-    static final String[] STYLES={"逐字弹起","沉浸流动","双色卡拉OK","大字专注","经典滚动","霓虹流光","弹簧聚焦","长音波浪"};
+    static final String[] STYLES={"逐字弹起","沉浸流动","双色卡拉OK","大字专注","经典滚动","霓虹流光","弹簧聚焦","长音波浪","逐字轻旋","柔光呼吸"};
     static final String[] BACKGROUNDS={"封面流动","封面静态","纯净深色"};
     static final String[] COLORS={"跟随封面","清透白","薄荷绿","暖金色","樱花粉","冰蓝紫"};
     int style=0,size=100,spacing=100,strength=100,background=0,color=0;

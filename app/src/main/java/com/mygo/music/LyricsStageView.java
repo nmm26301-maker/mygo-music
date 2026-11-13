@@ -147,14 +147,16 @@ final class LyricsStageView extends View {
         for(Glyph glyph:characters(text,line,index)){
             float lift=appearance.quiet()?0:LyricsCharacterMotion.lift(position,glyph.start,glyph.end)*appearance.strength/100f;
             if(appearance.style==7&&!appearance.quiet()&&glyph.emphasize&&position>=glyph.start)lift+=.85f*LyricsExpressiveMotion.wave(position,glyph.sourceStart,glyph.sourceEnd,glyph.phase)*appearance.strength/100f;
+            float breath=appearance.style==9&&!appearance.quiet()?LyricsExpressiveMotion.breathe(position,line.start,line.end)*appearance.strength/100f:0;
+            if(appearance.style==9)lift=0;
             float baseline=text.getLineBaseline(glyph.row),pivot=glyph.x+glyph.width/2;
-            canvas.save();canvas.translate(0,-Math.min(dp(9),textSize*.20f)*lift);float scale=1+.14f*lift;canvas.scale(scale,scale,pivot,baseline);
+            canvas.save();canvas.translate(0,-Math.min(dp(9),textSize*.20f)*lift);float scale=1+.14f*lift+.035f*breath;canvas.scale(scale,scale,pivot,baseline);if(appearance.style==8&&!appearance.quiet())canvas.rotate(LyricsExpressiveMotion.tilt(position,glyph.start,glyph.end)*(1-2*glyph.phase)*appearance.strength/100f,pivot,baseline-textSize*.45f);
             paint.setShader(null);paint.clearShadowLayer();paint.setColor(0xff777f97);
             drawCharacter(canvas,line.text,text,glyph,baseline);
             float fraction=position<glyph.start?0:glyph.end<=glyph.start?1:Math.max(0,Math.min(1,(position-glyph.start)/(float)(glyph.end-glyph.start)));
             if(fraction>0){
                 canvas.save();canvas.clipRect(glyph.x-dp(1),text.getLineTop(glyph.row)-dp(16),glyph.x+glyph.width*fraction+dp(1),text.getLineBottom(glyph.row)+dp(8));
-                lit(text.getWidth());if(lift>.02f)paint.setShadowLayer(dp(5)*Math.min(1,lift),0,0,0xaaffffff);
+                lit(text.getWidth());if(lift>.02f||breath>.02f)paint.setShadowLayer(dp(5)*Math.min(1,lift)+dp(7)*Math.min(1,breath),0,0,0xaaffffff);
                 drawCharacter(canvas,line.text,text,glyph,baseline);paint.setShader(null);paint.clearShadowLayer();canvas.restore();
             }
             canvas.restore();

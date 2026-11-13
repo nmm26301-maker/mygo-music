@@ -19,3 +19,5 @@ app/src/main/assets/third-party/FFmpeg-build.json
 app/src/androidTest/assets/provider-fixes/
 
 tests/baseline-v519/
+
+tests/baseline-v520/
