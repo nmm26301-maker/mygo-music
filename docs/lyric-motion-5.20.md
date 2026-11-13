@@ -5,8 +5,8 @@
 | 项目 | 维护与许可 | 实现、依赖与问题 | 本轮选择 |
 | --- | --- | --- | --- |
 | [AMLL](https://github.com/amll-dev/applemusic-like-lyrics) | 2026-11-11 更新；AGPL-3.0-only；固定 832bad5f16ec2a7f96d06707ef927c9a4d3713d3 | DOM/TypeScript、Web Animations、bezier-easing/gl-matrix，Pixi 相关 peer dependencies；README 列出浏览器和高帧率性能条件。#639、#638、#601 涉及中英混排断行，#633 涉及意外高亮。 | 移植 base/spring.ts 正常播放的弹簧参数策略，保留原文件和许可证说明。参考短词持续时间强调及逐字符错峰的设计，原生实现取样与画面，不移入 DOM 排版和整套浏览器运行库。 |
-| [Accompanist Lyrics UI](https://github.com/6xingyv/accompanist-lyrics-ui) | 2026-11-01 更新；Apache-2.0 | Kotlin/Compose Multiplatform、lyrics-core，逐词/多声音排版。README 将 LazyList 弹簧滚动、提取动效参数和流光背景列为 Todo，不能当作已经交付的能力。 | 对照布局和按绘制时钟读取状态的设计，保留现有 StaticLayout 与换行、译文。没有复制源文件或增加 Compose 依赖。 |
-| [Spicy Lyrics Mobile](https://github.com/spicylyrics/mobile) | 2026-11-05 更新；AGPL-3.0 | Kotlin/Jetpack Compose，逐字起伏、辉光与动态背景，项目仍处于早期；已有研究记录配色、控制区和平板尺寸问题。 | 对照长音逐字起伏与减少动态效果的选择，不引入它的歌词检索、翻译和网络服务。 |
+| [Accompanist Lyrics UI](https://github.com/6xingyv/accompanist-lyrics-ui) | 2026-11-01 更新；Apache-2.0 | Kotlin/Compose Multiplatform、lyrics-core。当前 README 展示多声部和伴奏行；它采用 Compose UI，不能直接作为现有 Java/StaticLayout 组件插入。 | 对照布局和按绘制时钟读取状态的设计，保留现有 StaticLayout 与换行、译文。没有复制源文件或增加 Compose 依赖。 |
+| [Spicy Lyrics Mobile](https://github.com/spicylyrics/mobile) | 2026-11-05 更新；AGPL-3.0 | Kotlin/Jetpack Compose，逐字起伏、辉光与动态背景；README 明确早期开发、界面及来源可能变化，并提供低性能模式。 | 对照长音逐字起伏与减少动态效果的选择，不引入它的歌词检索、翻译和网络服务。 |
 | [AMLV](https://github.com/dokar3/amlv) | 最近推送 2023-12-20；Apache-2.0 | Android/Jetpack Compose，Apple Music 式歌词与背景；较久未更新。 | 仅作为较早原生方案对照，不作为本轮主要依赖。 |
 
 ## 实际加入
