@@ -13,3 +13,9 @@ Android 官方媒体状态与异步定位依据：https://developer.android.com/
 新增原生回归覆盖授权拒绝、HTTP 403、解码器拒绝、准备时暂停和拖动、快速选择、取消、切歌和停止，并检查实际播放器身份、时钟、偏好和来源上报。已有 ALAC 16/24 位及全套歌词、缓存、后台、登录、插件回归继续运行。
 
 完整云端结果、覆盖升级与交付文件校验待构建完成后记录。实体手机和真实会员权限未实测。
+
+## 原生网络与登录会话
+
+新的 HTTP 音频回归提前初始化了系统 MediaPlayer 网络层，暴露出 java.net 的全局自动 Cookie 容器会重用其他插件响应 Cookie，并覆盖 B 站候选登录请求的显式 Cookie。原生来源会话一直由各插件显式保存和附带，WebView 登录使用独立的 android.webkit.CookieManager。现在在应用启动时为 java.net 安装不自动存取 Cookie 的处理器，保留插件显式请求头和 Set-Cookie 返回值，阻止媒体初始化创建跨来源的隐式容器。没有在请求间临时切换全局处理器。
+
+原生回归在媒体初始化后检查响应 Cookie 不自动复用、显式 Cookie 原样送达、不同插件实例不继承会话；B 站候选校验与喜马拉雅、QQ 网页登录回归继续保留。Android 实现依据：https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android13-release/media/java/android/media/MediaHTTPService.java 。

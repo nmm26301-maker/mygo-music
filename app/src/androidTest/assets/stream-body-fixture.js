@@ -15,3 +15,5 @@ export async function primitives({url}) {
  const local=await fetch(new URL('./stream-local.json',import.meta.url));const reader=local.body.getReader();const first=await reader.read();await reader.cancel();reader.releaseLock();const head=await fetch(url+'/json',{method:'HEAD'});
  return {value,text,twice,cookie:clone.headers.getSetCookie()[0],url:clone.url,local:new TextDecoder().decode(first.value),head:head.body===null};
 }
+
+export async function cookies({url,cookie}){const res=await fetch(url+'/cookie',{headers:cookie?{Cookie:cookie}:{}});return res.json();}
