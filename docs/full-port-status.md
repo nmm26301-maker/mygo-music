@@ -1,6 +1,7 @@
-# Current work: Android 5.23.0 four new lyric effects, versionCode 73
+# Current work: validated Android 5.23.0, versionCode 73
 
-Appending meteor trail, page entrance, ripple and dual-line handoff as styles 10–13, preserving saved choices and all 5.22 playback/login/QR fixes. Native pixel/time/reduced-motion and real menu checks are queued with the complete regression suite. Last delivered validated application: 5.22.0, code c65b50d9a62b285dce348103bbba2c6d1f1c7443, successful Actions run 43471075893. Resume main without initialization. See lyric-effects-5.23.md for behavior and validation.
+Delivered application code 1e17453de5b6dd352fb7845c79af635170a6d433, successful Actions run 43476371807. Four appended native presets are meteor trail, page entrance, ripple and dual-line handoff (IDs 10–13), with saved choices preserved. Fourteen distinct native pixel samples, deterministic pause/rewind, quiet/system/zero-strength modes, plain/RTL/narrow text, actual menus and boundary-continuous handoff passed with the complete Android 13 regression and 22 Node checks. Stable signing and overwrite upgrades from signed 5.6.0 and 5.22.0 passed. Anonymous audit: 63 installs/loads, 41 search calls, 10 HTTP audio responses, 8 prepared decoders; account/device conditions remain. Corresponding sources, native 19.8-second preview and exact checksums are recorded in lyric-effects-5.23.md. Resume latest main without initialization or repeating verified stages. Final documentation commits do not alter tested application code.
+
 
 
 
