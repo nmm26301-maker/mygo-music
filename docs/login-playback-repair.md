@@ -64,4 +64,3 @@ mygo-music-v5.16.0-install.zip
 mygo-music-v5.16.0-sources.zip
 
 3f14d587524e448162b63cd393887f854e681ba4f98ebbcac2a20d591c55ec06
-
