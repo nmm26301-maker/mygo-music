@@ -1,6 +1,8 @@
-# Current work: Android 5.20.0 lyric motion, versionCode 70
+# Latest checkpoint: Android 5.20.0 validated, versionCode 70
 
-Two additional native presets are implemented: AMLL-policy spring focus with row cascade, and source-duration word waves. Existing styles and source timing remain intact. The pinned original TypeScript generates independent expectations for native tests. Local 22 regression checks pass; complete Android tests, signed overwrite upgrades and delivery verification are pending. Last validated release remains 5.19.0, code 1eec6719bfe3f66bd7318efcd9f90f79c6d56571, successful run 43410675370. See lyric-motion-5.20.md. Resume current main without reinitializing.
+Validated application code: 29fdd5d9b57f03e43de07d09f70fa8910ca56012. Successful Actions: https://github.com/nmm26301-maker/mygo-music/actions/runs/43417102202 . All 22 local checks, 7 original AMLL policy cases, full Android regression, stable signing, signed overwrite upgrades from 5.6.0 and 5.19.0, and delivered-file checks passed. Two additional native presets bring the total to eight: AMLL-policy spring focus with visible-row cascade, and source-duration word waves. Actual menu actions, persistence, unchanged refresh action, pause/rewind pixels, quiet mode and plain lyrics passed. Original policy and AGPL attribution are retained; no DOM/Compose runtime was added. See lyric-motion-5.20.md for project/license comparison, precise scope and hashes.
+
+Anonymous 64-source stages: 63 installations/loads, 39 successful search calls, 6 audio HTTP responses, 4 prepared decoders. They do not certify all sources or subscribed accounts. The native preview uses 180 actual Android frames. Later documentation-only changes leave tested code unchanged. Resume current main without reinitializing; earlier checkpoints below are historical.
 
 # Latest checkpoint: Android 5.19.0 validated, versionCode 69
 
