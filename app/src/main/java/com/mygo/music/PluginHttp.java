@@ -18,6 +18,9 @@ final class PluginHttp {
     private final Handler main=new Handler(Looper.getMainLooper());
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(3,3,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(48));
     private final Map<String,Transfer> active=new ConcurrentHashMap<>();
+    // Closing Android's HTTP stream can drain unread bytes. Never do that on the UI thread,
+    // or on the request pool whose workers may themselves be blocked in read().
+    private static final ExecutorService cleanup=Executors.newFixedThreadPool(4,action->{Thread thread=new Thread(action,"plugin-http-cleanup");thread.setDaemon(true);return thread;});
     private volatile boolean closed;
     private static final int LIMIT=8*1024*1024;
     private static final class Transfer {
@@ -30,7 +33,7 @@ final class PluginHttp {
         // Disconnect cancels the socket. During an active read the worker owns InputStream.close():
         // Android's buffered stream cannot be closed concurrently with its read operation.
         void closeInput(){if(input!=null)try{input.close();}catch(IOException ignored){}finally{input=null;}}
-        void close(){cancelled=true;HttpURLConnection c=connection;if(c!=null)try{c.disconnect();}catch(RuntimeException ignored){}synchronized(this){if(!reading)closeInput();}}
+        void close(){cancelled=true;cleanup.execute(()->{HttpURLConnection c=connection;if(c!=null)try{c.disconnect();}catch(RuntimeException ignored){}synchronized(this){if(!reading)closeInput();}});}
     }
     PluginHttp(Access access,Reply reply,PluginResources resources){this.access=access;this.reply=reply;this.resources=resources;}
     void open(String id,String address,JSONObject init){
