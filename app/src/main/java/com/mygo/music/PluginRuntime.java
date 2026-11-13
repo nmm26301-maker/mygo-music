@@ -44,6 +44,11 @@ public final class PluginRuntime {
     private ImageView loginQr;
     private String lastQr="", signInRequest="";
     private Bitmap loginBitmap;
+    interface LoginRefresh {void restart(boolean save,boolean open);}
+    private LoginRefresh loginRefresh;private boolean saveFreshQr,openFreshQr;private long qrCreated;private Runnable qrAge;
+    void refreshLogin(LoginRefresh listener,boolean save,boolean open){loginRefresh=listener;saveFreshQr=save;openFreshQr=open;}
+    private void requestFreshQr(boolean save,boolean open){if(loginRefresh!=null){loginRefresh.restart(save,open);return;}if(save)saveNativeQr(open);}
+
     private static PluginRuntime browserOwner;
     private AlertDialog browserDialog;
     private WebView browserView;
@@ -61,7 +66,7 @@ public final class PluginRuntime {
         main.postDelayed(()->{Callback timeout=pending.remove(request);if(timeout!=null){finishSignInPrompt(request);timeout.done(false,"插件接口超时："+function);}},"signIn".equals(function)?300000:45000);
         web.evaluateJavascript("window.__invoke("+JSONObject.quote(request)+","+JSONObject.quote(function)+","+(args==null?"{}":args.toString())+");",null);
     }));}
-    public void dispose(){main.post(()->{closed=true;closePhoneDialog();synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
+    public void dispose(){main.post(()->{closed=true;if(qrAge!=null)main.removeCallbacks(qrAge);closePhoneDialog();synchronized(redirects){for(PluginRedirect redirect:redirects)redirect.close();redirects.clear();}if(processes!=null)processes.close();ioWorkers.shutdownNow();if(!browserRequest.isEmpty())finishBrowserLogin(false,"插件已关闭");for(Callback cb:new ArrayList<>(pending.values()))cb.done(false,"插件已关闭");pending.clear();if(web!=null){web.removeJavascriptInterface("nativeHost");web.destroy();web=null;}if(loginDialog!=null)loginDialog.dismiss();if(http!=null)http.close();if(typescript!=null)typescript.close();});}
     private void ensureLoaded(Callback cb){
         if(closed){cb.done(false,"插件已关闭");return;}if(loaded){cb.done(true,"");return;}if(!loadError.isEmpty()){cb.done(false,loadError);return;}
         loading.add(cb);if(starting)return;starting=true;
@@ -76,7 +81,7 @@ public final class PluginRuntime {
             JSONObject locales=new JSONObject();File localeFile=new File(directory,"locales/zh-CN.json");if(localeFile.isFile())locales=new JSONObject(read(new FileInputStream(localeFile)));
             JSONObject config=new JSONObject().put("typescript",typescript.needed()).put("translations",locales).put("module",module).put("arch",architecture()).put("dir",directory.getAbsolutePath());
             String bridge=read(context.getAssets().open("plugin-host.js"));
-            web=new WebView(context);WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
+            web=new WebView(context);WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);if(Build.VERSION.SDK_INT>=26)web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT,false);
             web.setWebChromeClient(new WebChromeClient(){@Override public boolean onConsoleMessage(ConsoleMessage message){if((context.getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.util.Log.i("MyGoPlugin",id+": "+message.message()+" @"+message.lineNumber());return true;}});
             web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}@Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){return resources.intercept(request.getUrl());}});
             web.addJavascriptInterface(new NativeHost(),"nativeHost");typescript.compiler(name->main.post(()->{if(closed||web==null){typescript.complete(name,"","插件已关闭");return;}web.evaluateJavascript("window.__compilePluginModule("+JSONObject.quote(name)+");",null);}));
@@ -91,6 +96,7 @@ public final class PluginRuntime {
         if(!"https".equals(url.getProtocol())&&!"http".equals(url.getProtocol()))throw new IOException("仅支持 HTTP/HTTPS");
         String host=url.getHost();if(processes!=null&&processes.declared()&&permissions.getBoolean("plugin_process_"+id,false)&&(host.equals("127.0.0.1")||host.equals("localhost")||host.equals("::1")||host.equals("[::1]")))return;
         if(!permissions.getBoolean("plugin_network_"+id,false))throw new IOException("请在插件网络权限中允许访问");
+        if(host.equals("userservice.kugou.com")&&resources!=null&&resources.deviceNetwork()&&permissions.getBoolean("plugin_device_network_"+id,false))return;
         for(int i=0;i<hosts.length();i++)if(hostMatches(url.getHost(),hosts.optString(i)))return;
         throw new IOException("插件未声明该网络域名："+url.getHost());
     }
@@ -139,7 +145,7 @@ public final class PluginRuntime {
         })){visible.recycle();browserQrEnabled(true);}
     }
     private void closePhoneDialog(){if(phoneDialog!=null){phoneDialog.dismiss();phoneDialog=null;}}
-    private void finishSignInPrompt(String request){if(!request.equals(signInRequest))return;signInRequest="";closePhoneDialog();if(loginDialog!=null)loginDialog.dismiss();loginBitmap=null;}
+    private void finishSignInPrompt(String request){if(!request.equals(signInRequest))return;signInRequest="";if(qrAge!=null)main.removeCallbacks(qrAge);closePhoneDialog();if(loginDialog!=null)loginDialog.dismiss();loginBitmap=null;}
     private void browserQrEnabled(boolean enabled){if(browserDialog==null)return;for(int which:new int[]{AlertDialog.BUTTON_NEUTRAL,AlertDialog.BUTTON_POSITIVE}){Button button=browserDialog.getButton(which);if(button!=null)button.setEnabled(enabled);}}
     private void browserQrSaved(String payload,boolean openApp,String request){
         if(closed||browserRequest.isEmpty()||!browserRequest.equals(request))return;
@@ -151,14 +157,16 @@ public final class PluginRuntime {
         if(closed)return;try{JSONObject prompt=new JSONObject(raw);String qr=prompt.optString("qr",""),text=prompt.optString("text","");
             if(loginDialog==null||!loginDialog.isShowing()){
                 LinearLayout box=new LinearLayout(context);box.setOrientation(1);box.setPadding(24,16,24,16);loginText=new TextView(context);box.addView(loginText);loginPhoneHint=new TextView(context);box.addView(loginPhoneHint);
-                loginOpenButton=new Button(context);loginOpenButton.setOnClickListener(view->saveNativeQr(true));box.addView(loginOpenButton);
-                loginSaveButton=new Button(context);loginSaveButton.setText("保存二维码");loginSaveButton.setOnClickListener(view->saveNativeQr(false));box.addView(loginSaveButton);
+                loginOpenButton=new Button(context);loginOpenButton.setOnClickListener(view->requestFreshQr(true,true));box.addView(loginOpenButton);
+                loginSaveButton=new Button(context);loginSaveButton.setText("保存二维码");loginSaveButton.setOnClickListener(view->requestFreshQr(true,false));box.addView(loginSaveButton);
                 loginQr=new ImageView(context);int size=Math.max(128,Math.min(400,(int)(context.getResources().getDisplayMetrics().heightPixels*.5)));box.addView(loginQr,new LinearLayout.LayoutParams(size,size));ScrollView scroll=new ScrollView(context);scroll.addView(box);
-                loginDialog=new AlertDialog.Builder(context).setTitle("本机相册扫码登录").setView(scroll).setNegativeButton("取消",(dialog,which)->dispose()).create();loginDialog.setOnCancelListener(dialog->dispose());loginDialog.setCanceledOnTouchOutside(false);lastQr="";loginDialog.show();
+                loginDialog=new AlertDialog.Builder(context).setTitle("本机相册扫码登录").setView(scroll).setPositiveButton("刷新二维码",null).setNegativeButton("取消",(dialog,which)->dispose()).create();loginDialog.setOnCancelListener(dialog->dispose());loginDialog.setCanceledOnTouchOutside(false);lastQr="";loginDialog.show();loginDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(loginRefresh!=null);loginDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view->requestFreshQr(false,false));
             }
             loginPromptText=text;loginText.setText(text);
-            if(!qr.isEmpty()&&!qr.equals(lastQr)){loginBitmap=PluginQrImage.create(qr);loginQr.setImageBitmap(loginBitmap);lastQr=qr;closePhoneDialog();}
-            loginPhoneHint.setText(PhoneQrLogin.instructions(lastQr,text));loginOpenButton.setText(PhoneQrLogin.button(lastQr,text));nativeQrEnabled(!loginQrSaving);
+            if(!qr.isEmpty()&&!qr.equals(lastQr)){qrCreated=SystemClock.elapsedRealtime();loginBitmap=PluginQrImage.create(qr);loginQr.setImageBitmap(loginBitmap);lastQr=qr;closePhoneDialog();}
+            loginSaveButton.setText(loginRefresh==null?"保存二维码":"刷新并保存二维码");loginOpenButton.setText((loginRefresh==null?"":"刷新后")+PhoneQrLogin.button(lastQr,text));nativeQrEnabled(!loginQrSaving);
+            if(qrAge!=null)main.removeCallbacks(qrAge);qrAge=()->{if(closed||loginDialog==null||!loginDialog.isShowing()||lastQr.isEmpty())return;long age=(SystemClock.elapsedRealtime()-qrCreated)/1000;loginPhoneHint.setText("当前二维码已生成 "+age+" 秒。请从相册选择最新保存的图片。\n"+(age>=90?"如平台提示失效，返回本页刷新，不要继续扫旧图。\n":"")+PhoneQrLogin.instructions(lastQr,loginPromptText));main.postDelayed(qrAge,1000);};qrAge.run();
+            if(saveFreshQr&&!qr.isEmpty()){saveFreshQr=false;main.post(()->saveNativeQr(openFreshQr));}
         }catch(Exception error){Toast.makeText(context,"登录提示失败："+error.getMessage(),Toast.LENGTH_LONG).show();}
     }
     private void nativeQrEnabled(boolean enabled){if(loginSaveButton!=null)loginSaveButton.setEnabled(enabled&&loginBitmap!=null);if(loginOpenButton!=null)loginOpenButton.setEnabled(enabled&&loginBitmap!=null);}
