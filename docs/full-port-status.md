@@ -1,6 +1,8 @@
-# Latest checkpoint: Android 5.19.0 development, versionCode 69
+# Latest checkpoint: Android 5.19.0 validated, versionCode 69
 
-Current work adds pull-based native response bodies for real plugins that call response.body.getReader(). Local 22 checks pass; the complete Android run, signing and upgrade checks are pending. The last delivered validated code remains 794fe3895b269050a01b8ec321c40cbede438565, Android 5.18.0, run 43371762017. See stream-body-5.19.md for current implementation, pinned original Qishui proof and verification boundaries. Resume from current main without reinitializing. The following migration map is historical context.
+Validated application code: 1eec6719bfe3f66bd7318efcd9f90f79c6d56571. Successful Actions run: https://github.com/nmm26301-maker/mygo-music/actions/runs/43410675370 . All 22 local checks, the full Android 13 regression suite, 64-source anonymous audit, stable signing, overwrite upgrades from signed 5.6.0 and 5.18.0, and delivered-file verification passed. Native streamed response bodies now support actual original Qishui JSON parsing, incremental UTF-8, body ownership, clone, cancel/abort and real socket disposal. HTTP stream cleanup runs outside UI/request threads; Response consumers retain abort reasons on older WebViews. Website QR capture has a bounded visual-callback fallback while still decoding actual visible pixels before enlargement or saving. The previous QR, source login and landscape icon changes remain verified. See stream-body-5.19.md for implementation, source/license comparison, artifact hashes and account/helper limitations.
+
+The audit recorded 63 installations/loads, 40 successful search calls (including valid empty results), 8 HTTP audio responses and 6 prepared native decoders. These are distinct stages, not certification of all plugins or subscribed accounts. Protocol 0.1.31 and desktop-helper requirements remain explicit. Actual user credentials were not used. Later documentation-only commits do not alter the tested application. Resume from current main without reinitializing; the following migration map is historical context.
 
 # Android migration checkpoint, 5.15.0
 
