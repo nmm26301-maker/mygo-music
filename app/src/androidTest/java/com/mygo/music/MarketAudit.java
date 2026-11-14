@@ -69,7 +69,7 @@ final class MarketAudit {
                 HlsPlayback transport=null;String kind=value.optString("type",value.optString("codec"));Uri playable=Uri.parse(resolved);Map<String,String> nativeHeaders=playerHeaders;
                 if(HlsPlayback.matches(playable,kind)){transport=new HlsPlayback(manager,id,resolved,new HashMap<>(connection.headers));playable=transport.address;nativeHeaders=new HashMap<>();row.put("androidTransport","app per-resource HLS");}else row.put("androidTransport","native direct");
                 try{DecoderProbe decoder=prepare(playable,nativeHeaders);
-                    if(!decoder.ready&&transport!=null&&AudioDecodeJob.candidate(Uri.parse(resolved),kind,decoder.error)){
+                    if(!decoder.ready&&transport!=null&&transport.failure().isEmpty()&&(decoder.error==0||AudioDecodeJob.candidate(Uri.parse(resolved),kind,decoder.error))){
                         transport.close();transport=null;File converted=null;long deadline=android.os.SystemClock.elapsedRealtime()+45000;
                         try{converted=AudioDecodeJob.decodeHls(context,manager,id,Uri.parse(resolved),new HashMap<>(connection.headers),()->{if(Thread.currentThread().isInterrupted()||android.os.SystemClock.elapsedRealtime()>deadline)throw new IOException("完整分段音频解码检查超时");});decoder=prepare(Uri.fromFile(converted),new HashMap<>());row.put("androidDecoderFallback","complete FLAC");}
                         catch(Exception failure){row.put("decoderDetail",trim(failure.getMessage()));}finally{if(converted!=null)converted.delete();}

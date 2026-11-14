@@ -21,7 +21,7 @@ final class AudioQualitySwitch implements AutoCloseable {
     final Listener listener;
     final Handler main=new Handler(Looper.getMainLooper());
     volatile boolean closed;
-    MediaPlayer player;HlsPlayback hlsPlayback;
+    MediaPlayer player;HlsPlayback hlsPlayback;private Runnable nativeTimeout;
     Uri address;
     HashMap<String,String> headers=new HashMap<>();
     JSONObject info=new JSONObject();
@@ -61,8 +61,9 @@ final class AudioQualitySwitch implements AutoCloseable {
             address=uri;headers=new HashMap<>(values);if(!PluginMedia.contains(headers,"User-Agent"))headers.put("User-Agent","MyGoMusic/5.22");
             MediaPlayer created=new MediaPlayer();player=created;created.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());created.setWakeMode(context,PowerManager.PARTIAL_WAKE_LOCK);
             if("http".equals(uri.getScheme())||"https".equals(uri.getScheme())){HashMap<String,String> restricted=new HashMap<>(headers);restricted.put("android-allow-cross-domain-redirect","0");Uri playable=uri;if(!cached&&HlsPlayback.matches(uri,kind)){String source=Uri.parse(track).getAuthority();hlsPlayback=new HlsPlayback(plugins,source==null?"":source,uri.toString(),headers);playable=hlsPlayback.address;restricted.clear();}created.setDataSource(context,playable,restricted);}else created.setDataSource(context,uri);
-            created.setOnPreparedListener(mp->{if(!closed&&player==mp)listener.prepared(this);});
-            created.setOnErrorListener((mp,what,extra)->{if(closed||player!=mp)return true;if(!decoded&&AudioDecodeJob.candidate(uri,kind,extra))decode(uri,values);else fail(hlsPlayback!=null&&!hlsPlayback.failure().isEmpty()?"新音质分段音频无法播放："+hlsPlayback.failure():"新音质音频无法播放："+what+" / "+extra);return true;});
+            created.setOnPreparedListener(mp->{if(!closed&&player==mp){cancelNativeTimeout();listener.prepared(this);}});
+            created.setOnErrorListener((mp,what,extra)->{if(closed||player!=mp)return true;if(!decoded&&(hlsPlayback==null||hlsPlayback.failure().isEmpty())&&AudioDecodeJob.candidate(uri,kind,extra))decode(uri,values);else fail(hlsPlayback!=null&&!hlsPlayback.failure().isEmpty()?"新音质分段音频无法播放："+hlsPlayback.failure():"新音质音频无法播放："+what+" / "+extra);return true;});
+            if(!cached&&!decoded&&hlsPlayback!=null){nativeTimeout=()->{if(closed||player!=created||decoded)return;if(hlsPlayback!=null&&hlsPlayback.failure().isEmpty())decode(uri,values);else fail("新音质分段音频准备超时，继续播放原音频");};main.postDelayed(nativeTimeout,30000);}
             created.prepareAsync();
         }catch(Exception error){fail(error.getMessage());}
     }
@@ -82,6 +83,7 @@ final class AudioQualitySwitch implements AutoCloseable {
     }
     private void fail(String message){if(!closed)listener.failed(this,message==null||message.isEmpty()?"新音质准备失败":message);}
     void transferred(){player=null;temporary=null;close();}
-    private void releasePlayer(){if(hlsPlayback!=null){hlsPlayback.close();hlsPlayback=null;}if(player!=null){player.setOnPreparedListener(null);player.setOnErrorListener(null);player.setOnSeekCompleteListener(null);player.release();player=null;}}
+    private void cancelNativeTimeout(){if(nativeTimeout!=null){main.removeCallbacks(nativeTimeout);nativeTimeout=null;}}
+    private void releasePlayer(){cancelNativeTimeout();if(hlsPlayback!=null){hlsPlayback.close();hlsPlayback=null;}if(player!=null){player.setOnPreparedListener(null);player.setOnErrorListener(null);player.setOnSeekCompleteListener(null);player.release();player=null;}}
     @Override public void close(){if(closed)return;closed=true;main.removeCallbacksAndMessages(null);releasePlayer();if(temporary!=null){temporary.delete();temporary=null;}cache.pinSwitch(null);}
 }
