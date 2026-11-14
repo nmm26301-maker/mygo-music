@@ -124,6 +124,12 @@ public class PlaybackService extends Service {
     void clearQueue(){stopPlayback();queue.clear();index=-1;publish();}
     void pause(){remoteCompletion.pause();pauseInternal(true);}
     private void pauseInternal(boolean clearResume){if(closed)return;if(clearResume)resumeAfterFocus=false;wanted=false;if(remote.active())remote.pause();else if(ready&&player!=null)try{player.pause();}catch(Exception ignored){}if(clearResume&&!remote.active())abandonFocus();publish();}
+    // Retry the failed session in place. A login callback may outlive a skip, stop or replacement queue.
+    boolean retryFailed(Snapshot failed){
+        if(closed||failed==null||failed.error.isEmpty()||error.isEmpty()||generation!=failed.generation||errorId!=failed.errorId||index!=failed.index||index<0||index>=queue.size()||!queue.get(index).optString("uri").equals(failed.uri))return false;
+        if(radioWaiting){error="";resume();}else resolve(index,failed.position,true);
+        return true;
+    }
     void resume(){if(closed)return;remoteCompletion.resume();if(radioWaiting){radioFailure="";wanted=true;refillRadio();return;}resumeAfterFocus=false;if(index<0||queue.isEmpty())return;wanted=true;ensureForeground();session.setActive(true);if(remote.active()){remote.resume();publish();}else if(ready&&player!=null){if(requestFocus()){player.start();armClockGuard();recordAndCache();publish();}else{wanted=false;publish();}}else if(!loading)resolve(index,initialPosition,true);else publish();}
     private boolean offlineOnly(){return index>=0&&index<queue.size()&&queue.get(index).optBoolean("cacheOnly");}
     boolean changeQuality(String selected){
