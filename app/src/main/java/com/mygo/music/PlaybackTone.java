@@ -38,5 +38,5 @@ final class PlaybackTone implements AutoCloseable {
         }catch(RuntimeException failure){close();status="此设备暂无法应用本应用均衡器，音频继续播放";return 1;}
     }
     boolean active(){return active;}
-    @Override public void close(){active=false;headroom=1;applied=null;session=-1;if(equalizer!=null){try{equalizer.release();}catch(RuntimeException ignored){}equalizer=null;}}
+    @Override public void close(){active=false;headroom=1;applied=null;session=-1;Equalizer old=equalizer;equalizer=null;if(old!=null){try{if(old.hasControl())old.setEnabled(false);}catch(RuntimeException ignored){}try{old.release();}catch(RuntimeException ignored){}}}
 }
