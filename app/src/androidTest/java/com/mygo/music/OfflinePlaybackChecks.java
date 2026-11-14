@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 
 /** Exercise the actual cache picker, mixed-quality native queue, cold resume and saved lyric page. */
 final class OfflinePlaybackChecks {
-    final Instrumentation test;final Context context;final CompletionChecks helper;
+    final Instrumentation test;final Context context;final CompletionChecks helper;PlaybackService service;
     OfflinePlaybackChecks(Instrumentation test){this.test=test;context=test.getTargetContext();helper=new CompletionChecks(test);}
     interface Action{void run()throws Exception;}
     void ui(Action action)throws Exception{Throwable[] failure={null};test.runOnMainSync(()->{try{action.run();}catch(Throwable error){failure[0]=error;}});if(failure[0]!=null)throw new AssertionError("Offline action failed",failure[0]);}
@@ -28,7 +28,7 @@ final class OfflinePlaybackChecks {
     void run()throws Exception{
         String id="offline-workflow",a="plugin://"+id+"?id=a",b="plugin://"+id+"?id=b",raw="{\"lines\":[{\"start\":0,\"end\":9000,\"translation\":\"Saved translation\",\"words\":[{\"text\":\"离线歌词仍然亮起\",\"start\":1000,\"end\":8000}]}]}";
         SharedPreferences prefs=context.getSharedPreferences("library",0),data=context.getSharedPreferences("plugin_data_"+id,0);Map<String,?> original=new HashMap<>(prefs.getAll());prefs.edit().remove("selected_source").putBoolean("auto_cache",false).putString("play_quality","lossless").commit();
-        MainActivity[] activity={launch()};PlaybackService service=service(activity[0]);AudioCache cache=AudioCache.shared(context);ui(()->{service.clearQueue();service.setModes(false,false);});cache.clear();
+        MainActivity[] activity={launch()};service=service(activity[0]);AudioCache cache=AudioCache.shared(context);ui(()->{service.clearQueue();service.setModes(false,false);});cache.clear();
         try{
             helper.install(new PluginManager(context),id,"stream",new JSONArray(),"export function stream(){host.storage.set('streamCalls',(host.storage.get('streamCalls')||0)+1);throw Error('network stream must never run offline');}export function lyrics(){host.storage.set('lyricCalls',(host.storage.get('lyricCalls')||0)+1);if(host.storage.get('empty'))return '';throw Error('fixture lyric update failure');}export function played(){host.storage.set('playedCalls',(host.storage.get('playedCalls')||0)+1);}");
             try(Server server=new Server()){store(cache,a,"Offline A","high",server.url());store(cache,a,"Offline A","lossless",server.url());store(cache,b,"Offline B","standard",server.url());}
@@ -46,7 +46,7 @@ final class OfflinePlaybackChecks {
             check(data.getString("lyricCalls","0").equals("0"),"offline refresh called source lyrics");
             ui(()->{String uri=service.snapshot().uri;((HashMap<String,String>)field(activity[0],"localLyrics")).remove(uri);invoke(activity[0],"loadStageLyrics",new Class<?>[]{boolean.class},true);LyricsStageDialog stage=(LyricsStageDialog)field(activity[0],"lyricsStage");check(stage.stage.timeline().lines.isEmpty()&&((String)field(stage.stage,"message")).contains("尚未保存"),"missing offline lyric did not explain how to get lyrics");((HashMap<String,String>)field(activity[0],"localLyrics")).put(uri,raw);invoke(activity[0],"saveLocalLyrics",new Class<?>[]{});stage.dismiss();service.pause();service.seek(3200);});
             helper.await(()->Math.abs(service.snapshot().position-3200)<200,"offline seek failed");String resumeUri=service.snapshot().uri,resumeQuality=service.snapshot().requestedQuality;
-            ui(()->{service.clearQueue();activity[0].finish();});activity[0]=launch();check(service(activity[0])==service,"offline Activity recreation replaced service");ui(()->invoke(activity[0],"toggle",new Class<?>[]{}));helper.await(()->service.snapshot().playing&&service.snapshot().uri.equals(resumeUri)&&service.snapshot().requestedQuality.equals(resumeQuality)&&service.snapshot().position>=3000,"empty-service restore lost offline mode, cached tier or position");
+            ui(()->{service.clearQueue();activity[0].finish();});test.waitForIdleSync();activity[0]=launch();service=service(activity[0]);ui(()->invoke(activity[0],"toggle",new Class<?>[]{}));helper.await(()->service.snapshot().playing&&service.snapshot().uri.equals(resumeUri)&&service.snapshot().requestedQuality.equals(resumeQuality)&&service.snapshot().position>=3000,"empty-service restore lost offline mode, cached tier or position");
             ui(()->{check(service.snapshot().offlineOnly&&service.queueSnapshot().length()==3,"cold resume rebuilt global library queue");try{service.enqueue(new JSONObject().put("uri","https://example.com/uncached"),false);throw new AssertionError("online row entered offline queue");}catch(IOException expected){} });
             check(data.getString("streamCalls","0").equals("0")&&data.getString("playedCalls","0").equals("0")&&data.getString("lyricCalls","0").equals("0"),"offline workflow invoked source exports");
             // Online refresh failure and empty response must retain the last usable timed lyric.
