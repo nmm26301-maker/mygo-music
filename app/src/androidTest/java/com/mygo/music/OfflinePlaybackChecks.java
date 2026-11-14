@@ -27,6 +27,7 @@ final class OfflinePlaybackChecks {
     void store(AudioCache cache,String uri,String title,String quality,String url)throws Exception{CountDownLatch done=new CountDownLatch(1);boolean[] success={false};cache.store(uri,title,quality,url,new HashMap<>(),(ok,message)->{success[0]=ok;done.countDown();});check(done.await(15,TimeUnit.SECONDS)&&success[0],"offline fixture transfer failed");}
     void run()throws Exception{
         String id="offline-workflow",a="plugin://"+id+"?id=a",b="plugin://"+id+"?id=b",raw="{\"lines\":[{\"start\":0,\"end\":9000,\"translation\":\"Saved translation\",\"words\":[{\"text\":\"离线歌词仍然亮起\",\"start\":1000,\"end\":8000}]}]}";
+        check(LyricsTimeline.parse(JSONObject.quote("[00:01.00]插件字符串歌词")).timed,"JSON-encoded source LRC lost timing");check(LyricsTimeline.parse(JSONObject.quote(raw)).wordTimed,"JSON-encoded source word timings lost");check(LyricsTimeline.parse(JSONObject.quote("")).lines.isEmpty(),"encoded empty lyric became visible quote characters");
         SharedPreferences prefs=context.getSharedPreferences("library",0),data=context.getSharedPreferences("plugin_data_"+id,0);Map<String,?> original=new HashMap<>(prefs.getAll());prefs.edit().remove("selected_source").putBoolean("auto_cache",false).putString("play_quality","lossless").commit();
         MainActivity[] activity={launch()};service=service(activity[0]);AudioCache cache=AudioCache.shared(context);ui(()->{service.clearQueue();service.setModes(false,false);});cache.clear();
         try{

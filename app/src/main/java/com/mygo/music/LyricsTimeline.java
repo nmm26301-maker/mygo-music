@@ -59,6 +59,9 @@ final class LyricsTimeline {
         if(raw==null||raw.trim().isEmpty()||raw.trim().equals("null"))return empty();
         if(raw.length()>MAX_INPUT)throw new JSONException("歌词文件超过 2 MB");
         raw=raw.replace("\uFEFF","").trim();
+        // Plugin results are JSON-encoded, including string LRC and the empty string.
+        if(raw.startsWith("\""))try{Object decoded=new JSONTokener(raw).nextValue();if(decoded instanceof String)raw=((String)decoded).trim();}catch(JSONException ignored){}
+        if(raw.isEmpty()||raw.equals("null"))return empty();
         if(raw.startsWith("{")) {
             JSONObject root=new JSONObject(raw);JSONArray items=root.optJSONArray("lines");
             if(items!=null&&items.length()>0) {
