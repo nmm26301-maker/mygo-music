@@ -32,3 +32,7 @@
 - Android 缓冲回调：https://developer.android.com/reference/android/media/MediaPlayer.OnBufferingUpdateListener
 
 Lucide 固定版本为 55782beff3a0133df79c417eb68f96e8f19e2404。第三方目录保留原始图形和逐文件校验和；tests/generate-player-icons.py 可重新生成 Android 资源。未引入网页图标运行时或联网图标请求，也未声称移植上述完整播放器的内核。
+
+## 视觉检查发现并补充修复
+
+第一轮原生流程虽通过，但紧凑截图被插件未启用弹窗遮挡。核查确认：非插件歌曲带元数据时，界面错误写入空来源的插件引用。现仅为真实插件会话写入引用，并清理旧空来源记录；合法的旧直链插件来源仍保留，以支持原有歌词与评论桥接。新增回归要求真正加载两行定时歌词并核对原来源调用，而不只确认歌词窗口打开。最终交付必须使用修复后的完整回归与截图。
