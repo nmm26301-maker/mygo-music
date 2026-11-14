@@ -1,0 +1,67 @@
+{
+  "repository": "lucide-icons/lucide",
+  "commit": "55782beff3a0133df79c417eb68f96e8f19e2404",
+  "license": "ISC; MIT for inherited Feather icons as listed in Lucide-LICENSE.txt",
+  "icons": {
+    "chevron-down.svg": {
+      "svg_sha256": "66ea878e72ed3488bb3b464c39dfdccee8d1f78e560dccea40e5e12da0e87e87",
+      "android_sha256": "ff9da2339b8f8e5a800e59a58d1a4f176e0c72afa95af36ba6e863b32ae190ea"
+    },
+    "ellipsis.svg": {
+      "svg_sha256": "4f495cc72013ffdfec677f03b33a150f7b4dd741979283fd6853a09024bca112",
+      "android_sha256": "14bf37c2f668e31316565b5101de28e6fdd786e396b9516683652e18b18333ec"
+    },
+    "heart.svg": {
+      "svg_sha256": "70af5f30be9fcb500b852556b38dcdf8c04a4ba81fd262534fb0336bd39b3b52",
+      "android_sha256": "8ab1a44e19d92b25bc24589c8de11553f4001686546da85942d5aee6894ce76a"
+    },
+    "list-music.svg": {
+      "svg_sha256": "e86c9d93aab1828013afca1ecc679f9eea432881ea373f97064801b5768d2580",
+      "android_sha256": "d1bf7182fc64f07bfac11408a911e503dbf111a253b4315b7c4cf94996b68ed4"
+    },
+    "mic-vocal.svg": {
+      "svg_sha256": "571cafe82376ae0950eab5a709c3c9195aa466c9043462ea83f26e125e027d47",
+      "android_sha256": "aecabca6811feed2dc84bdf32f2991b01d75270c88ea86b1666de17bde8febc6"
+    },
+    "moon.svg": {
+      "svg_sha256": "205b959e940d5841f0ce1d09c933153da9d9c94130a54d5cc0c68c2af1d403da",
+      "android_sha256": "498b1b8f0b1e31a997fb67fabf6552f0e72230bebe46786bea71936cc5636c2b"
+    },
+    "pause.svg": {
+      "svg_sha256": "f122ec4ea7f5693a0b1baafa9c708b53980dc87b4aacb297c6e6f71c1a4c115c",
+      "android_sha256": "b82339ee7eb1a857ed1c4c21ab4fc8c9d5f9e91a943e632e84ffcd171100b08e"
+    },
+    "play.svg": {
+      "svg_sha256": "d7c34786135922a92b6896f6c2384ceeb0346afbf6041dc79982011411409833",
+      "android_sha256": "722f5198d165d2aeb667346851ce779d6b6ff5466e35c06f80dd1a8e4733d5a6"
+    },
+    "repeat-1.svg": {
+      "svg_sha256": "d74c0581fd9410e52108d74aa07b011162000382238266775aaf7a2d18ba6c68",
+      "android_sha256": "6b3b239613f39d7dd623cd3cc09572220de35d489f7ba55d133ee69a4bd7a235"
+    },
+    "repeat.svg": {
+      "svg_sha256": "6b67b8707e6a3107a1ccad48716bd93fc5e95e8d91f2bff5eec64f62cc7dfc4b",
+      "android_sha256": "e0b0a2d2565a2564817d3b11101b1ea9c506402f1ce54bd9f81840b15d4c0f5d"
+    },
+    "shuffle.svg": {
+      "svg_sha256": "7051f9ba993df6e7fefd9e3ffccb5d812e0f83c89e1287a850111295202edee0",
+      "android_sha256": "f3854cc5f4155bd502bb0e337d1a9fd15fb69fc265d99226275be85ecabbca2d"
+    },
+    "skip-back.svg": {
+      "svg_sha256": "901579624a7d28036a39b3b8bd9e6da0e8cf771a79c67836d8a52b3e2287c031",
+      "android_sha256": "82ff91271ab258764dae7c71a0e772e7705964ae191d3989af019445a69a046e"
+    },
+    "skip-forward.svg": {
+      "svg_sha256": "f6bdc4b8d453332bafcf1366a48d5ece4bd4f15eced97c85c3676bd22c5cadf9",
+      "android_sha256": "5cc8a95d2d308f95548ae1232ae1e7f5e42891ef6da65e07a3173326a33290fa"
+    },
+    "sliders-horizontal.svg": {
+      "svg_sha256": "e43a00e5eb684e6cbb61083bed2528d7a3fa5f265693eb2b5f314cd432aa65f4",
+      "android_sha256": "99ab793bc261444c922320b91db024ec3af2de302291f469dcceb7e92ecc4ee9"
+    },
+    "volume-2.svg": {
+      "svg_sha256": "fb404f9c128a0579de67b399177631e5edb3502fdc247ceb30e8b15754b46071",
+      "android_sha256": "e598da676976c13fba992ebd3912099c58a5a3ea835c21cb5a701d627ae859fd"
+    }
+  }
+}

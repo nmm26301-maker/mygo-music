@@ -11,7 +11,7 @@ import android.widget.*;
 /** Controls use the same service clock and transport as the notification and native player. */
 final class LyricsStageDialog extends Dialog {
     interface Host extends LyricsStageView.Clock {
-        long duration();void toggle();void previous();void next();void refresh();void importLyrics();default void quality(){}default void sleep(){}default String sleepStatus(){return "";}
+        default int buffered(){return 0;}long duration();void toggle();void previous();void next();void refresh();void importLyrics();default void quality(){}default void sleep(){}default String sleepStatus(){return "";}
     }
     private final Host host;
     final LyricsTiming timing;
@@ -26,7 +26,7 @@ final class LyricsStageDialog extends Dialog {
     private AlertDialog appearanceDialog;
     private AlertDialog timingDialog;
     String trackUri="";
-    private final Runnable tick=new Runnable(){public void run(){if(!isShowing())return;long duration=host.duration(),position=host.position();if(!touching){progress.setProgress(duration>0?(int)Math.min(10000,position*10000/duration):0);showTime(position,duration);}play.setText(host.playing()?"暂停":"播放");play.setContentDescription(host.playing()?"暂停播放":"开始播放");body.setPlaying(host.playing());if(host.playing())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stage.invalidate();handler.postDelayed(this,100);}};
+    private final Runnable tick=new Runnable(){public void run(){if(!isShowing())return;long duration=host.duration(),position=host.position();if(!touching){progress.setSecondaryProgress(Math.max(0,Math.min(100,host.buffered()))*100);progress.setProgress(duration>0?(int)Math.min(10000,position*10000/duration):0);showTime(position,duration);}play.setText(host.playing()?"暂停":"播放");play.setContentDescription(host.playing()?"暂停播放":"开始播放");body.setPlaying(host.playing());if(host.playing())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stage.invalidate();handler.postDelayed(this,100);}};
     LyricsStageDialog(Activity activity,Host host){
         super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;appearance=LyricsAppearance.read(activity.getSharedPreferences("library",0));try{appearance.systemReduceMotion=android.provider.Settings.Global.getFloat(activity.getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0;}catch(Exception ignored){}timing=new LyricsTiming(host,activity.getSharedPreferences("library",0));stage=new LyricsStageView(activity,timing);stage.setBackdrop(false);body=new LyricsPlayerBody(activity,stage);body.setAlbumEnabled(appearance.album);
         LinearLayout root=new LinearLayout(activity);root.setOrientation(1);root.setPadding(dp(16),dp(5),dp(16),dp(4));
