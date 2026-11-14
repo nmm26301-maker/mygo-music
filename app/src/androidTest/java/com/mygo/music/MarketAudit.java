@@ -42,6 +42,12 @@ final class MarketAudit {
         Answer answer=new Answer();CountDownLatch done=new CountDownLatch(1);manager.export(id,method,args,(ok,raw)->{answer.ok=ok;answer.value=raw;done.countDown();});
         if(!done.await(35,TimeUnit.SECONDS))answer.value="read-only audit deadline exceeded";return answer;
     }
+    private static final class DecoderProbe {boolean ready;int error;}
+    private DecoderProbe prepare(Uri address,Map<String,String> headers)throws Exception{
+        DecoderProbe result=new DecoderProbe();CountDownLatch done=new CountDownLatch(1);MediaPlayer[] player={null};
+        try{test.runOnMainSync(()->{try{player[0]=new MediaPlayer();player[0].setDataSource(context,address,headers);player[0].setOnPreparedListener(mp->{result.ready=true;done.countDown();});player[0].setOnErrorListener((mp,what,extra)->{result.error=extra;done.countDown();return true;});player[0].prepareAsync();}catch(Exception failure){done.countDown();}});done.await(15,TimeUnit.SECONDS);return result;}
+        finally{test.runOnMainSync(()->{if(player[0]!=null)player[0].release();});}
+    }
     private void probe(JSONObject row)throws Exception{
         PluginManager manager=new PluginManager(context);String id=row.getString("instanceId");
         try{
@@ -62,10 +68,14 @@ final class MarketAudit {
                 String resolved=connection.http.getURL().toString();HashMap<String,String> playerHeaders=new HashMap<>(connection.headers);playerHeaders.put("android-allow-cross-domain-redirect","0");
                 HlsPlayback transport=null;String kind=value.optString("type",value.optString("codec"));Uri playable=Uri.parse(resolved);Map<String,String> nativeHeaders=playerHeaders;
                 if(HlsPlayback.matches(playable,kind)){transport=new HlsPlayback(manager,id,resolved,new HashMap<>(connection.headers));playable=transport.address;nativeHeaders=new HashMap<>();row.put("androidTransport","app per-resource HLS");}else row.put("androidTransport","native direct");
-                final Uri nativeAddress=playable;final Map<String,String> requestHeaders=nativeHeaders;CountDownLatch prepared=new CountDownLatch(1);MediaPlayer[] player={null};boolean[] ok={false};int[] error={0};
-                try{test.runOnMainSync(()->{try{player[0]=new MediaPlayer();player[0].setDataSource(context,nativeAddress,requestHeaders);player[0].setOnPreparedListener(mp->{ok[0]=true;prepared.countDown();});player[0].setOnErrorListener((mp,what,extra)->{error[0]=extra;prepared.countDown();return true;});player[0].prepareAsync();}catch(Exception failure){prepared.countDown();}});
-                    prepared.await(15,TimeUnit.SECONDS);row.put("androidDecoder",ok[0]?"prepared":"unverified_or_failed");if(!ok[0]){row.put("decoderError",error[0]);if(transport!=null&&!transport.failure().isEmpty())row.put("decoderDetail",trim(transport.failure()));}
-                }finally{test.runOnMainSync(()->{if(player[0]!=null)player[0].release();});if(transport!=null)transport.close();}
+                try{DecoderProbe decoder=prepare(playable,nativeHeaders);
+                    if(!decoder.ready&&transport!=null&&AudioDecodeJob.candidate(Uri.parse(resolved),kind,decoder.error)){
+                        transport.close();transport=null;File converted=null;long deadline=android.os.SystemClock.elapsedRealtime()+45000;
+                        try{converted=AudioDecodeJob.decodeHls(context,manager,id,Uri.parse(resolved),new HashMap<>(connection.headers),()->{if(Thread.currentThread().isInterrupted()||android.os.SystemClock.elapsedRealtime()>deadline)throw new IOException("完整分段音频解码检查超时");});decoder=prepare(Uri.fromFile(converted),new HashMap<>());row.put("androidDecoderFallback","complete FLAC");}
+                        catch(Exception failure){row.put("decoderDetail",trim(failure.getMessage()));}finally{if(converted!=null)converted.delete();}
+                    }
+                    row.put("androidDecoder",decoder.ready?"prepared":"unverified_or_failed");if(!decoder.ready){row.put("decoderError",decoder.error);if(transport!=null&&!transport.failure().isEmpty())row.put("decoderDetail",trim(transport.failure()));}
+                }finally{if(transport!=null)transport.close();}
             }catch(Exception failure){row.put("stream","http_failed").put("streamDetail",trim(failure.toString()));}
         }finally{manager.close();android.util.Log.i("MyGoMarket",row.getString("repo")+" search="+row.optString("search")+" stream="+row.optString("stream")+" decoder="+row.optString("androidDecoder"));}
     }

@@ -12,9 +12,10 @@ final class HlsPlayback implements AutoCloseable {
     private final HlsAudioProxy proxy;
     private volatile boolean closed;
     static boolean matches(Uri uri,String kind){String path=uri.getPath();return "hls".equalsIgnoreCase(kind)||"application/vnd.apple.mpegurl".equalsIgnoreCase(kind)||"application/x-mpegurl".equalsIgnoreCase(kind)||path!=null&&path.toLowerCase(Locale.ROOT).endsWith(".m3u8");}
-    HlsPlayback(PluginManager plugins,String source,String original,Map<String,String> headers)throws Exception{
+    HlsPlayback(PluginManager plugins,String source,String original,Map<String,String> headers)throws Exception{this(plugins,source,original,headers,true);}
+    HlsPlayback(PluginManager plugins,String source,String original,Map<String,String> headers,boolean allowLive)throws Exception{
         URL origin=new URL(original);HashMap<String,String> explicit=new HashMap<>(headers);
-        proxy=new HlsAudioProxy(child->{JSONObject values=new JSONObject();if(PluginMedia.sameOrigin(origin,new URL(child)))for(Map.Entry<String,String> item:explicit.entrySet())values.put(item.getKey(),item.getValue());return plugins.mediaHeaders(source,child,"audio",values);},()->{if(closed||Thread.currentThread().isInterrupted())throw new IOException("分段播放已取消");},Long.MAX_VALUE,true);
+        proxy=new HlsAudioProxy(child->{JSONObject values=new JSONObject();if(PluginMedia.sameOrigin(origin,new URL(child)))for(Map.Entry<String,String> item:explicit.entrySet())values.put(item.getKey(),item.getValue());return plugins.mediaHeaders(source,child,"audio",values);},()->{if(closed||Thread.currentThread().isInterrupted())throw new IOException("分段播放已取消");},allowLive?Long.MAX_VALUE:AudioCache.MAX_TRACK*2,allowLive);
         Uri local;try{local=Uri.parse(proxy.address(original));}catch(Exception error){proxy.close();throw error;}address=local;
     }
     String failure(){return proxy.failure();}

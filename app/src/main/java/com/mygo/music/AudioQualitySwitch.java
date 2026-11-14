@@ -72,7 +72,7 @@ final class AudioQualitySwitch implements AutoCloseable {
         try{workers.execute(()->{
             File result=null;
             try{
-                result=AudioDecodeJob.decode(context,uri,values,()->{if(closed||Thread.currentThread().isInterrupted())throw new IOException("音质切换已取消");});
+                NativeAudio.Check check=()->{if(closed||Thread.currentThread().isInterrupted())throw new IOException("音质切换已取消");};result=HlsPlayback.matches(uri,kind)?AudioDecodeJob.decodeHls(context,plugins,Uri.parse(track).getAuthority(),uri,values,check):AudioDecodeJob.decode(context,uri,values,check);
                 File stored=null;
                 if(!closed&&context.getSharedPreferences("library",0).getBoolean("auto_cache",true))try{stored=cache.importFile(track,title,quality,info,result,epoch);}catch(Exception ignored){}
                 final File output=result,saved=stored;

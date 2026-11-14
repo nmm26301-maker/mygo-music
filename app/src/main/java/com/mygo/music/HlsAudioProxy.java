@@ -22,7 +22,7 @@ final class HlsAudioProxy implements AutoCloseable {
     private synchronized void addBytes(int count)throws IOException{bytes+=count;if(bytes>maximum)throw new IOException("分段音频超过下载大小限制");}
     private String rewrite(String text,URL base)throws Exception{
         text=text.replaceFirst("^\\uFEFF","");if(!text.trim().startsWith("#EXTM3U"))throw new IOException("分段音频清单无效");
-        if(!allowLive&&text.contains("#EXTINF:")&&!text.contains("#EXT-X-ENDLIST"))throw new IOException("直播流不能保存为完整离线歌曲");
+        if(!allowLive&&text.contains("#EXTINF:")&&!text.contains("#EXT-X-ENDLIST"))throw new IOException("直播清单没有完整结尾，无法转换为完整音频");
         if(text.contains("#EXT-X-DEFINE"))throw new IOException("此分段清单使用变量，暂不支持分段处理");
         StringBuilder result=new StringBuilder();for(String line:text.split("\\r?\\n")){
             String value=line.trim();if(value.startsWith("#EXT-X-KEY")||value.startsWith("#EXT-X-SESSION-KEY")){if(value.contains("SAMPLE-AES")||value.contains("KEYFORMAT=")&&!value.contains("KEYFORMAT=\"identity\""))throw new IOException("此分段音频需要平台 DRM 授权，当前暂不支持");}

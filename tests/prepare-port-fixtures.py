@@ -25,3 +25,7 @@ try:
 finally:
     key_info.unlink()
 print('Generated 16/24-bit ALAC and encrypted HLS audio fixtures')
+
+# Opus in MPEG-TS exercises a format the Android 13 HLS extractor cannot directly prepare.
+subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=330:duration=8','-c:a','libopus','-b:a','96k','-f','hls','-hls_time','2','-hls_playlist_type','vod','-hls_segment_filename',str(target/'opus-%03d.ts'),str(target/'opus.m3u8')],check=True)
+print('Generated complete Opus HLS for native decoder fallback checks')

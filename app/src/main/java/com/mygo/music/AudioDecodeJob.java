@@ -9,7 +9,14 @@ import java.util.*;
 /** Decode unsupported ALAC/M4A to a complete lossless FLAC, retaining native player controls. */
 final class AudioDecodeJob {
     static boolean iso(File file){try(InputStream in=new FileInputStream(file)){byte[] bytes=new byte[64];int count=in.read(bytes);return count>=12&&bytes[4]=='f'&&bytes[5]=='t'&&bytes[6]=='y'&&bytes[7]=='p';}catch(IOException ignored){return false;}}
-    static boolean candidate(Uri address,String kind,int error){if(error==-1004)return false;if("content".equals(address.getScheme())&&error==-1010)return true;if(kind.equalsIgnoreCase("alac")||kind.equalsIgnoreCase("m4a")||kind.equalsIgnoreCase("mp4"))return true;if("file".equals(address.getScheme()))return iso(new File(address.getPath()));String path=address.getPath();return path!=null&&path.toLowerCase(Locale.ROOT).endsWith(".m4a");}
+    static boolean candidate(Uri address,String kind,int error){if(error==-1004)return false;if(HlsPlayback.matches(address,kind)&&(error==-1007||error==-1010))return true;if("content".equals(address.getScheme())&&error==-1010)return true;if(kind.equalsIgnoreCase("alac")||kind.equalsIgnoreCase("m4a")||kind.equalsIgnoreCase("mp4"))return true;if("file".equals(address.getScheme()))return iso(new File(address.getPath()));String path=address.getPath();return path!=null&&path.toLowerCase(Locale.ROOT).endsWith(".m4a");}
+    static File decodeHls(Context context,PluginManager plugins,String source,Uri address,Map<String,String> headers,NativeAudio.Check check)throws Exception{
+        File output=File.createTempFile("mygo-hls-decoded-",".flac",context.getCacheDir());boolean ok=false;
+        try(HlsPlayback proxy=new HlsPlayback(plugins,source==null?"":source,address.toString(),headers,false)){
+            try{NativeAudio.convert(context,proxy.address.toString(),output,AudioCache.MAX_TRACK,check);}catch(Exception error){if(!proxy.failure().isEmpty())throw new IOException(proxy.failure());throw error;}
+            check.run();ok=true;return output;
+        }finally{if(!ok)output.delete();}
+    }
     static File decode(Context context,Uri address,Map<String,String> headers,NativeAudio.Check check)throws Exception{
         File downloaded=null,output=File.createTempFile("mygo-decoded-",".flac",context.getCacheDir());boolean ok=false;
         try{File input;
