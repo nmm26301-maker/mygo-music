@@ -25,7 +25,7 @@ final class HlsAudioProxy implements AutoCloseable {
         if(!allowLive&&text.contains("#EXTINF:")&&!text.contains("#EXT-X-ENDLIST"))throw new IOException("直播流不能保存为完整离线歌曲");
         if(text.contains("#EXT-X-DEFINE"))throw new IOException("此分段清单使用变量，暂不支持分段处理");
         StringBuilder result=new StringBuilder();for(String line:text.split("\\r?\\n")){
-            String value=line.trim();if(value.startsWith("#EXT-X-KEY")||value.startsWith("#EXT-X-SESSION-KEY")){if(value.contains("SAMPLE-AES")||value.contains("KEYFORMAT=")&&!value.contains("KEYFORMAT=\"identity\""))throw new IOException("受 DRM 保护的分段音频不能转为离线缓存");}
+            String value=line.trim();if(value.startsWith("#EXT-X-KEY")||value.startsWith("#EXT-X-SESSION-KEY")){if(value.contains("SAMPLE-AES")||value.contains("KEYFORMAT=")&&!value.contains("KEYFORMAT=\"identity\""))throw new IOException("此分段音频需要平台 DRM 授权，当前暂不支持");}
             if(!value.isEmpty()&&!value.startsWith("#"))result.append(address(new URL(base,value).toString()));
             else{Matcher match=URI.matcher(line);StringBuffer replaced=new StringBuffer();int matches=0;while(match.find()){matches++;match.appendReplacement(replaced,Matcher.quoteReplacement("URI=\""+address(new URL(base,match.group(1)).toString())+"\""));}match.appendTail(replaced);if(line.toUpperCase(Locale.ROOT).contains("URI=")&&matches==0)throw new IOException("分段音频 URI 格式无效");result.append(replaced);}
             result.append('\n');
