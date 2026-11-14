@@ -17,40 +17,42 @@ final class LyricsStageDialog extends Dialog {
     final LyricsTiming timing;
     private final Handler handler=new Handler(Looper.getMainLooper());
     final LyricsStageView stage;
+    final LyricsPlayerBody body;
     final SeekBar progress;
     private final TextView title,badge,time;
-    private final Button play;
+    private final Button play,coverMode;
     private boolean touching;
     private LyricsAppearance appearance;
     private AlertDialog appearanceDialog;
     private AlertDialog timingDialog;
     String trackUri="";
-    private final Runnable tick=new Runnable(){public void run(){if(!isShowing())return;long duration=host.duration(),position=host.position();if(!touching)progress.setProgress(duration>0?(int)Math.min(10000,position*10000/duration):0);time.setText(format(position)+" / "+format(duration));play.setText(host.playing()?"暂停":"播放");if(host.playing())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stage.invalidate();handler.postDelayed(this,100);}};
+    private final Runnable tick=new Runnable(){public void run(){if(!isShowing())return;long duration=host.duration(),position=host.position();if(!touching)progress.setProgress(duration>0?(int)Math.min(10000,position*10000/duration):0);time.setText(format(position)+" / "+format(duration));play.setText(host.playing()?"暂停":"播放");play.setContentDescription(host.playing()?"暂停播放":"开始播放");body.setPlaying(host.playing());if(host.playing())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stage.invalidate();handler.postDelayed(this,100);}};
     LyricsStageDialog(Activity activity,Host host){
-        super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;appearance=LyricsAppearance.read(activity.getSharedPreferences("library",0));try{appearance.systemReduceMotion=android.provider.Settings.Global.getFloat(activity.getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0;}catch(Exception ignored){}timing=new LyricsTiming(host,activity.getSharedPreferences("library",0));stage=new LyricsStageView(activity,timing);stage.setBackdrop(false);
+        super(activity,android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);this.host=host;appearance=LyricsAppearance.read(activity.getSharedPreferences("library",0));try{appearance.systemReduceMotion=android.provider.Settings.Global.getFloat(activity.getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0;}catch(Exception ignored){}timing=new LyricsTiming(host,activity.getSharedPreferences("library",0));stage=new LyricsStageView(activity,timing);stage.setBackdrop(false);body=new LyricsPlayerBody(activity,stage);body.setAlbumEnabled(appearance.album);
         LinearLayout root=new LinearLayout(activity);root.setOrientation(1);root.setPadding(dp(16),dp(5),dp(16),dp(4));
         root.setBackground(new android.graphics.drawable.Drawable(){public void draw(Canvas canvas){stage.drawBackground(canvas,getBounds().width(),getBounds().height());}public void setAlpha(int value){}public void setColorFilter(ColorFilter filter){}public int getOpacity(){return PixelFormat.OPAQUE;}});
         LinearLayout header=new LinearLayout(activity);header.setGravity(Gravity.CENTER_VERTICAL);
         Button back=button("返回");back.setContentDescription("返回播放器");header.addView(back,new LinearLayout.LayoutParams(dp(58),dp(40)));back.setOnClickListener(v->dismiss());
         LinearLayout info=new LinearLayout(activity);info.setOrientation(1);info.setPadding(dp(14),0,0,0);title=label("",15);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);badge=label("正在获取歌词",11);badge.setTextColor(0xffa8b7d8);info.addView(title);info.addView(badge);header.addView(info,new LinearLayout.LayoutParams(0,-2,1));
         Button quality=button("音质");quality.setContentDescription("歌词页播放音质");header.addView(quality,new LinearLayout.LayoutParams(dp(50),dp(40)));quality.setOnClickListener(v->host.quality());
-        Button follow=button("跟随");header.addView(follow,new LinearLayout.LayoutParams(dp(58),dp(40)));follow.setOnClickListener(v->stage.follow());
+        coverMode=button(appearance.album?"纯歌词":"封面");coverMode.setTag("lyrics-layout-toggle");coverMode.setContentDescription("切换封面与纯歌词布局");header.addView(coverMode,new LinearLayout.LayoutParams(dp(56),dp(40)));coverMode.setOnClickListener(v->{LyricsAppearance next=appearance.copy();next.album=!next.album;applyAppearance(next);});
+        Button follow=button("跟随");follow.setContentDescription("回到正在演唱的歌词");header.addView(follow,new LinearLayout.LayoutParams(dp(58),dp(40)));follow.setOnClickListener(v->stage.follow());
         Button more=button("动效");more.setContentDescription("歌词动效与设置");header.addView(more,new LinearLayout.LayoutParams(dp(58),dp(40)));more.setOnClickListener(v->showSettings(more));root.addView(header,new LinearLayout.LayoutParams(-1,dp(44)));
-        root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
+        root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         progress=new SeekBar(activity);progress.setContentDescription("歌词播放进度");progress.setMax(10000);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xffd7def2));progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x446c7593));progress.setThumbTintList(android.content.res.ColorStateList.valueOf(0xffe9edfb));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(22)));
         progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar bar,int value,boolean user){if(user){host.seek(host.duration()*value/10000);stage.follow();stage.invalidate();}}public void onStartTrackingTouch(SeekBar bar){touching=true;}public void onStopTrackingTouch(SeekBar bar){touching=false;}});
         LinearLayout controls=new LinearLayout(activity);controls.setGravity(Gravity.CENTER_VERTICAL);time=label("00:00 / 00:00",12);controls.addView(time,new LinearLayout.LayoutParams(0,dp(40),1));
-        Button previous=button("上一首");controls.addView(previous,new LinearLayout.LayoutParams(dp(76),dp(40)));previous.setOnClickListener(v->host.previous());play=button("播放");controls.addView(play,new LinearLayout.LayoutParams(dp(72),dp(40)));play.setOnClickListener(v->{host.toggle();stage.invalidate();});Button next=button("下一首");controls.addView(next,new LinearLayout.LayoutParams(dp(76),dp(40)));next.setOnClickListener(v->host.next());root.addView(controls,new LinearLayout.LayoutParams(-1,dp(40)));
+        Button previous=button("上一首");controls.addView(previous,new LinearLayout.LayoutParams(dp(76),dp(40)));previous.setOnClickListener(v->host.previous());play=button("播放");LyricsPlayerBody.surface(play,0xffe5eafa,dp(20));play.setTextColor(0xff182138);controls.addView(play,new LinearLayout.LayoutParams(dp(72),dp(40)));play.setOnClickListener(v->{host.toggle();stage.invalidate();});Button next=button("下一首");controls.addView(next,new LinearLayout.LayoutParams(dp(76),dp(40)));next.setOnClickListener(v->host.next());root.addView(controls,new LinearLayout.LayoutParams(-1,dp(40)));
         setContentView(root);setOnShowListener(d->{getWindow().setLayout(-1,-1);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);stage.setAppearance(appearance);handler.post(tick);});
     }
     private int dp(float value){return (int)(value*getContext().getResources().getDisplayMetrics().density+.5f);}
     private TextView label(String text,int size){TextView view=new TextView(getContext());view.setText(text);view.setTextSize(size);view.setTextColor(Color.WHITE);view.setGravity(Gravity.CENTER_VERTICAL);return view;}
-    private Button button(String text){Button button=new Button(getContext());button.setText(text);button.setTextSize(13);button.setTextColor(0xffe5eafa);button.setAllCaps(false);button.setPadding(0,0,0,0);button.setMinHeight(0);button.setMinimumHeight(0);button.setMinWidth(0);button.setMinimumWidth(0);button.setBackgroundColor(Color.TRANSPARENT);return button;}
-    void setTrack(String uri,String name){if(!uri.equals(trackUri)&&timingDialog!=null)timingDialog.dismiss();if(!uri.equals(trackUri))stage.setArtwork(null);trackUri=uri;timing.select(uri);title.setText(name);setTimeline(LyricsTimeline.empty());setMessage("正在获取歌词");}
+    private Button button(String text){Button button=new Button(getContext());button.setText(text);button.setTextSize(13);button.setTextColor(0xffe5eafa);button.setAllCaps(false);button.setPadding(0,0,0,0);button.setMinHeight(0);button.setMinimumHeight(0);button.setMinWidth(0);button.setMinimumWidth(0);LyricsPlayerBody.surface(button,Color.TRANSPARENT,dp(18));return button;}
+    void setTrack(String uri,String name){if(!uri.equals(trackUri)&&timingDialog!=null)timingDialog.dismiss();if(!uri.equals(trackUri))setArtwork(null);trackUri=uri;timing.select(uri);title.setText(name);body.setTitle(name);setTimeline(LyricsTimeline.empty());setMessage("正在获取歌词");}
     void setTimeline(LyricsTimeline value){stage.setTimeline(value);badge.setText(value.lines.isEmpty()?"暂无歌词":value.wordTimed?(value.estimatedWordTiming?"逐字歌词 · 部分时间按行推算":"逐字歌词 · 点击歌词可跳转"):value.timed?"逐行歌词 · 此来源未提供逐字时间":"文本歌词 · 此来源未提供时间轴");}
     void setMessage(String message){stage.setMessage(message);}
-    void setArtwork(Bitmap bitmap){stage.setArtwork(bitmap);}
-    void applyAppearance(LyricsAppearance value){appearance=value.copy();appearance.save(getContext().getSharedPreferences("library",0));stage.setAppearance(appearance);}
+    void setArtwork(Bitmap bitmap){stage.setArtwork(bitmap);body.setArtwork(bitmap);}
+    void applyAppearance(LyricsAppearance value){appearance=value.copy();appearance.save(getContext().getSharedPreferences("library",0));stage.setAppearance(appearance);body.setAlbumEnabled(appearance.album);coverMode.setText(appearance.album?"纯歌词":"封面");}
     private void showSettings(View anchor){
         PopupMenu menu=new PopupMenu(getContext(),anchor);
         java.util.ArrayList<Integer> order=new java.util.ArrayList<>();for(int recent:new int[]{13,10,11,12})if(recent<LyricsAppearance.STYLES.length)order.add(recent);for(int i=0;i<LyricsAppearance.STYLES.length;i++)if(!order.contains(i))order.add(i);
@@ -73,7 +75,7 @@ final class LyricsStageDialog extends Dialog {
         choices(box,"背景",LyricsAppearance.BACKGROUNDS,appearance.background,value->appearance.background=value);
         choices(box,"高亮配色",LyricsAppearance.COLORS,appearance.color,value->appearance.color=value);
         slider(box,"歌词字号",appearance.size,80,135,value->appearance.size=value);slider(box,"行间距",appearance.spacing,75,150,value->appearance.spacing=value);slider(box,"动效强度",appearance.strength,0,140,value->appearance.strength=value);
-        option(box,"歌词居中排列",appearance.centered,value->appearance.centered=value);option(box,"显示已有译文",appearance.translation,value->appearance.translation=value);option(box,"减少动态效果",appearance.reduceMotion,value->appearance.reduceMotion=value);
+        option(box,"横屏显示专辑封面",appearance.album,value->appearance.album=value);option(box,"歌词居中排列",appearance.centered,value->appearance.centered=value);option(box,"显示已有译文",appearance.translation,value->appearance.translation=value);option(box,"减少动态效果",appearance.reduceMotion,value->appearance.reduceMotion=value);
         TextView note=label("流星拖尾跟随演唱位置，翻页入场带轻微透视，涟漪扩散环绕当前字，双行交接显示当前和下一行。长音波浪按来源字词时长起伏，不分析鼓点。双色卡拉OK和大字专注使用居中布局。减少动态效果保留逐字进度，关闭弹动和背景流动，也会跟随系统动画设置。",12);box.addView(note);
         ScrollView scroll=new ScrollView(getContext());scroll.addView(box);AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("歌词外观与动效").setView(scroll).setPositiveButton("完成",null).setNeutralButton("恢复默认",(ignored,which)->{LyricsAppearance defaults=new LyricsAppearance();defaults.systemReduceMotion=appearance.systemReduceMotion;applyAppearance(defaults);}).create();appearanceDialog=dialog;dialog.show();
     }
@@ -91,6 +93,6 @@ final class LyricsStageDialog extends Dialog {
         earlier.setOnClickListener(adjust);later.setOnClickListener(adjust);reset.setOnClickListener(adjust);dialog.show();
     }
     private static String format(long time){return String.format(java.util.Locale.CHINA,"%02d:%02d",Math.max(0,time)/60000,Math.max(0,time)/1000%60);}
-    @Override public void dismiss(){handler.removeCallbacksAndMessages(null);if(timingDialog!=null)timingDialog.dismiss();if(appearanceDialog!=null)appearanceDialog.dismiss();stage.release();super.dismiss();}
+    @Override public void dismiss(){handler.removeCallbacksAndMessages(null);if(timingDialog!=null)timingDialog.dismiss();if(appearanceDialog!=null)appearanceDialog.dismiss();body.release();stage.release();super.dismiss();}
     @Override protected void onStop(){handler.removeCallbacksAndMessages(null);super.onStop();}
 }
