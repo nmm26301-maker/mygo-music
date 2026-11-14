@@ -60,9 +60,12 @@ final class MarketAudit {
             try(PluginMedia.Connection connection=PluginMedia.open(address,headers,true)){
                 row.put("stream","http_passed").put("httpStatus",connection.http.getResponseCode());
                 String resolved=connection.http.getURL().toString();HashMap<String,String> playerHeaders=new HashMap<>(connection.headers);playerHeaders.put("android-allow-cross-domain-redirect","0");
-                CountDownLatch prepared=new CountDownLatch(1);MediaPlayer[] player={null};boolean[] ok={false};int[] error={0};
-                test.runOnMainSync(()->{try{player[0]=new MediaPlayer();player[0].setDataSource(context,Uri.parse(resolved),playerHeaders);player[0].setOnPreparedListener(mp->{ok[0]=true;prepared.countDown();});player[0].setOnErrorListener((mp,what,extra)->{error[0]=extra;prepared.countDown();return true;});player[0].prepareAsync();}catch(Exception failure){prepared.countDown();}});
-                prepared.await(15,TimeUnit.SECONDS);test.runOnMainSync(()->{if(player[0]!=null)player[0].release();});row.put("androidDecoder",ok[0]?"prepared":"unverified_or_failed");if(!ok[0])row.put("decoderError",error[0]);
+                HlsPlayback transport=null;String kind=value.optString("type",value.optString("codec"));Uri playable=Uri.parse(resolved);Map<String,String> nativeHeaders=playerHeaders;
+                if(HlsPlayback.matches(playable,kind)){transport=new HlsPlayback(manager,id,resolved,playerHeaders);playable=transport.address;nativeHeaders=new HashMap<>();row.put("androidTransport","app per-resource HLS");}else row.put("androidTransport","native direct");
+                final Uri nativeAddress=playable;final Map<String,String> requestHeaders=nativeHeaders;CountDownLatch prepared=new CountDownLatch(1);MediaPlayer[] player={null};boolean[] ok={false};int[] error={0};
+                try{test.runOnMainSync(()->{try{player[0]=new MediaPlayer();player[0].setDataSource(context,nativeAddress,requestHeaders);player[0].setOnPreparedListener(mp->{ok[0]=true;prepared.countDown();});player[0].setOnErrorListener((mp,what,extra)->{error[0]=extra;prepared.countDown();return true;});player[0].prepareAsync();}catch(Exception failure){prepared.countDown();}});
+                    prepared.await(15,TimeUnit.SECONDS);row.put("androidDecoder",ok[0]?"prepared":"unverified_or_failed");if(!ok[0]){row.put("decoderError",error[0]);if(transport!=null&&!transport.failure().isEmpty())row.put("decoderDetail",trim(transport.failure()));}
+                }finally{test.runOnMainSync(()->{if(player[0]!=null)player[0].release();});if(transport!=null)transport.close();}
             }catch(Exception failure){row.put("stream","http_failed").put("streamDetail",trim(failure.toString()));}
         }finally{manager.close();android.util.Log.i("MyGoMarket",row.getString("repo")+" search="+row.optString("search")+" stream="+row.optString("stream")+" decoder="+row.optString("androidDecoder"));}
     }

@@ -10,19 +10,20 @@ import java.util.regex.*;
 /** FFmpeg parses the HLS grammar. This loopback transport retains Java TLS and per-origin headers. */
 final class HlsAudioProxy implements AutoCloseable {
     interface Headers {Map<String,String> get(String address)throws Exception;}
-    private final ServerSocket server;private final String token=UUID.randomUUID().toString();private final Headers headers;private final NativeAudio.Check check;private final long maximum;
+    private final ServerSocket server;private final String token=UUID.randomUUID().toString();private final Headers headers;private final NativeAudio.Check check;private final long maximum;private final boolean allowLive;
     private final Map<String,Integer> ids=new LinkedHashMap<>();private final ArrayList<String> addresses=new ArrayList<>();
     private final Set<Socket> clients=ConcurrentHashMap.newKeySet();private final Set<PluginMedia.Connection> connections=ConcurrentHashMap.newKeySet();
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(2,4,20,TimeUnit.SECONDS,new ArrayBlockingQueue<>(32));private volatile boolean closed;private long bytes;private volatile String failure="";
     private static final Pattern URI=Pattern.compile("(?i)\\bURI\\s*=\\s*\"([^\"]*)\"");
-    HlsAudioProxy(Headers headers,NativeAudio.Check check,long maximum)throws IOException{this.headers=headers;this.check=check;this.maximum=maximum;server=new ServerSocket(0,8,InetAddress.getByName("127.0.0.1"));Thread accept=new Thread(()->{while(!closed)try{Socket client=server.accept();clients.add(client);try{workers.execute(()->serve(client));}catch(RejectedExecutionException error){clients.remove(client);client.close();}}catch(IOException ignored){}});accept.setDaemon(true);accept.start();}
+    HlsAudioProxy(Headers headers,NativeAudio.Check check,long maximum)throws IOException{this(headers,check,maximum,false);}
+    HlsAudioProxy(Headers headers,NativeAudio.Check check,long maximum,boolean allowLive)throws IOException{this.allowLive=allowLive;this.headers=headers;this.check=check;this.maximum=maximum;server=new ServerSocket(0,8,InetAddress.getByName("127.0.0.1"));Thread accept=new Thread(()->{while(!closed)try{Socket client=server.accept();clients.add(client);try{workers.execute(()->serve(client));}catch(RejectedExecutionException error){clients.remove(client);client.close();}}catch(IOException ignored){}});accept.setDaemon(true);accept.start();}
     synchronized String address(String original)throws IOException{URL url=new URL(original);if(!url.getProtocol().equals("http")&&!url.getProtocol().equals("https"))throw new IOException("分段音频地址必须使用 HTTP 或 HTTPS");Integer id=ids.get(original);if(id==null){if(addresses.size()>=4096)throw new IOException("分段音频资源数量过多");id=addresses.size();ids.put(original,id);addresses.add(original);}String suffix=url.getPath().toLowerCase(Locale.ROOT).endsWith(".m3u8")?"playlist.m3u8":"media.ts";return "http://127.0.0.1:"+server.getLocalPort()+"/"+token+"/"+id+"/"+suffix;}
     String failure(){return failure;}
     private synchronized void addBytes(int count)throws IOException{bytes+=count;if(bytes>maximum)throw new IOException("分段音频超过下载大小限制");}
     private String rewrite(String text,URL base)throws Exception{
         text=text.replaceFirst("^\\uFEFF","");if(!text.trim().startsWith("#EXTM3U"))throw new IOException("分段音频清单无效");
-        if(text.contains("#EXTINF:")&&!text.contains("#EXT-X-ENDLIST"))throw new IOException("直播流不能保存为完整离线歌曲");
-        if(text.contains("#EXT-X-DEFINE"))throw new IOException("此分段清单使用变量，暂不支持完整离线缓存");
+        if(!allowLive&&text.contains("#EXTINF:")&&!text.contains("#EXT-X-ENDLIST"))throw new IOException("直播流不能保存为完整离线歌曲");
+        if(text.contains("#EXT-X-DEFINE"))throw new IOException("此分段清单使用变量，暂不支持分段处理");
         StringBuilder result=new StringBuilder();for(String line:text.split("\\r?\\n")){
             String value=line.trim();if(value.startsWith("#EXT-X-KEY")||value.startsWith("#EXT-X-SESSION-KEY")){if(value.contains("SAMPLE-AES")||value.contains("KEYFORMAT=")&&!value.contains("KEYFORMAT=\"identity\""))throw new IOException("受 DRM 保护的分段音频不能转为离线缓存");}
             if(!value.isEmpty()&&!value.startsWith("#"))result.append(address(new URL(base,value).toString()));

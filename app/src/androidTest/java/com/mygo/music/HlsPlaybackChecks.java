@@ -1,0 +1,59 @@
+package com.mygo.music;
+
+import android.app.*;
+import android.content.*;
+import android.media.MediaPlayer;
+import android.os.SystemClock;
+import org.json.*;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+/** Actual HLS manifests, authenticated segments/keys, cross-origin redirects and native clocks. */
+final class HlsPlaybackChecks {
+    final Instrumentation test;final Context context;final CompletionChecks helper;
+    HlsPlaybackChecks(Instrumentation test){this.test=test;context=test.getTargetContext();helper=new CompletionChecks(test);}
+    static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
+    interface Action{void run()throws Exception;}
+    void ui(Action action)throws Exception{Throwable[] failure={null};test.runOnMainSync(()->{try{action.run();}catch(Throwable error){failure[0]=error;}});if(failure[0]!=null)throw new AssertionError("HLS action failed",failure[0]);}
+    byte[] asset(String name)throws Exception{try(InputStream in=test.getContext().getAssets().open("port-fixtures/"+name);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);return out.toByteArray();}}
+    final class Server implements AutoCloseable {
+        final ServerSocket socket=new ServerSocket(0,16,InetAddress.getByName("127.0.0.1"));final ExecutorService workers=Executors.newCachedThreadPool();final Set<String> seen=ConcurrentHashMap.newKeySet();final CountDownLatch stalled=new CountDownLatch(1),release=new CountDownLatch(1);final boolean auth;volatile boolean badHeader;String child="";
+        Server(boolean auth)throws Exception{this.auth=auth;Thread accept=new Thread(()->{while(!socket.isClosed())try{Socket client=socket.accept();workers.execute(()->serve(client));}catch(Exception ignored){}});accept.setDaemon(true);accept.start();}
+        String base(){return "http://127.0.0.1:"+socket.getLocalPort();}
+        void serve(Socket client){try(Socket current=client){current.setSoTimeout(12000);BufferedReader input=new BufferedReader(new InputStreamReader(current.getInputStream(),"US-ASCII"));String first=input.readLine();if(first==null)return;String path=first.split(" ")[1].split("\\?",2)[0].substring(1),line,token="",authorization="",range="";while((line=input.readLine())!=null&&!line.isEmpty()){int cut=line.indexOf(':');if(cut<0)continue;String name=line.substring(0,cut).toLowerCase(Locale.ROOT),value=line.substring(cut+1).trim();if(name.equals("x-audio"))token=value;if(name.equals("authorization"))authorization=value;if(name.equals("range"))range=value;}
+            seen.add(path);boolean allowed=auth?token.equals("native")&&authorization.equals("Bearer native-fixture"):token.isEmpty()&&authorization.isEmpty();if(!allowed)badHeader=true;OutputStream out=current.getOutputStream();if(!allowed){out.write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes("US-ASCII"));return;}
+            if(path.startsWith("redirect-")){out.write(("HTTP/1.1 302 Found\r\nLocation: "+child+"/"+path.substring(9)+"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes("US-ASCII"));return;}
+            byte[] data;
+            if(path.equals("stall.wav")){data=BackgroundPlaybackChecks.wav(60000);out.write(("HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: "+data.length+"\r\nConnection: close\r\n\r\n").getBytes("US-ASCII"));out.flush();stalled.countDown();release.await(35,TimeUnit.SECONDS);return;}
+            if(path.equals("protected.m3u8"))data=asset("sample.m3u8");
+            else if(path.equals("redirected.m3u8"))data=new String(asset("sample.m3u8"),"UTF-8").replace("segment-","redirect-segment-").getBytes("UTF-8");
+            else if(path.equals("cross.m3u8"))data=new String(asset("sample.m3u8"),"UTF-8").replace("segment-",child+"/segment-").getBytes("UTF-8");
+            else if(path.equals("live.m3u8"))data=new String(asset("sample.m3u8"),"UTF-8").replace("#EXT-X-ENDLIST","").getBytes("UTF-8");
+            else if(path.equals("drm.m3u8"))data="#EXTM3U\n#EXT-X-TARGETDURATION:8\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"key.bin\",KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXTINF:8,\nsegment-000.ts\n#EXT-X-ENDLIST\n".getBytes("UTF-8");
+            else data=asset(path);
+            int start=0,end=data.length-1,status=200;if(range.matches("bytes=[0-9]+-[0-9]*")){String[] parts=range.substring(6).split("-",-1);start=Integer.parseInt(parts[0]);if(!parts[1].isEmpty())end=Math.min(end,Integer.parseInt(parts[1]));status=206;}if(start> end)return;String type=path.endsWith(".m3u8")?"application/vnd.apple.mpegurl":"application/octet-stream";out.write(("HTTP/1.1 "+status+" OK\r\nContent-Type: "+type+"\r\nContent-Length: "+(end-start+1)+"\r\n"+(status==206?"Content-Range: bytes "+start+"-"+end+"/"+data.length+"\r\n":"")+"Connection: close\r\n\r\n").getBytes("US-ASCII"));out.write(data,start,end-start+1);out.flush();
+        }catch(Exception ignored){}}
+        public void close(){release.countDown();try{socket.close();}catch(IOException ignored){}workers.shutdownNow();}
+    }
+    void start(PlaybackService service,String id,String song,String quality)throws Exception{ui(()->PlaybackService.startQueue(context,new JSONArray().put(new JSONObject().put("uri","plugin://"+id+"?id="+song).put("title","HLS "+song)),0,0,70,false,false,quality));helper.await(()->service.snapshot().playing&&service.snapshot().position>180,"HLS native playback failed for "+song+": "+service.snapshot().error);}
+    void run()throws Exception{
+        String id="hls-playback-native";SharedPreferences prefs=context.getSharedPreferences("library",0);boolean oldCache=prefs.getBoolean("auto_cache",true);String oldQuality=prefs.getString("play_quality","high");prefs.edit().putBoolean("auto_cache",false).commit();MainActivity activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PlaybackService[] holder={null};helper.await(()->{holder[0]=(PlaybackService)FullPortChecks.field(activity,"playbackService");return holder[0]!=null;},"HLS service missing");PlaybackService service=holder[0];PluginManager manager=new PluginManager(activity);
+        try(Server origin=new Server(true);Server cdn=new Server(false)){
+            origin.child=cdn.base();String code="export function stream({id,quality}){const file=id==='quality'?(quality==='standard'?'protected':quality==='high'?'encrypted':'drm'):id;return {url:'"+origin.base()+"/'+file+(id==='stall'?'.wav':'.m3u8'),type:id==='stall'?'wav':'hls',headers:{'X-Audio':'native','Authorization':'Bearer native-fixture'}};}";
+            // Keep the stall fixture outside HLS to exercise the general native prepare watchdog.
+            helper.install(manager,id,"stream",new JSONArray(),code);
+            for(String song:new String[]{"master","redirected","cross","live"}){start(service,id,song,"standard");ui(()->check(FullPortChecks.field(service,"hlsPlayback")!=null,"HLS source bypassed per-resource transport"));}
+            check(!origin.badHeader&&!cdn.badHeader&&cdn.seen.stream().anyMatch(p->p.endsWith(".ts")),"manifest/segment origin isolation failed");
+            start(service,id,"quality","standard");HlsPlayback[] previous={null};MediaPlayer[] original={null};ui(()->{previous[0]=(HlsPlayback)FullPortChecks.field(service,"hlsPlayback");original[0]=service.snapshot().player;service.seek(2400);service.pause();check(service.changeQuality("high"),"HLS quality preparation did not start");});
+            helper.await(()->!service.snapshot().qualitySwitching&&service.snapshot().requestedQuality.equals("high")&&service.snapshot().player!=original[0],"HLS replacement did not adopt prepared audio");ui(()->{check(!service.snapshot().playing&&Math.abs(service.snapshot().position-2400)<250,"HLS replacement lost paused seek position");check((Boolean)FullPortChecks.field(previous[0],"closed"),"old HLS transport survived replacement");HlsPlayback next=(HlsPlayback)FullPortChecks.field(service,"hlsPlayback");check(next!=null&&!(Boolean)FullPortChecks.field(next,"closed"),"adopting a prepared HLS replacement closed its transport");service.resume();});helper.await(()->service.snapshot().playing&&service.snapshot().position>2700,"transferred encrypted HLS did not continue native audio");check(origin.seen.contains("key.bin")&&!origin.badHeader,"AES key request lost source authorization");
+            MediaPlayer active=service.snapshot().player;ui(()->service.changeQuality("lossless"));helper.await(()->!service.snapshot().qualitySwitching&&!service.snapshot().qualityIssue.isEmpty(),"unsupported HLS key method did not fail replacement");ui(()->check(service.snapshot().player==active&&service.snapshot().playing,"failed HLS replacement stopped current audio"));SourcePlaylistUiChecks.click(test,"关闭");
+            // Saving uses the original source URL rather than the short-lived loopback endpoint.
+            prefs.edit().putBoolean("auto_cache",true).commit();start(service,id,"protected","standard");AudioCache cache=AudioCache.shared(context);String track="plugin://"+id+"?id=protected";helper.await(()->cache.find(track,"standard")!=null,"proxy playback did not retain original URL for offline cache");prefs.edit().putBoolean("auto_cache",false).commit();
+            ui(()->PlaybackService.startQueue(context,new JSONArray().put(new JSONObject().put("uri","plugin://"+id+"?id=stall").put("title","stalled native fixture")),0,0,70,false,false,"standard"));check(origin.stalled.await(12,TimeUnit.SECONDS),"stall did not reach actual native preparation");helper.await(()->service.snapshot().loading&&FullPortChecks.field(service,"prepareTimeout")!=null,"prepare watchdog was not armed");Runnable[] timeout={null};ui(()->{timeout[0]=(Runnable)FullPortChecks.field(service,"prepareTimeout");timeout[0].run();check(!service.snapshot().loading&&service.snapshot().error.contains("超时"),"prepare timeout left playback indefinitely loading");});origin.release.countDown();SourcePlaylistUiChecks.click(test,"关闭");
+            start(service,id,"protected","standard");ui(()->{timeout[0].run();check(service.snapshot().playing&&service.snapshot().error.isEmpty(),"old watchdog stopped a later track");HlsPlayback transport=(HlsPlayback)FullPortChecks.field(service,"hlsPlayback");service.stopPlayback();check((Boolean)FullPortChecks.field(transport,"closed")&&FullPortChecks.field(service,"hlsPlayback")==null,"stopping playback retained its HLS transport");});
+            System.out.println("MYGO_HLS_PLAYBACK_OK: actual native master/live/AES audio, origin-specific manifest/segment/key headers, direct and redirected CDN isolation, staged quality transport ownership and paused seek, failure preserves current audio, original-URL cache, prepare timeout and stale timer rejection, stop cleanup");
+        }finally{ui(()->{service.stopPlayback();manager.close();activity.finish();});prefs.edit().putBoolean("auto_cache",oldCache).putString("play_quality",oldQuality).commit();helper.cleanup(id);}
+    }
+}
