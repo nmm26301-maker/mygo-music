@@ -414,7 +414,7 @@ public class MainActivity extends Activity {
             public boolean playing(){return playbackService!=null&&playbackService.snapshot().playing;}
             public void seek(long position){seekPlayback((int)Math.min(Integer.MAX_VALUE,Math.max(0,position)));}
             public void toggle(){MainActivity.this.toggle();}public void next(){MainActivity.this.next();}public void previous(){MainActivity.this.previous();}
-            public void refresh(){loadStageLyrics(true);}public void importLyrics(){pickLyrics();}public void quality(){showPlaybackQuality();}public void sleep(){showSleepTimer();}
+            public void refresh(){loadStageLyrics(true);}public void importLyrics(){pickLyrics();}public void quality(){showPlaybackQuality();}public void sleep(){showSleepTimer();}public String sleepStatus(){return playbackService==null?"":PlaybackService.sleepLabel(playbackService.snapshot());}
         });
         lyricsStage=page;page.setOnDismissListener(d->{if(lyricsStage==page){lyricsRequest++;lyricsStage=null;}});page.show();
     }
