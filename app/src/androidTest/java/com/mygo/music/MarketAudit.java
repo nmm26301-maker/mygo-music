@@ -42,10 +42,10 @@ final class MarketAudit {
         Answer answer=new Answer();CountDownLatch done=new CountDownLatch(1);manager.export(id,method,args,(ok,raw)->{answer.ok=ok;answer.value=raw;done.countDown();});
         if(!done.await(35,TimeUnit.SECONDS))answer.value="read-only audit deadline exceeded";return answer;
     }
-    private static final class DecoderProbe {boolean ready;int error;}
+    private static final class DecoderProbe {boolean ready,noAudio;int error;}
     private DecoderProbe prepare(Uri address,Map<String,String> headers)throws Exception{
         DecoderProbe result=new DecoderProbe();CountDownLatch done=new CountDownLatch(1);MediaPlayer[] player={null};
-        try{test.runOnMainSync(()->{try{player[0]=new MediaPlayer();player[0].setDataSource(context,address,headers);player[0].setOnPreparedListener(mp->{result.ready=true;done.countDown();});player[0].setOnErrorListener((mp,what,extra)->{result.error=extra;done.countDown();return true;});player[0].prepareAsync();}catch(Exception failure){done.countDown();}});done.await(15,TimeUnit.SECONDS);return result;}
+        try{test.runOnMainSync(()->{try{player[0]=new MediaPlayer();player[0].setDataSource(context,address,headers);player[0].setOnPreparedListener(mp->{result.ready=AudioDecodeJob.hasAudio(mp);result.noAudio=!result.ready;done.countDown();});player[0].setOnErrorListener((mp,what,extra)->{result.error=extra;done.countDown();return true;});player[0].prepareAsync();}catch(Exception failure){done.countDown();}});done.await(15,TimeUnit.SECONDS);return result;}
         finally{test.runOnMainSync(()->{if(player[0]!=null)player[0].release();});}
     }
     private void probe(JSONObject row)throws Exception{
@@ -74,7 +74,7 @@ final class MarketAudit {
                         try{converted=AudioDecodeJob.decodeHls(context,manager,id,Uri.parse(resolved),new HashMap<>(connection.headers),()->{if(Thread.currentThread().isInterrupted()||android.os.SystemClock.elapsedRealtime()>deadline)throw new IOException("完整分段音频解码检查超时");});decoder=prepare(Uri.fromFile(converted),new HashMap<>());row.put("androidDecoderFallback","complete FLAC");}
                         catch(Exception failure){row.put("decoderDetail",trim(failure.getMessage()));}finally{if(converted!=null)converted.delete();}
                     }
-                    row.put("androidDecoder",decoder.ready?"prepared":"unverified_or_failed");if(!decoder.ready){row.put("decoderError",decoder.error);if(transport!=null&&!transport.failure().isEmpty())row.put("decoderDetail",trim(transport.failure()));}
+                    row.put("androidDecoder",decoder.ready?"prepared":"unverified_or_failed");if(!decoder.ready){row.put("decoderError",decoder.error);if(decoder.noAudio)row.put("decoderDetail","原生准备完成但未识别到可播放音轨");if(transport!=null&&!transport.failure().isEmpty())row.put("decoderDetail",trim(transport.failure()));}
                 }finally{if(transport!=null)transport.close();}
             }catch(Exception failure){row.put("stream","http_failed").put("streamDetail",trim(failure.toString()));}
         }finally{manager.close();android.util.Log.i("MyGoMarket",row.getString("repo")+" search="+row.optString("search")+" stream="+row.optString("stream")+" decoder="+row.optString("androidDecoder"));}

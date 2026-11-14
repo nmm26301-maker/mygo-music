@@ -9,6 +9,7 @@ import java.util.*;
 /** Decode unsupported ALAC/M4A to a complete lossless FLAC, retaining native player controls. */
 final class AudioDecodeJob {
     static boolean iso(File file){try(InputStream in=new FileInputStream(file)){byte[] bytes=new byte[64];int count=in.read(bytes);return count>=12&&bytes[4]=='f'&&bytes[5]=='t'&&bytes[6]=='y'&&bytes[7]=='p';}catch(IOException ignored){return false;}}
+    static boolean hasAudio(android.media.MediaPlayer player){try{android.media.MediaPlayer.TrackInfo[] tracks=player.getTrackInfo();if(tracks==null)return true;for(android.media.MediaPlayer.TrackInfo track:tracks)if(track.getTrackType()==android.media.MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO)return true;return false;}catch(Exception ignored){return true;}}
     static boolean candidate(Uri address,String kind,int error){if(error==-1004)return false;if(HlsPlayback.matches(address,kind)&&(error==-1007||error==-1010))return true;if("content".equals(address.getScheme())&&error==-1010)return true;if(kind.equalsIgnoreCase("alac")||kind.equalsIgnoreCase("m4a")||kind.equalsIgnoreCase("mp4"))return true;if("file".equals(address.getScheme()))return iso(new File(address.getPath()));String path=address.getPath();return path!=null&&path.toLowerCase(Locale.ROOT).endsWith(".m4a");}
     static File decodeHls(Context context,PluginManager plugins,String source,Uri address,Map<String,String> headers,NativeAudio.Check check)throws Exception{
         File output=File.createTempFile("mygo-hls-decoded-",".flac",context.getCacheDir());boolean ok=false;

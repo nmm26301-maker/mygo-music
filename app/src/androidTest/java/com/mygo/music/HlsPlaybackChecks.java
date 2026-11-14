@@ -12,7 +12,7 @@ import java.util.concurrent.*;
 
 /** Actual HLS manifests, authenticated segments/keys, cross-origin redirects and native clocks. */
 final class HlsPlaybackChecks {
-    final Instrumentation test;final Context context;final CompletionChecks helper;
+    final Instrumentation test;final Context context;final CompletionChecks helper;PlaybackService observed;
     HlsPlaybackChecks(Instrumentation test){this.test=test;context=test.getTargetContext();helper=new CompletionChecks(test);}
     static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     interface Action{void run()throws Exception;}
@@ -37,10 +37,10 @@ final class HlsPlaybackChecks {
         }catch(Exception ignored){}}
         public void close(){release.countDown();try{socket.close();}catch(IOException ignored){}workers.shutdownNow();}
     }
-    void awaitFormat(CompletionChecks.Ready ready,String message)throws Exception{long deadline=SystemClock.elapsedRealtime()+50000;while(SystemClock.elapsedRealtime()<deadline){boolean[] done={false};ui(()->done[0]=ready.get());if(done[0])return;SystemClock.sleep(50);}throw new AssertionError(message);}
+    void awaitFormat(CompletionChecks.Ready ready,String message)throws Exception{long deadline=SystemClock.elapsedRealtime()+50000;while(SystemClock.elapsedRealtime()<deadline){boolean[] done={false};ui(()->done[0]=ready.get());if(done[0])return;SystemClock.sleep(50);}PlaybackService.Snapshot state=observed.snapshot();String tracks=state.player==null?"none":Arrays.toString(state.player.getTrackInfo());throw new AssertionError(message+"; loading="+state.loading+" ready="+state.ready+" position="+state.position+" stream="+state.stream+" error="+state.error+" quality="+state.qualityIssue+" tracks="+tracks);}
     void start(PlaybackService service,String id,String song,String quality)throws Exception{ui(()->PlaybackService.startQueue(context,new JSONArray().put(new JSONObject().put("uri","plugin://"+id+"?id="+song).put("title","HLS "+song)),0,0,70,false,false,quality));CompletionChecks.Ready ready=()->service.snapshot().playing&&service.snapshot().position>180;if(song.equals("opus"))awaitFormat(ready,"HLS format fallback did not start native audio");else helper.await(ready,"HLS native playback failed for "+song+": "+service.snapshot().error);}
     void run()throws Exception{
-        String id="hls-playback-native";SharedPreferences prefs=context.getSharedPreferences("library",0);boolean oldCache=prefs.getBoolean("auto_cache",true);String oldQuality=prefs.getString("play_quality","high");prefs.edit().putBoolean("auto_cache",false).commit();MainActivity activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PlaybackService[] holder={null};helper.await(()->{holder[0]=(PlaybackService)FullPortChecks.field(activity,"playbackService");return holder[0]!=null;},"HLS service missing");PlaybackService service=holder[0];PluginManager manager=new PluginManager(activity);
+        String id="hls-playback-native";SharedPreferences prefs=context.getSharedPreferences("library",0);boolean oldCache=prefs.getBoolean("auto_cache",true);String oldQuality=prefs.getString("play_quality","high");prefs.edit().putBoolean("auto_cache",false).commit();MainActivity activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));PlaybackService[] holder={null};helper.await(()->{holder[0]=(PlaybackService)FullPortChecks.field(activity,"playbackService");return holder[0]!=null;},"HLS service missing");PlaybackService service=holder[0];observed=service;PluginManager manager=new PluginManager(activity);
         try(Server origin=new Server(true);Server cdn=new Server(false)){
             origin.child=cdn.base();String code="export function stream({id,quality}){const file=id==='quality-fallback'?(quality==='standard'?'protected':quality==='high'?'opus':'drm'):id==='quality'?(quality==='standard'?'protected':quality==='high'?'encrypted':'drm'):id;return {url:'"+origin.base()+"/'+file+(id==='stall'?'.wav':'.m3u8'),type:id==='stall'?'wav':'hls',headers:{'X-Audio':'native','Authorization':'Bearer native-fixture'}};}";
             // Keep the stall fixture outside HLS to exercise the general native prepare watchdog.
