@@ -132,6 +132,11 @@ public class PlaybackService extends Service {
     }
     void resume(){if(closed)return;remoteCompletion.resume();if(radioWaiting){radioFailure="";wanted=true;refillRadio();return;}resumeAfterFocus=false;if(index<0||queue.isEmpty())return;wanted=true;ensureForeground();session.setActive(true);if(remote.active()){remote.resume();publish();}else if(ready&&player!=null){if(requestFocus()){player.start();armClockGuard();recordAndCache();publish();}else{wanted=false;publish();}}else if(!loading)resolve(index,initialPosition,true);else publish();}
     private boolean offlineOnly(){return index>=0&&index<queue.size()&&queue.get(index).optBoolean("cacheOnly");}
+    // A quality-error window and its login callback belong to exactly one failed replacement.
+    boolean retryQuality(Snapshot failed){
+        if(closed||failed==null||failed.qualityIssue.isEmpty()||qualityIssue.isEmpty()||qualityChange!=null||generation!=failed.generation||qualityIssueId!=failed.qualityIssueId||index<0||index>=queue.size()||!queue.get(index).optString("uri").equals(failed.uri))return false;
+        return changeQuality(failed.failedQuality);
+    }
     boolean changeQuality(String selected){
         if(offlineOnly()){prefs.edit().putString("play_quality",AudioQuality.normalize(selected)).apply();publish();return false;}
         if(closed)return false;String next=AudioQuality.normalize(selected);boolean changed=!next.equals(quality);if(!changed)return false;

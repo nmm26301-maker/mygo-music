@@ -22,9 +22,14 @@ final class AudioQuality {
             double bits=numeric(input,input.has("sourceBitDepth")?"sourceBitDepth":input.has("bitDepth")?"bitDepth":"bitsPerSample");if(Arrays.asList(8.0,16.0,20.0,24.0,32.0,64.0).contains(bits))result.put("sourceBitDepth",bits);
         }catch(JSONException ignored){}return result;
     }
+    private static String losslessLabel(String codec){
+        if(Arrays.asList("aac","aac-lc","he-aac","he-aac-v2","heaac","mp4a.40.2","mp3","mp2","opus","vorbis").contains(codec))return "无损标注与编码不符";
+        if(codec.equals("flac")||codec.equals("alac"))return "无损编码";
+        return "无损标注未核验";
+    }
     static String describe(JSONObject raw){
         JSONObject info=info(raw);ArrayList<String> parts=new ArrayList<>();String quality=info.optString("sourceQuality"),codec=info.optString("sourceCodec");
-        if(!quality.isEmpty())parts.add(quality.equals("lossless")?"无损":label(quality));if(!codec.isEmpty())parts.add(codec.toUpperCase(Locale.ROOT));
+        if(!quality.isEmpty())parts.add(quality.equals("lossless")?losslessLabel(codec):label(quality));if(!codec.isEmpty())parts.add(codec.toUpperCase(Locale.ROOT));
         double rate=numeric(info,"sourceBitRate");String unit=info.optString("sourceBitRateUnit");if(rate>0){if(unit.equals("bps"))parts.add(number(rate/1000)+" kbps");else if(unit.equals("kbps"))parts.add(number(rate)+" kbps");else parts.add("码率参数 "+number(rate)+"（单位未说明）");}
         double sample=numeric(info,"sourceSampleRate"),bits=numeric(info,"sourceBitDepth");if(bits>0)parts.add(number(bits)+" bit");if(sample>0)parts.add(number(sample/1000)+" kHz");
         return parts.isEmpty()?"音源未报告音质参数":"音源报告："+String.join(" · ",parts);
