@@ -13,9 +13,9 @@ final class TurntableView extends View {
     TurntableView(Context context){super(context);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
     void setArtwork(Bitmap source){releaseArtwork();if(source!=null&&!source.isRecycled()){float f=Math.min(1,640f/Math.max(source.getWidth(),source.getHeight()));Bitmap scaled=Bitmap.createScaledBitmap(source,Math.max(1,Math.round(source.getWidth()*f)),Math.max(1,Math.round(source.getHeight()*f)),true);artwork=scaled==source?source.copy(Bitmap.Config.ARGB_8888,false):scaled;shader=new BitmapShader(artwork,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP);}invalidate();}
     private void advance(){long now=SystemClock.uptimeMillis();if(frame>0&&playing&&active&&motion)angle=(angle+Math.min(80,now-frame)*.012f)%360;frame=now;}
-    void setPlaying(boolean value){advance();playing=value;invalidate();}
-    void setActive(boolean value){advance();active=value;frame=SystemClock.uptimeMillis();invalidate();}
-    void setMotion(boolean value){advance();motion=value;invalidate();}
+    void setPlaying(boolean value){if(playing==value)return;advance();playing=value;invalidate();}
+    void setActive(boolean value){if(active==value)return;advance();active=value;frame=SystemClock.uptimeMillis();invalidate();}
+    void setMotion(boolean value){if(motion==value)return;advance();motion=value;invalidate();}
     float angle(){advance();return angle;}
     @Override protected void onDraw(Canvas canvas){
         advance();float side=Math.min(getWidth(),getHeight()),cx=getWidth()*.44f,cy=getHeight()*.53f,r=side*.405f;

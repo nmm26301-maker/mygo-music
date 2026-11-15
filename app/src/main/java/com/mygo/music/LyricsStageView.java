@@ -24,7 +24,8 @@ final class LyricsStageView extends View {
     private LyricsTimeline timeline=LyricsTimeline.empty();
     private int anchor=-1,effect=0;
     private float offset,downY,lastY;
-    private boolean dragging,following=true,paintBackdrop=true;
+    private boolean dragging,following=true,paintBackdrop=true,renderActive=true,softEdges;
+    private int interactionVersion,downVersion=-1;
     private Runnable browseListener;
     void setBrowseListener(Runnable listener){browseListener=listener;notifyBrowse();}
     private void notifyBrowse(){if(browseListener!=null)browseListener.run();}
@@ -36,12 +37,15 @@ final class LyricsStageView extends View {
     LyricsStageView(Context context,Clock clock){super(context);this.clock=clock;setLayerType(View.LAYER_TYPE_SOFTWARE,null);setContentDescription("全屏歌词，滑动浏览，点按歌词跳转播放");}
     private float dp(float value){return value*getResources().getDisplayMetrics().density;}
     private void invalidateBackdrop(boolean animate){View owner=getParent() instanceof View?(View)getParent():null;if(owner instanceof LyricsPlayerBody&&owner.getParent() instanceof View)owner=(View)owner.getParent();if(owner!=null){if(!animate)owner.invalidate();else if(appearance.quiet())owner.postInvalidateDelayed(40);else owner.postInvalidateOnAnimation();}}
+    void setRenderActive(boolean enabled){if(renderActive==enabled)return;renderActive=enabled;frameTime=0;if(enabled)invalidate();}
+    void setSoftEdges(boolean enabled){softEdges=enabled;invalidate();}
+    void cancelInteraction(){interactionVersion++;downVersion=-1;dragging=false;drawnCenters.clear();}
     void setBackdrop(boolean enabled){paintBackdrop=enabled;invalidate();}
     void drawBackground(Canvas canvas,int width,int height){backdrop.draw(canvas,clock.position(),appearance,width,height);}
     void setArtwork(Bitmap bitmap){backdrop.artwork(bitmap);highlightShader=null;invalidate();invalidateBackdrop(false);}
     void release(){backdrop.release();}
     LyricsAppearance appearance(){return appearance.copy();}
-    void setAppearance(LyricsAppearance value){appearance=value.copy();effect=(value.style==0||value.style>=6)?0:(value.style==2||value.style==4?2:1);clearLayouts();metrics();anchor=-1;offset=0;following=true;notifyBrowse();invalidate();invalidateBackdrop(false);}
+    void setAppearance(LyricsAppearance value){cancelInteraction();appearance=value.copy();effect=(value.style==0||value.style>=6)?0:(value.style==2||value.style==4?2:1);clearLayouts();metrics();anchor=-1;offset=0;following=true;notifyBrowse();invalidate();invalidateBackdrop(false);}
     private void clearLayouts(){layouts.clear();glyphs.clear();translations.clear();highlightShader=null;}
     private boolean expressive(){return appearance.style>=6;}
     private boolean compactStage(){return appearance.style==2||appearance.style==3||appearance.style==13;}
@@ -50,7 +54,7 @@ final class LyricsStageView extends View {
     private void lit(int width){paint.setColor(accent());if((appearance.style==5||appearance.style==7)&&highlightShader==null)highlightShader=new LinearGradient(0,0,Math.max(1,width),0,new int[]{accent(),0xffffffff,0xffb0cfff},null,Shader.TileMode.CLAMP);paint.setShader((appearance.style==5||appearance.style==7)?highlightShader:null);}
     private void metrics(){float factor=expressive()?1.08f:appearance.style==3?1.24f:appearance.style==4?.79f:appearance.style==2?1.08f:1;float w=getWidth(),h=getHeight();textSize=Math.max(dp(25),Math.min(dp(48),Math.min(w*.075f,h*.20f)))*appearance.size/100f*factor;lineGap=Math.max(dp(28),h*.18f)*appearance.spacing/100f*(appearance.style==4?.67f:1);}
 
-    void setTimeline(LyricsTimeline timeline){this.timeline=timeline;clearLayouts();anchor=-1;offset=0;following=true;lastPosition=-1;notifyBrowse();invalidate();}
+    void setTimeline(LyricsTimeline timeline){cancelInteraction();this.timeline=timeline;clearLayouts();anchor=-1;offset=0;following=true;lastPosition=-1;notifyBrowse();invalidate();}
     LyricsTimeline timeline(){return timeline;}
     int activeLine(){return timeline.active(clock.position());}
     void setMessage(String value){message=value;invalidate();}
@@ -58,7 +62,7 @@ final class LyricsStageView extends View {
     int effect(){return effect;}
     void follow(){following=true;anchor=-1;offset=0;notifyBrowse();invalidate();}
     boolean following(){return following;}
-    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){clearLayouts();metrics();backdrop.resize(w,h);anchor=-1;offset=0;following=true;notifyBrowse();}
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){cancelInteraction();clearLayouts();metrics();backdrop.resize(w,h);anchor=-1;offset=0;following=true;notifyBrowse();}
     private StaticLayout layout(int index){
         StaticLayout value=layouts.get(index);if(value!=null)return value;
         paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
@@ -98,7 +102,7 @@ final class LyricsStageView extends View {
             if(top>getHeight()+dp(60)||top+block< -dp(60))continue;
             LyricsTimeline.Line line=timeline.lines.get(i);boolean current=timeline.timed?i==active:i==target;
             float focus=1-Math.min(1,Math.abs(center-focusY())/Math.max(1,getHeight()*.7f));
-            float opacity=appearance.style>=10?LyricsStageEffects.edgeFade(center,block,getHeight()):1;
+            float opacity=(softEdges||appearance.style>=10)?LyricsStageEffects.edgeFade(center,block,getHeight()):1;
             int rowAlpha=(int)((handoff>0?(current?255*(1-handoff):220+35*handoff):255)*opacity);if(rowAlpha<=0)continue;
             drawnCenters.put(i,center);int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top);
             if(rowAlpha<255){float layerTop=Math.max(-dp(40),-top),layerBottom=Math.min(block+dp(40),getHeight()-top);if(layerBottom<=layerTop){canvas.restoreToCount(rowSave);continue;}canvas.saveLayerAlpha(-dp(40),layerTop,text.getWidth()+dp(40),layerBottom,rowAlpha);}
@@ -125,7 +129,7 @@ final class LyricsStageView extends View {
         Iterator<Integer> keys=layouts.keySet().iterator();while(keys.hasNext()){int i=keys.next();if(i<lo-2||i>hi+2){keys.remove();glyphs.remove(i);translations.remove(i);}}
         interlude(canvas,position,active);
         paint.setShader(null);paint.clearShadowLayer();
-        if(isShown()&&(clock.playing()||Math.abs(offset)>.3f)){if(appearance.quiet())postInvalidateDelayed(40);else postInvalidateOnAnimation();if(!paintBackdrop)invalidateBackdrop(true);}
+        if(renderActive&&isShown()&&(clock.playing()||Math.abs(offset)>.3f)){if(appearance.quiet())postInvalidateDelayed(40);else postInvalidateOnAnimation();if(!paintBackdrop)invalidateBackdrop(true);}
     }
     private void interlude(Canvas canvas,long position,int active){
         if(!timeline.timed||timeline.lines.isEmpty())return;long from=0,to=timeline.lines.get(0).start;
@@ -207,8 +211,9 @@ final class LyricsStageView extends View {
         }
     }
     @Override public boolean onTouchEvent(MotionEvent event){
+        if(event.getActionMasked()!=MotionEvent.ACTION_DOWN&&downVersion!=interactionVersion){dragging=false;return true;}
         switch(event.getActionMasked()){
-            case MotionEvent.ACTION_DOWN:downY=lastY=event.getY();dragging=false;return true;
+            case MotionEvent.ACTION_DOWN:downVersion=interactionVersion;downY=lastY=event.getY();dragging=false;return true;
             case MotionEvent.ACTION_MOVE:
                 if(Math.abs(event.getY()-downY)>dp(8)){dragging=true;following=false;}
                 if(dragging&&anchor>=0){offset+=event.getY()-lastY;
