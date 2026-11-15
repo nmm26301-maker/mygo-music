@@ -13,6 +13,7 @@ final class ThemeArtworkView extends View {
  void art(Bitmap source){free();if(source!=null&&!source.isRecycled()){float f=Math.min(1,640f/Math.max(source.getWidth(),source.getHeight()));Bitmap b=Bitmap.createScaledBitmap(source,Math.max(1,Math.round(source.getWidth()*f)),Math.max(1,Math.round(source.getHeight()*f)),true);bitmap=b==source?source.copy(Bitmap.Config.ARGB_8888,false):b;shader=new BitmapShader(bitmap,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP);}invalidate();}
  void state(String n,String a,int position,int duration,boolean p,boolean visible,boolean reduce){advance();name=n;artist=a;progress=duration>0?Math.max(0,Math.min(1,position/(float)duration)):0;playing=p;active=visible;quiet=reduce;invalidate();}
  private void advance(){long now=SystemClock.uptimeMillis();if(frame>0&&playing&&active&&!quiet)phase=(phase+Math.min(80,now-frame)*.012f)%360;frame=now;}
+ void active(boolean value){advance();active=value;if(value)invalidate();}
  float phase(){advance();return phase;}
  private void cover(Canvas c,RectF r,float radius){paint.setColor(light?0xffcfdedb:0xff31515d);if(shader!=null){float s=Math.max(r.width()/bitmap.getWidth(),r.height()/bitmap.getHeight());matrix.setScale(s,s);matrix.postTranslate(r.centerX()-bitmap.getWidth()*s/2,r.centerY()-bitmap.getHeight()*s/2);shader.setLocalMatrix(matrix);paint.setShader(shader);}c.drawRoundRect(r,radius,radius,paint);paint.setShader(null);}
  private String fit(String s,float width){while(s.length()>1&&paint.measureText(s)>width)s=s.substring(0,s.length()-1);return s;}
