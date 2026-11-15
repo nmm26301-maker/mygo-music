@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='mygo-tools-') as tmp:
    qbuild=work/(abi+'-qjs');shutil.copytree(sources['qjs'],qbuild)
    run(['make','-j2','CONFIG_TEMPORAL_INTL=','qjsc'],qbuild)
    shutil.copyfile(qbuild/'qjsc',qbuild/'mygo-host-qjsc');(qbuild/'mygo-host-qjsc').chmod(0o755);shutil.rmtree(qbuild/'.obj')
-   run(['make','-j2','CONFIG_TEMPORAL_INTL=','QJSC=./mygo-host-qjsc','CC='+str(BIN/(target+'24-clang')),'AR='+str(BIN/'llvm-ar'),'LDFLAGS=-pie -Wl,-z,relro,-z,now,-z,max-page-size=16384','qjs'],qbuild)
+   run(['make','-j2','CONFIG_TEMPORAL_INTL=','QJSC=./mygo-host-qjsc','LIBS=-lm -ldl','CC='+str(BIN/(target+'24-clang')),'AR='+str(BIN/'llvm-ar'),'LDFLAGS=-pie -Wl,-z,relro,-z,now,-z,max-page-size=16384','qjs'],qbuild)
    shutil.copyfile(qbuild/'qjs',cached/'libmygo-qjs.so')
    run([str(BIN/(target+'24-clang')),'-O2','-fPIE','-pie','-Wl,-z,relro,-z,now,-z,max-page-size=16384',str(ROOT/'app/src/main/cpp/plugin-python.c'),'-ldl','-o',str(cached/'libmygo-python.so')],ROOT)
    for path in cached.glob('*.so'):

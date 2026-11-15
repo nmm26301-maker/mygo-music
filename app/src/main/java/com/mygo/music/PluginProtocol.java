@@ -5,7 +5,7 @@ import java.io.IOException;
 
 /** Upstream protocol versions are separate from the Android release version. */
 final class PluginProtocol {
-    static final String VERSION="0.1.24";
+    static final String VERSION="0.1.31";
     static void validate(JSONObject manifest)throws IOException{
         String minimum=manifest.optString("minAppVersion","");if(minimum.isEmpty())return;
         if(!minimum.matches("v?\\d+\\.\\d+\\.\\d+"))throw new IOException("插件最低协议版本格式无效："+minimum);

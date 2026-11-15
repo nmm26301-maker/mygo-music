@@ -189,6 +189,8 @@ jobs:
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Refresh corresponding sources with the final source audit
         run: python3 tests/build-native-audio.py
+      - name: Include exact native plugin sources and licenses
+        run: python3 tests/package-plugin-sources.py
       - name: Prepare direct install files
         run: |
           VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)

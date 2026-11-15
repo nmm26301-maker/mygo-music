@@ -27,7 +27,16 @@ final class PluginNativeToolChecks {
     PluginNativeTools.Plan plan=PluginNativeTools.prepare(context,id,Arrays.asList("--version"));ProcessBuilder builder=new ProcessBuilder(plan.binary.getAbsolutePath(),"-c","import ssl,hashlib,ctypes,json;print(json.dumps({'roots':len(ssl.create_default_context().get_ca_certs())}))");builder.environment().putAll(plan.env);Process python=builder.start();String line;try(BufferedReader r=new BufferedReader(new InputStreamReader(python.getInputStream()))){line=r.readLine();}check(python.waitFor()==0&&line!=null&&new JSONObject(line).getInt("roots")>0,"Python SSL/Android trust failed");
     long waiting=processes.spawn("mygo-qjs",new JSONArray().put("-e").put("while(true){} ")).getLong("pid");processes.kill(waiting);check(processes.waitFor(waiting)!=0,"native process cancellation failed");
     System.out.println("MYGO_NATIVE_TOOLS_OK webViewSpawn=true ytDlp=true quickjsBigInt=true stdin=true actualAudioJSON=true networkGate=true sslAndroidRoots=true cancellation=true");
+    originalPlugin();
    }finally{processes.close();}
   }finally{manager.close();helper.cleanup(id);prefs.edit().remove("plugin_process_"+id).remove("plugin_network_"+id).commit();}
+ }
+ void originalPlugin()throws Exception{
+  PluginManager manager=new PluginManager(context);String id="";try{
+   CountDownLatch installed=new CountDownLatch(1);boolean[] ok={false};String[] detail={""};manager.installZipStream(test.getContext().getAssets().open("market-audit/47.zip"),"maxbeau/mygo-music-youtube-music",(success,raw)->{ok[0]=success;detail[0]=raw;installed.countDown();});check(installed.await(35,TimeUnit.SECONDS)&&ok[0],"original 0.1.31 plugin failed installation: "+detail[0]);
+   PluginManager.PluginInfo source=null;for(PluginManager.PluginInfo item:manager.list())if(item.repository.equals("maxbeau/mygo-music-youtube-music")){source=item;break;}check(source!=null,"original plugin identity missing");id=source.id;
+   context.getSharedPreferences("library",0).edit().putBoolean("plugin_process_"+id,true).putBoolean("plugin_network_"+id,true).commit();CountDownLatch done=new CountDownLatch(1);manager.export(id,"diagnostics",new JSONObject(),(success,raw)->{ok[0]=success;detail[0]=raw;done.countDown();});check(done.await(40,TimeUnit.SECONDS)&&ok[0],"original diagnostics failed: "+detail[0]);JSONArray checks=new JSONArray(detail[0]);int verified=0;for(int i=0;i<checks.length();i++){JSONObject item=checks.getJSONObject(i);String name=item.optString("name");if(name.equals("ffmpeg")||name.equals("yt-dlp")||name.equals("Saved Login")){check(item.optBoolean("ok"),"original native host check failed: "+item);verified++;}}check(verified==3,"original diagnostics omitted native checks");
+   System.out.println("MYGO_ORIGINAL_YOUTUBE_HOST_OK unmodified=true protocol031=true ffmpeg=true ytDlp=true secrets=true");
+  }finally{if(!id.isEmpty()){for(PluginManager.PluginInfo item:manager.list())if(item.id.equals(id))manager.remove(item);}manager.close();}
  }
 }
