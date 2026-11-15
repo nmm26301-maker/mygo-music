@@ -62,17 +62,17 @@ final class AudioQualitySwitch implements AutoCloseable {
             MediaPlayer created=new MediaPlayer();player=created;created.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());created.setWakeMode(context,PowerManager.PARTIAL_WAKE_LOCK);
             if("http".equals(uri.getScheme())||"https".equals(uri.getScheme())){HashMap<String,String> restricted=new HashMap<>(headers);restricted.put("android-allow-cross-domain-redirect","0");Uri playable=uri;if(!cached&&HlsPlayback.matches(uri,kind)){String source=Uri.parse(track).getAuthority();hlsPlayback=new HlsPlayback(plugins,source==null?"":source,uri.toString(),headers);playable=hlsPlayback.address;restricted.clear();}created.setDataSource(context,playable,restricted);}else created.setDataSource(context,uri);
             created.setOnBufferingUpdateListener((mp,percent)->{if(!closed&&player==mp)buffered=Math.max(0,Math.min(100,percent));});
-            created.setOnPreparedListener(mp->{if(!closed&&player==mp){if(!decoded&&!cached&&hlsPlayback!=null){try{mp.setVolume(0,0);mp.start();probeHls(mp,uri,values,android.os.SystemClock.elapsedRealtime());}catch(Exception error){fail(error.getMessage());}return;}cancelNativeTimeout();listener.prepared(this);}});
+            created.setOnPreparedListener(mp->{if(!closed&&player==mp){if(!decoded&&!cached&&AudioDecodeJob.candidate(uri,kind,-1010)){try{mp.setVolume(0,0);mp.start();probeClock(mp,uri,values,android.os.SystemClock.elapsedRealtime());}catch(Exception error){fail(error.getMessage());}return;}cancelNativeTimeout();listener.prepared(this);}});
             created.setOnErrorListener((mp,what,extra)->{if(closed||player!=mp)return true;if(!decoded&&(hlsPlayback==null||hlsPlayback.failure().isEmpty())&&AudioDecodeJob.candidate(uri,kind,extra))decode(uri,values);else fail(hlsPlayback!=null&&!hlsPlayback.failure().isEmpty()?"新音质分段音频无法播放："+hlsPlayback.failure():"新音质音频无法播放："+what+" / "+extra);return true;});
-            if(!cached&&!decoded&&hlsPlayback!=null){nativeTimeout=()->{if(closed||player!=created||decoded)return;if(hlsPlayback!=null&&hlsPlayback.failure().isEmpty())decode(uri,values);else fail("新音质分段音频准备超时，继续播放原音频");};main.postDelayed(nativeTimeout,30000);}
+            if(!cached&&!decoded&&AudioDecodeJob.candidate(uri,kind,-1010)){nativeTimeout=()->{if(closed||player!=created||decoded)return;if(hlsPlayback==null||hlsPlayback.failure().isEmpty())decode(uri,values);else fail("新音质分段音频准备超时，继续播放原音频");};main.postDelayed(nativeTimeout,30000);}
             created.prepareAsync();
         }catch(Exception error){fail(error.getMessage());}
     }
-    private void probeHls(MediaPlayer candidate,Uri uri,HashMap<String,String> values,long started){
+    private void probeClock(MediaPlayer candidate,Uri uri,HashMap<String,String> values,long started){
         if(closed||player!=candidate||decoded)return;
         try{if(candidate.getCurrentPosition()>100){cancelNativeTimeout();candidate.pause();if(candidate.getDuration()>0){candidate.setOnSeekCompleteListener(mp->{if(closed||player!=mp)return;mp.setOnSeekCompleteListener(null);listener.prepared(this);});candidate.seekTo(0);}else listener.prepared(this);return;}
             if(android.os.SystemClock.elapsedRealtime()-started>=1500&&!AudioDecodeJob.hasAudio(candidate)){decode(uri,values);return;}
-            main.postDelayed(()->probeHls(candidate,uri,values,started),200);
+            main.postDelayed(()->probeClock(candidate,uri,values,started),200);
         }catch(Exception error){fail(error.getMessage());}
     }
     private void decode(Uri uri,HashMap<String,String> values){

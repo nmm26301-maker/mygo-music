@@ -95,6 +95,7 @@ public final class PluginRuntime {
     private void requireNetwork(URL url)throws Exception{
         if(!"https".equals(url.getProtocol())&&!"http".equals(url.getProtocol()))throw new IOException("仅支持 HTTP/HTTPS");
         String host=url.getHost();if(processes!=null&&processes.declared()&&permissions.getBoolean("plugin_process_"+id,false)&&(host.equals("127.0.0.1")||host.equals("localhost")||host.equals("::1")||host.equals("[::1]")))return;
+        if(hosts.length()==0)throw new IOException("插件未声明网络权限，无法访问域名："+host);
         if(!permissions.getBoolean("plugin_network_"+id,false))throw new IOException("请在插件网络权限中允许访问");
         if(host.equals("userservice.kugou.com")&&resources!=null&&resources.deviceNetwork()&&permissions.getBoolean("plugin_device_network_"+id,false))return;
         for(int i=0;i<hosts.length();i++)if(hostMatches(url.getHost(),hosts.optString(i)))return;

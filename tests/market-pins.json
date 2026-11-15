@@ -277,16 +277,16 @@
     "sourceBytes": 17875
   },
   {
-    "repo": "Maker-World/mygo-music-migu",
-    "commit": "80417dd3d38cb80bc4c5f59e09844561ffb80fb1",
+    "repo": "Maker-World/MygoMusicMigu",
+    "commit": "1e334b305822be59c359f7768d5e6a1cec88a735",
     "name": "Migu Music",
-    "url": "https://codeload.github.com/Maker-World/mygo-music-migu/zip/80417dd3d38cb80bc4c5f59e09844561ffb80fb1",
-    "sha256": "7b4184f0c84c33aedb41c8b8edb75bbaf365313cdaf99a433504148ebcc6ee1e",
+    "url": "https://codeload.github.com/Maker-World/MygoMusicMigu/zip/1e334b305822be59c359f7768d5e6a1cec88a735",
+    "sha256": "5f48cb57c4d5c9d554956c0f0c8287d578b2afdb558058c4903fc3fe359dcbe2",
     "licenseFiles": [],
     "main": "index.js",
     "declaredId": "migu",
     "programs": [],
-    "sourceBytes": 107211
+    "sourceBytes": 195199
   },
   {
     "repo": "SixWa12138/mygo-music-netease-music",

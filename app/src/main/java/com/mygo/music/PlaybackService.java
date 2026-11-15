@@ -77,16 +77,17 @@ public class PlaybackService extends Service {
     }
     private void prepare(long request,Uri address,HashMap<String,String> values,boolean cached){try{if(request!=generation||closed)return;stream=address.toString();currentCached=cached;headers=new HashMap<>(values);if(!PluginMedia.contains(headers,"User-Agent"))headers.put("User-Agent","MyGoMusic/5.11");cache.pin(cached?new File(address.getPath()):null);MediaPlayer created=new MediaPlayer();player=created;created.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());created.setWakeMode(getApplicationContext(),PowerManager.PARTIAL_WAKE_LOCK);if("http".equals(address.getScheme())||"https".equals(address.getScheme())){HashMap<String,String> playerHeaders=new HashMap<>(headers);playerHeaders.put("android-allow-cross-domain-redirect","0");Uri playable=address;if(!cached&&HlsPlayback.matches(address,streamKind)){String source=index>=0&&index<queue.size()?Uri.parse(queue.get(index).optString("uri")).getAuthority():"";hlsPlayback=new HlsPlayback(plugins,source==null?"":source,address.toString(),headers);playable=hlsPlayback.address;playerHeaders.clear();}created.setDataSource(this,playable,playerHeaders);}else created.setDataSource(this,address);
         created.setOnPreparedListener(mp->{if(closed||request!=generation||player!=mp)return;cancelPrepareTimeout();ready=true;loading=false;if(cached||"file".equals(address.getScheme()))buffered=100;applyVolume();if(initialPosition>0)mp.seekTo(Math.min(initialPosition,Math.max(0,mp.getDuration()-1)));if(wanted&&requestFocus())mp.start();else wanted=false;if(safePlaying()){armClockGuard();recordAndCache();}publish();});
-        attachPlaybackListeners(request,created,address,values,cached);prepareTimeout=()->{if(closed||request!=generation||player!=created||ready)return;String reason=hlsPlayback==null?"":hlsPlayback.failure();if(!codecAttempted&&!cached&&HlsPlayback.matches(address,streamKind)&&reason.isEmpty())decode(request,address,values,false);else fail(reason.isEmpty()?"音频准备超时，请检查网络或切换音乐源后重试":"分段音频准备失败："+reason);};main.postDelayed(prepareTimeout,30000);created.prepareAsync();publish();
+        attachPlaybackListeners(request,created,address,values,cached);prepareTimeout=()->{if(closed||request!=generation||player!=created||ready)return;String reason=hlsPlayback==null?"":hlsPlayback.failure();if(!codecAttempted&&!cached&&(HlsPlayback.matches(address,streamKind)||sourceResolved&&AudioDecodeJob.candidate(address,streamKind,-1010))&&reason.isEmpty())decode(request,address,values,false);else fail(reason.isEmpty()?"音频准备超时，请检查网络或切换音乐源后重试":"分段音频准备失败："+reason);};main.postDelayed(prepareTimeout,30000);created.prepareAsync();publish();
     }catch(Exception exception){fail(exception.getMessage()==null?"音频无法准备":exception.getMessage());}}
     private void cancelClockGuard(){if(clockGuard!=null){main.removeCallbacks(clockGuard);clockGuard=null;}}
+    private boolean clockDecodeCandidate(){return hlsPlayback!=null||sourceResolved&&!stream.isEmpty()&&AudioDecodeJob.candidate(Uri.parse(stream),streamKind,-1010);}
     private void armClockGuard(){
-        cancelClockGuard();if(!ready||!wanted||codecAttempted||currentCached||hlsPlayback==null||player==null)return;
+        cancelClockGuard();if(!ready||!wanted||codecAttempted||currentCached||!clockDecodeCandidate()||player==null)return;
         MediaPlayer watched=player;long request=generation,startedAt=SystemClock.elapsedRealtime();int started=position();clockGuard=()->checkClock(watched,request,started,startedAt);main.postDelayed(clockGuard,5000);
     }
     private void checkClock(MediaPlayer watched,long request,int started,long startedAt){
-        clockGuard=null;if(closed||request!=generation||player!=watched||!ready||!wanted||codecAttempted||hlsPlayback==null||position()>started+100)return;
-        String reason=hlsPlayback.failure();if(!reason.isEmpty()){fail("分段音频没有开始播放："+reason);return;}
+        clockGuard=null;if(closed||request!=generation||player!=watched||!ready||!wanted||codecAttempted||!clockDecodeCandidate()||position()>started+100)return;
+        String reason=hlsPlayback==null?"":hlsPlayback.failure();if(!reason.isEmpty()){fail("分段音频没有开始播放："+reason);return;}
         if(AudioDecodeJob.hasAudio(watched)&&SystemClock.elapsedRealtime()-startedAt<30000){clockGuard=()->checkClock(watched,request,started,startedAt);main.postDelayed(clockGuard,5000);return;}
         decode(request,Uri.parse(stream),new HashMap<>(headers),false);
     }
@@ -173,7 +174,7 @@ public class PlaybackService extends Service {
         releasePlayer();player=replacement;hlsPlayback=change.hlsPlayback;change.hlsPlayback=null;decodedFile=change.temporary;audioInfo=change.info;streamKind=change.kind;stream=change.address.toString();headers=new HashMap<>(change.headers);currentCached=change.cached;sourceResolved=change.sourceResolved;codecAttempted=change.decoded;
         buffered=change.cached||"file".equals(change.address.getScheme())?100:change.buffered;buffering=false;activeQuality=change.quality;quality=activeQuality;initialPosition=aligned;wanted=play;ready=true;loading=false;trackReported=false;qualityReload=acknowledged;qualityChange=null;
         cache.pin(currentCached?new File(change.address.getPath()):null);change.transferred();long request=++generation;attachPlaybackListeners(request,replacement,Uri.parse(stream),headers,currentCached);applyVolume();
-        if(safePlaying())recordAndCache();publish();
+        if(safePlaying()){armClockGuard();recordAndCache();}publish();
     }
     void seek(int position){if(closed)return;seekRevision++;remoteCompletion.resume();initialPosition=Math.max(0,position);if(remote.active())remote.seek(initialPosition);else if(ready&&player!=null)player.seekTo(Math.min(initialPosition,Math.max(0,player.getDuration()-1)));armClockGuard();publish();}
     void setVolume(int value){percent=Math.max(0,Math.min(100,value));if(remote.active())remote.volume(percent);else applyVolume();publish();}

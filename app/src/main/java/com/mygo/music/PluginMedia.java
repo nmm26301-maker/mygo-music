@@ -16,8 +16,12 @@ final class PluginMedia {
     private static final Pattern PLACEHOLDER=Pattern.compile("\\{(setting|storage):([^{}]+)\\}");
     static boolean contains(Map<String,String> values,String key){for(String name:values.keySet())if(name.equalsIgnoreCase(key))return true;return false;}
     private static boolean reaches(JSONArray network,String host){for(int i=0;i<network.length();i++)if(PluginRuntime.hostMatches(host,network.optString(i)))return true;return false;}
+    private static JSONArray rules(JSONObject manifest)throws Exception{
+        JSONArray merged=new JSONArray();JSONObject permissions=manifest.optJSONObject("permissions");
+        for(JSONObject owner:new JSONObject[]{manifest,permissions}){if(owner==null||!owner.has("requestHeaders"))continue;JSONArray values=owner.optJSONArray("requestHeaders");if(values==null)throw new IOException("资源请求头规则必须是数组");for(int i=0;i<values.length();i++)merged.put(values.getJSONObject(i));}return merged;
+    }
     static void validate(JSONObject manifest)throws Exception{
-        JSONArray rules=manifest.optJSONArray("requestHeaders");if(rules==null)return;
+        JSONArray rules=rules(manifest);if(rules.length()==0)return;
         JSONObject permissions=manifest.optJSONObject("permissions");JSONArray network=permissions==null?new JSONArray():permissions.optJSONArray("network");if(network==null)network=new JSONArray();
         for(int i=0;i<rules.length();i++){
             JSONObject rule=rules.getJSONObject(i);JSONArray hosts=rule.getJSONArray("hosts");JSONObject headers=rule.getJSONObject("headers");
@@ -42,7 +46,7 @@ final class PluginMedia {
         if(!url.getProtocol().equals("https")&&!url.getProtocol().equals("http"))throw new IOException("资源地址必须使用 HTTP/HTTPS");
         if(source!=null){
             JSONObject manifest=new JSONObject(PluginIdentity.read(new File(source.directory,"plugin.json")));validate(manifest);
-            JSONArray rules=manifest.optJSONArray("requestHeaders");SharedPreferences settings=context.getSharedPreferences("plugin_settings_"+source.id,0),storage=context.getSharedPreferences("plugin_data_"+source.id,0);
+            JSONArray rules=rules(manifest);SharedPreferences settings=context.getSharedPreferences("plugin_settings_"+source.id,0),storage=context.getSharedPreferences("plugin_data_"+source.id,0);
             if(rules!=null&&context.getSharedPreferences("library",0).getBoolean("plugin_network_"+source.id,false))for(int i=0;i<rules.length();i++){
                 JSONObject rule=rules.getJSONObject(i);JSONArray kinds=rule.optJSONArray("kinds");if(kinds!=null&&kinds.length()>0){boolean matches=false;for(int j=0;j<kinds.length();j++)if(kind.equals(kinds.optString(j)))matches=true;if(!matches)continue;}
                 boolean matches=false;JSONArray hosts=rule.getJSONArray("hosts");for(int j=0;j<hosts.length();j++){

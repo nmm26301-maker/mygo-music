@@ -28,14 +28,24 @@ final class MarketAudit {
                     PluginManager.PluginInfo source=null;for(PluginManager.PluginInfo item:installer.list())if(item.repository.equals(pin.getString("repo"))){source=item;break;}
                     if(source==null)throw new AssertionError("installed repository lost its identity: "+pin.getString("repo"));
                     row.put("install","passed").put("version",source.version).put("instanceId",source.id).put("exports",new JSONArray(source.functions)).put("programs",source.programs).put("playback",source.playback);
-                    context.getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+source.id,true).putBoolean("plugin_process_"+source.id,false).commit();installed.add(row);
+                    context.getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+source.id,false).putBoolean("plugin_process_"+source.id,false).commit();installed.add(row);
                 }
                 android.util.Log.i("MyGoMarket",(i+1)+"/"+pins.length()+" "+pin.getString("repo")+" install="+row.getString("install"));save();
             }
         }finally{installer.close();}
+        authorizeInstalled(installed);
         ExecutorService workers=Executors.newFixedThreadPool(3);ArrayList<Future<?>> checks=new ArrayList<>();
         for(JSONObject row:installed)checks.add(workers.submit(()->{try{probe(row);}catch(Exception failure){try{row.put("auditError",failure.toString());}catch(JSONException ignored){}}finally{try{save();}catch(Exception ignored){}}}));
         workers.shutdown();for(Future<?> check:checks)check.get(8,TimeUnit.MINUTES);save();
+    }
+    private void authorizeInstalled(ArrayList<JSONObject> installed)throws Exception{
+        android.content.SharedPreferences prefs=context.getSharedPreferences("library",0);String selected=prefs.getString("selected_source","");prefs.edit().remove("selected_source").commit();
+        MainActivity activity=(MainActivity)test.startActivitySync(new android.content.Intent(context,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));PluginManager foreground=new PluginManager(activity);
+        try{for(JSONObject row:installed){String id=row.getString("instanceId");PluginManager.PluginInfo source=null;for(PluginManager.PluginInfo item:foreground.list())if(item.id.equals(id)){source=item;break;}if(source==null)throw new AssertionError("authorization source missing: "+id);row.put("networkDomains",source.network);
+            if(source.network.length()==0){row.put("networkAuthorization","not_required");continue;}
+            prefs.edit().putBoolean("plugin_network_"+id,false).commit();CountDownLatch done=new CountDownLatch(1);boolean[] ok={false};String[] detail={""};foreground.authorizeNetwork(id,(allowed,message)->{ok[0]=allowed;detail[0]=message;done.countDown();});
+            SourcePlaylistUiChecks.click(test,"允许并继续");if(!done.await(8,TimeUnit.SECONDS)||!ok[0]||!prefs.getBoolean("plugin_network_"+id,false))throw new AssertionError("foreground network authorization failed: "+id+" "+detail[0]);row.put("networkAuthorization","native_dialog_passed_from_saved_false");save();
+        }}finally{test.runOnMainSync(()->{foreground.close();activity.finish();});prefs.edit().putString("selected_source",selected).commit();}
     }
     private static final class Answer {boolean ok;String value="timeout";}
     private Answer call(PluginManager manager,String id,String method,JSONObject args)throws Exception{
@@ -61,7 +71,7 @@ final class MarketAudit {
             if(tracks==null||tracks.length()==0){row.put("stream","unverified_no_search_track");return;}
             Answer stream=call(manager,id,"stream",new JSONObject().put("id",tracks.getJSONObject(0).getString("id")).put("quality","high"));
             if(!stream.ok){row.put("stream","failed_or_requires_setup").put("streamDetail",trim(stream.value));return;}
-            JSONObject value=new JSONObject(stream.value);String address=value.optString("url");if(!address.startsWith("http://")&&!address.startsWith("https://")){row.put("stream","unverified_no_http_url");return;}
+            JSONObject value=new JSONObject(stream.value);row.put("sampleTrackId",tracks.getJSONObject(0).getString("id")).put("sampleTrackName",tracks.getJSONObject(0).optString("name")).put("reportedType",value.optString("type",value.optString("codec")));String address=value.optString("url");if(!address.startsWith("http://")&&!address.startsWith("https://")){row.put("stream","unverified_no_http_url");return;}
             HashMap<String,String> headers=manager.mediaHeaders(id,address,"audio",value.optJSONObject("headers"));
             try(PluginMedia.Connection connection=PluginMedia.open(address,headers,true)){
                 row.put("stream","http_passed").put("httpStatus",connection.http.getResponseCode());
@@ -69,9 +79,9 @@ final class MarketAudit {
                 HlsPlayback transport=null;String kind=value.optString("type",value.optString("codec"));Uri playable=Uri.parse(resolved);Map<String,String> nativeHeaders=playerHeaders;
                 if(HlsPlayback.matches(playable,kind)){transport=new HlsPlayback(manager,id,resolved,new HashMap<>(connection.headers));playable=transport.address;nativeHeaders=new HashMap<>();row.put("androidTransport","app per-resource HLS");}else row.put("androidTransport","native direct");
                 try{DecoderProbe decoder=prepare(playable,nativeHeaders);
-                    if(!decoder.ready&&transport!=null&&transport.failure().isEmpty()&&(decoder.error==0||AudioDecodeJob.candidate(Uri.parse(resolved),kind,decoder.error))){
-                        transport.close();transport=null;File converted=null;long deadline=android.os.SystemClock.elapsedRealtime()+45000;
-                        try{converted=AudioDecodeJob.decodeHls(context,manager,id,Uri.parse(resolved),new HashMap<>(connection.headers),()->{if(Thread.currentThread().isInterrupted()||android.os.SystemClock.elapsedRealtime()>deadline)throw new IOException("完整分段音频解码检查超时");});decoder=prepare(Uri.fromFile(converted),new HashMap<>());row.put("androidDecoderFallback","complete FLAC");}
+                    if(!decoder.ready&&(transport==null||transport.failure().isEmpty())&&(decoder.error==0||AudioDecodeJob.candidate(Uri.parse(resolved),kind,decoder.error))&&AudioDecodeJob.candidate(Uri.parse(resolved),kind,-1010)){
+                        if(transport!=null)transport.close();transport=null;File converted=null;long deadline=android.os.SystemClock.elapsedRealtime()+45000;
+                        try{NativeAudio.Check stop=()->{if(Thread.currentThread().isInterrupted()||android.os.SystemClock.elapsedRealtime()>deadline)throw new IOException("完整音频兼容解码检查超时");};converted=HlsPlayback.matches(Uri.parse(resolved),kind)?AudioDecodeJob.decodeHls(context,manager,id,Uri.parse(resolved),new HashMap<>(connection.headers),stop):AudioDecodeJob.decode(context,Uri.parse(resolved),new HashMap<>(connection.headers),stop);decoder=prepare(Uri.fromFile(converted),new HashMap<>());row.put("androidDecoderFallback","complete FLAC");}
                         catch(Exception failure){row.put("decoderDetail",trim(failure.getMessage()));}finally{if(converted!=null)converted.delete();}
                     }
                     row.put("androidDecoder",decoder.ready?"prepared":"unverified_or_failed");if(!decoder.ready){row.put("decoderError",decoder.error);if(decoder.noAudio)row.put("decoderDetail","原生准备完成但播放时钟未推进");if(transport!=null&&!transport.failure().isEmpty())row.put("decoderDetail",trim(transport.failure()));}
@@ -82,6 +92,6 @@ final class MarketAudit {
     private String trim(String text){return text==null?"":text.substring(0,Math.min(800,text.length()));}
     private synchronized void save()throws Exception{
         File dir=new File(context.getExternalFilesDir(null),"qa");dir.mkdirs();
-        try(FileOutputStream out=new FileOutputStream(new File(dir,"market-audit.json"))){out.write(new JSONObject().put("mode","anonymous read-only; no account login, no mutations, no desktop helper execution").put("results",results).toString(2).getBytes("UTF-8"));}
+        try(FileOutputStream out=new FileOutputStream(new File(dir,"market-audit.json"))){out.write(new JSONObject().put("mode","anonymous provider-read-only; local install and native network-consent tests; no account login, remote writes or desktop helper execution").put("results",results).toString(2).getBytes("UTF-8"));}
     }
 }
