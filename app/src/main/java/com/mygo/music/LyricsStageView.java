@@ -24,7 +24,7 @@ final class LyricsStageView extends View {
     private LyricsTimeline timeline=LyricsTimeline.empty();
     private int anchor=-1,effect=0;
     private float offset,downY,lastY;
-    private boolean dragging,following=true,paintBackdrop=true,renderActive=true,softEdges;
+    private boolean fitInline;private boolean dragging,following=true,paintBackdrop=true,renderActive=true,softEdges;
     private int interactionVersion,downVersion=-1;
     private Runnable browseListener;
     void setBrowseListener(Runnable listener){browseListener=listener;notifyBrowse();}
@@ -48,8 +48,9 @@ final class LyricsStageView extends View {
     void setAppearance(LyricsAppearance value){cancelInteraction();appearance=value.copy();effect=(value.style==0||value.style>=6)?0:(value.style==2||value.style==4?2:1);clearLayouts();metrics();anchor=-1;offset=0;following=true;notifyBrowse();invalidate();invalidateBackdrop(false);}
     private void clearLayouts(){layouts.clear();glyphs.clear();translations.clear();highlightShader=null;}
     private boolean expressive(){return appearance.style>=6;}
-    private boolean compactStage(){return appearance.style==2||appearance.style==3||appearance.style==13;}
-    private float focusY(){return compactStage()?getHeight()*.33f:getHeight()*((appearance.style==1||expressive())?.43f:.48f);}
+    void fitInline(boolean value){if(fitInline==value)return;fitInline=value;cancelInteraction();clearLayouts();anchor=-1;metrics();invalidate();}
+    private boolean compactStage(){return fitInline||appearance.style==2||appearance.style==3||appearance.style==13;}
+    private float focusY(){return fitInline?getHeight()*.5f:compactStage()?getHeight()*.33f:getHeight()*((appearance.style==1||expressive())?.43f:.48f);}
     private int accent(){return appearance.color==0?backdrop.accent:THEME_COLORS[appearance.color];}
     private void lit(int width){paint.setColor(accent());if((appearance.style==5||appearance.style==7)&&highlightShader==null)highlightShader=new LinearGradient(0,0,Math.max(1,width),0,new int[]{accent(),0xffffffff,0xffb0cfff},null,Shader.TileMode.CLAMP);paint.setShader((appearance.style==5||appearance.style==7)?highlightShader:null);}
     private void metrics(){float factor=expressive()?1.08f:appearance.style==3?1.24f:appearance.style==4?.79f:appearance.style==2?1.08f:1;float w=getWidth(),h=getHeight();textSize=Math.max(dp(25),Math.min(dp(48),Math.min(w*.075f,h*.20f)))*appearance.size/100f*factor;lineGap=Math.max(dp(28),h*.18f)*appearance.spacing/100f*(appearance.style==4?.67f:1);}
@@ -90,25 +91,25 @@ final class LyricsStageView extends View {
         if(lastPosition>=0&&Math.abs(position-lastPosition)>1800&&following)offset=0;
         long elapsed=frameTime==0?16:Math.min(64,now-frameTime);frameTime=now;lastPosition=position;
         if(!dragging){offset=appearance.quiet()?0:(float)(offset*Math.exp(-elapsed/(appearance.style==1?200.0:130.0)));if(Math.abs(offset)<.3f)offset=0;}
-        drawnCenters.clear();int lo=compactStage()?target:Math.max(0,anchor-5),hi=Math.min(timeline.lines.size()-1,compactStage()?target+1:anchor+5);
+        drawnCenters.clear();int lo=compactStage()?target:Math.max(0,anchor-5),hi=Math.min(timeline.lines.size()-1,fitInline?target:compactStage()?target+1:anchor+5);
         for(int i=lo;i<=hi;i++){
-            StaticLayout text=layout(i);float block=blockHeight(i);float center=compactStage()?(i==target?focusY():getHeight()*.77f):focusY()+offset+distance(anchor,i);if(expressive()&&appearance.style!=11&&appearance.style!=13&&following&&active>0&&!appearance.quiet()){
+            StaticLayout text=layout(i);float block=blockHeight(i);float center=compactStage()?(i==target?focusY():getHeight()*.77f):focusY()+offset+distance(anchor,i);if(!fitInline&&expressive()&&appearance.style!=11&&appearance.style!=13&&following&&active>0&&!appearance.quiet()){
                 LyricsTimeline.Line entered=timeline.lines.get(active);long interval=entered.start-timeline.lines.get(active-1).start;
                 center+=distance(active-1,active)*LyricsExpressiveMotion.cascade(position-entered.start,interval,i-active);
             }
-            float handoff=appearance.style==13&&following&&target==active&&timeline.timed&&active>=0&&active+1<timeline.lines.size()&&!appearance.quiet()?LyricsStageEffects.handoff(position,timeline.lines.get(active).start,timeline.lines.get(active+1).start,appearance.strength/100f):0;
-            if(appearance.style==13)center-=(getHeight()*.77f-focusY())*handoff;
+            float handoff=!fitInline&&appearance.style==13&&following&&target==active&&timeline.timed&&active>=0&&active+1<timeline.lines.size()&&!appearance.quiet()?LyricsStageEffects.handoff(position,timeline.lines.get(active).start,timeline.lines.get(active+1).start,appearance.strength/100f):0;
+            if(!fitInline&&appearance.style==13)center-=(getHeight()*.77f-focusY())*handoff;
             float top=center-block/2f;
             if(top>getHeight()+dp(60)||top+block< -dp(60))continue;
             LyricsTimeline.Line line=timeline.lines.get(i);boolean current=timeline.timed?i==active:i==target;
             float focus=1-Math.min(1,Math.abs(center-focusY())/Math.max(1,getHeight()*.7f));
-            float opacity=(softEdges||appearance.style>=10)?LyricsStageEffects.edgeFade(center,block,getHeight()):1;
+            float opacity=fitInline?1:(softEdges||appearance.style>=10)?LyricsStageEffects.edgeFade(center,block,getHeight()):1;
             int rowAlpha=(int)((handoff>0?(current?255*(1-handoff):220+35*handoff):255)*opacity);if(rowAlpha<=0)continue;
             drawnCenters.put(i,center);int rowSave=canvas.save();canvas.translate(getWidth()*.08f,top);
             if(rowAlpha<255){float layerTop=Math.max(-dp(40),-top),layerBottom=Math.min(block+dp(40),getHeight()-top);if(layerBottom<=layerTop){canvas.restoreToCount(rowSave);continue;}canvas.saveLayerAlpha(-dp(40),layerTop,text.getWidth()+dp(40),layerBottom,rowAlpha);}
             float scale=appearance.style==4?1:current?(expressive()?1.04f:1):compactStage()?.70f:expressive()?.80f+.09f*focus:.86f+.06f*focus;
             if(appearance.style==13)scale=current?1.04f-.10f*handoff:.70f+.34f*handoff;
-            if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:appearance.style==13?.30f+.27f*handoff:.30f))/Math.max(1,block));
+            if(fitInline)scale=Math.min(1,Math.max(1,getHeight()-dp(8))/Math.max(1,block));else if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:appearance.style==13?.30f+.27f*handoff:.30f))/Math.max(1,block));
             float pivot=(appearance.centered||compactStage())?text.getWidth()/2f:0;canvas.scale(scale,scale,pivot,block/2f);
             if(current&&appearance.style==11&&timeline.timed&&!appearance.quiet())stageEffects.page(canvas,text.getWidth(),block,LyricsStageEffects.entrance(position,line.start,line.end)*appearance.strength/100f,getResources().getDisplayMetrics().density);
             paint.setShader(null);paint.clearShadowLayer();paint.setTextSize(textSize);paint.setTypeface(Typeface.create(appearance.font==1?"serif":appearance.font==2?"monospace":"sans-serif",Typeface.BOLD));
