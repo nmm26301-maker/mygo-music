@@ -128,6 +128,7 @@ jobs:
             recommended-covers.png
             qq-official-login.png
             login-repair/
+            .native-audio-cache/*-lame.log
       - name: Include per-source Android check results in the release
         run: cp market-audit.json app/src/main/assets/plugin-audit.json
       - name: Decode stable release signing key

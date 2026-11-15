@@ -19,7 +19,7 @@ final class PluginProcesses implements Closeable {
     boolean declared(){return !rules.isEmpty();}
     synchronized JSONObject spawn(String command,JSONArray args)throws Exception {
         if(closed)throw new IOException("插件辅助程序环境已关闭");
-        if(!context.getSharedPreferences("library",0).getBoolean("plugin_process_"+id,false))throw new IOException("请先在插件权限中允许启动辅助程序 (allow process)");
+        if(!context.getSharedPreferences("library",0).getBoolean("plugin_process_"+id,false))throw new IOException("请先在插件权限中允许启动辅助程序 (allow process: not allowed)");
         if(command.isEmpty()||command.indexOf('\0')>=0||!allowed(command))throw new IOException("插件未声明此辅助程序："+command);
         int active=0;for(Child child:children.values())if(child.alive())active++;if(active>=4)throw new IOException("每个插件最多同时启动 4 个辅助程序");
         if(args.length()>256)throw new IOException("辅助程序参数过多");List<String> arguments=new ArrayList<>();int length=0;for(int i=0;i<args.length();i++){String value=args.getString(i);if(value.indexOf('\0')>=0||((length+=value.length())>65536))throw new IOException("无效的辅助程序参数");arguments.add(value);}File launcher=new File(context.getApplicationInfo().nativeLibraryDir,"libmygo-launcher.so");if(!launcher.isFile())throw new IOException("当前安装包缺少 Android 辅助程序启动器");File binary=resolve(command);PluginHelperNetwork network=null;ArrayList<String> argv=new ArrayList<>();argv.add(launcher.getAbsolutePath());argv.add(binary.getAbsolutePath());if(binary.getName().equals("libffmpeg.so")){network=new PluginHelperNetwork(context,id,arguments);argv.addAll(network.args);}else argv.addAll(arguments);
