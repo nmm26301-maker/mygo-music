@@ -1,0 +1,97 @@
+{
+  "flet": {
+    "url": "https://codeload.github.com/flet-dev/python-build/tar.gz/cb42554b9af40724e14d4297c0b10031b2412c6a",
+    "sha256": "7adb7e9e3645d962f7cf0ee24f32ebc202268c09a1b560853ec243799eff5e19",
+    "file": "flet-source.tar.gz"
+  },
+  "qjs": {
+    "url": "https://codeload.github.com/bellard/quickjs/tar.gz/e585640ffa2cf88ce7c2d587583c6fe15928ec2f",
+    "sha256": "56d9d9d7e206ea77a1a0badc560536e455d50639db6c0cc6e6ca8a8c5a12d47f",
+    "file": "quickjs-source.tar.gz"
+  },
+  "python": {
+    "url": "https://www.python.org/ftp/python/3.12.16/Python-3.12.16.tgz",
+    "sha256": "710c3e75dac8b2f258d9cd0f76e5c4c2e9175fac9e249c98901552f7cf33b7dd",
+    "file": "Python-3.12.16.tgz"
+  },
+  "arm64-v8a": {
+    "url": "https://github.com/flet-dev/python-build/releases/download/20261027/python-android-dart-3.12.16-arm64-v8a.tar.gz",
+    "sha256": "9cbda69aa13475ff67180cde03261601066f974882e3769997e8362bc4486eaa",
+    "file": "python-android-dart-3.12.16-arm64-v8a.tar.gz"
+  },
+  "armeabi-v7a": {
+    "url": "https://github.com/flet-dev/python-build/releases/download/20261027/python-android-dart-3.12.16-armeabi-v7a.tar.gz",
+    "sha256": "8d99128e368c534127a6cb3079627468966f8b09bc576425d3cfc32ac5d1a507",
+    "file": "python-android-dart-3.12.16-armeabi-v7a.tar.gz"
+  },
+  "x86_64": {
+    "url": "https://github.com/flet-dev/python-build/releases/download/20261027/python-android-dart-3.12.16-x86_64.tar.gz",
+    "sha256": "92df0dcf6eb3869d9cb8c0f521344d46ec49033de104904fd33b3954ba964ed9",
+    "file": "python-android-dart-3.12.16-x86_64.tar.gz"
+  },
+  "yt-dlp": {
+    "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp",
+    "sha256": "e51e69e89489f199530f13d32a4342da3ddb2cf34842f364603a066db05afbf3",
+    "file": "yt-dlp"
+  },
+  "yt-source": {
+    "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.tar.gz",
+    "sha256": "21f942d258d25cc4e60b4982a25c423460f0bebb835f38e6dfd1fcb140087f95",
+    "file": "yt-dlp.tar.gz"
+  },
+  "ejs": {
+    "url": "https://files.pythonhosted.org/packages/d3/e6/cceb9530e8f4e5940f6f7822d90e9d94f1b85343329a16baaf47bbbb3de1/yt_dlp_ejs-0.8.0.tar.gz",
+    "sha256": "d5fa1639f63b5c4af8d932495f60689d5370f1a095782c944f7f62a303eb104e",
+    "file": "yt-dlp-ejs-0.8.0.tar.gz"
+  },
+  "dep-bzip2-1.0.8-2": {
+    "url": "https://github.com/beeware/cpython-android-source-deps/releases/download/bzip2-1.0.8-2/bzip2-1.0.8-2-i686-linux-android.tar.gz",
+    "sha256": "c084a2852c1ae253e89343fa4c009230111261c459dc28054f76ac68b9b7fbe5",
+    "file": "bzip2-1.0.8-2-x86.tar.gz"
+  },
+  "dep-libffi-3.4.4-3": {
+    "url": "https://github.com/beeware/cpython-android-source-deps/releases/download/libffi-3.4.4-3/libffi-3.4.4-3-i686-linux-android.tar.gz",
+    "sha256": "556133e368a31319160e7ddc8275df12d923801a9afbd375290a378421819dcd",
+    "file": "libffi-3.4.4-3-x86.tar.gz"
+  },
+  "dep-sqlite-3.45.3-3": {
+    "url": "https://github.com/beeware/cpython-android-source-deps/releases/download/sqlite-3.45.3-3/sqlite-3.45.3-3-i686-linux-android.tar.gz",
+    "sha256": "708b6b0b39adbae512c38b13fb1b31c39daa6f65d23216f45dd5e50bbab1ffa3",
+    "file": "sqlite-3.45.3-3-x86.tar.gz"
+  },
+  "dep-xz-5.4.6-1": {
+    "url": "https://github.com/beeware/cpython-android-source-deps/releases/download/xz-5.4.6-1/xz-5.4.6-1-i686-linux-android.tar.gz",
+    "sha256": "afd923e8dd6172d275b1712305ceb97e8230afd19caeb6a83465ea96f44aed89",
+    "file": "xz-5.4.6-1-x86.tar.gz"
+  },
+  "dep-openssl-3.0.15-4": {
+    "url": "https://github.com/beeware/cpython-android-source-deps/releases/download/openssl-3.0.15-4/openssl-3.0.15-4-i686-linux-android.tar.gz",
+    "sha256": "fe518e962d2862ff63fcb7fceb055c7873b89f4821c67cb2a7d251cfb4411beb",
+    "file": "openssl-3.0.15-4-x86.tar.gz"
+  },
+  "license-OpenSSL-3.0.15-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0.15/LICENSE.txt",
+    "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+    "file": "OpenSSL-3.0.15-LICENSE.txt"
+  },
+  "license-libffi-3.4.4-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/libffi/libffi/v3.4.4/LICENSE",
+    "sha256": "2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388",
+    "file": "libffi-3.4.4-LICENSE.txt"
+  },
+  "license-bzip2-1.0.8-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/libarchive/bzip2/bzip2-1.0.8/LICENSE",
+    "sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3",
+    "file": "bzip2-1.0.8-LICENSE.txt"
+  },
+  "license-XZ-5.4.6-COPYING.txt": {
+    "url": "https://raw.githubusercontent.com/tukaani-project/xz/v5.4.6/COPYING",
+    "sha256": "29a1e305b2e34eefe5d4602d00cde1d528b71c5d9f2eec5106972cf6ddb6f73f",
+    "file": "XZ-5.4.6-COPYING.txt"
+  },
+  "license-SQLite-PUBLIC-DOMAIN.txt": {
+    "url": "https://raw.githubusercontent.com/sqlite/sqlite/version-3.45.3/LICENSE.md",
+    "sha256": "9c6479123f32a1ed50d9a0af203dfe8972e65035b0cdeef436b5f8d0924517fe",
+    "file": "SQLite-PUBLIC-DOMAIN.txt"
+  }
+}

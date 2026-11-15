@@ -21,3 +21,8 @@ app/src/androidTest/assets/provider-fixes/
 tests/baseline-v519/
 
 tests/baseline-v520/
+
+.plugin-tools-cache/
+app/src/main/assets/vendor/yt-dlp
+app/src/main/assets/native-tools.json
+app/src/main/assets/third-party/LAME-LGPL-2.0.txt
