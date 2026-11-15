@@ -223,8 +223,8 @@ final class LyricsStageView extends View {
                 lastY=event.getY();return true;
             case MotionEvent.ACTION_UP:
                 if(!dragging){performClick();int nearest=-1;float delta=Float.MAX_VALUE;for(Map.Entry<Integer,Float> entry:drawnCenters.entrySet()){float d=Math.abs(entry.getValue()-event.getY());if(d<delta){nearest=entry.getKey();delta=d;}}if(nearest>=0&&delta<dp(90)&&timeline.timed){clock.seek(timeline.lines.get(nearest).start);follow();}}
-                dragging=false;notifyBrowse();invalidate();return true;
-            case MotionEvent.ACTION_CANCEL:dragging=false;notifyBrowse();invalidate();return true;
+                downVersion=-1;dragging=false;notifyBrowse();invalidate();return true;
+            case MotionEvent.ACTION_CANCEL:downVersion=-1;dragging=false;notifyBrowse();invalidate();return true;
         }
         return super.onTouchEvent(event);
     }
