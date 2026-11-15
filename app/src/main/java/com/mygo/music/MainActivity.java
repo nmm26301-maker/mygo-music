@@ -90,7 +90,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
         getWindow().setStatusBarColor(Color.rgb(14,11,18));
-        prefs = getSharedPreferences("library", MODE_PRIVATE);shuffle=prefs.getBoolean("shuffle",false);repeat=prefs.getBoolean("repeat",false);
+        prefs = getSharedPreferences("library", MODE_PRIVATE);setRequestedOrientation(prefs.getInt("player_orientation",android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));shuffle=prefs.getBoolean("shuffle",false);repeat=prefs.getBoolean("repeat",false);
         pluginManager = new PluginManager(this);audioCache=AudioCache.shared(this);
 
         audioManager=(AudioManager)getSystemService(AUDIO_SERVICE);

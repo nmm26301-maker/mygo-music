@@ -48,4 +48,4 @@ Android 官方依据：
 - https://developer.android.com/media/platform/av-capture
 - https://developer.android.com/reference/android/media/AudioPlaybackCaptureConfiguration
 
-实际取得的仓库元数据、递归文件树、固定源码与许可证保存在会话 research-themes 目录，后续采用的部分需一并进入仓库 third-party 及应用通知。
+仓库元数据、固定提交和许可证检查结果记录在上表。新增原生视图自行实现，未将参考项目源文件编入应用；本项目实际包含的第三方代码与许可证位于 third-party 和 app/src/main/assets/third-party。
