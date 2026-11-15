@@ -84,6 +84,7 @@ jobs:
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyric-motion lyric-motion || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/lyric-player lyric-player || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/now-playing now-playing || true
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/themes themes || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/audio-quality.png audio-quality.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/audio-experience.png audio-experience.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/web-qr-test.png web-qr-test.png || true
@@ -112,6 +113,7 @@ jobs:
             lyric-player/
             audio-quality.png
             now-playing/
+            themes/
             audio-experience.png
             web-qr-test.png
             source-browser.png

@@ -65,14 +65,14 @@ final class LyricsStageView extends View {
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){cancelInteraction();clearLayouts();metrics();backdrop.resize(w,h);anchor=-1;offset=0;following=true;notifyBrowse();}
     private StaticLayout layout(int index){
         StaticLayout value=layouts.get(index);if(value!=null)return value;
-        paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
+        paint.setTextSize(textSize);paint.setTypeface(Typeface.create(appearance.font==1?"serif":appearance.font==2?"monospace":"sans-serif",Typeface.BOLD));
         value=StaticLayout.Builder.obtain(timeline.lines.get(index).text,0,timeline.lines.get(index).text.length(),paint,Math.max(1,(int)(getWidth()*.84f)))
             .setAlignment((appearance.centered||compactStage())?Layout.Alignment.ALIGN_CENTER:Layout.Alignment.ALIGN_NORMAL).setIncludePad(false).setLineSpacing(dp(effect==0?12:5),1).setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY).build();
         layouts.put(index,value);return value;
     }
     private StaticLayout translation(int index){
-        if(!appearance.translation||timeline.lines.get(index).translation.isEmpty())return null;StaticLayout value=translations.get(index);if(value!=null)return value;
-        int width=layout(index).getWidth();paint.setTextSize(Math.max(dp(13),textSize*.40f));paint.setTypeface(Typeface.DEFAULT);String text=timeline.lines.get(index).translation;
+        LyricsTimeline.Line entry=timeline.lines.get(index);String content=(appearance.romanization?entry.romanization:"");if(appearance.translation&&!entry.translation.isEmpty())content+=(content.isEmpty()?"":"\n")+entry.translation;if(content.isEmpty())return null;StaticLayout value=translations.get(index);if(value!=null)return value;
+        int width=layout(index).getWidth();paint.setTextSize(Math.max(dp(13),textSize*.40f));paint.setTypeface(Typeface.DEFAULT);String text=content;
         value=StaticLayout.Builder.obtain(text,0,text.length(),paint,width).setAlignment((appearance.centered||compactStage())?Layout.Alignment.ALIGN_CENTER:Layout.Alignment.ALIGN_NORMAL).setIncludePad(false).build();translations.put(index,value);return value;
     }
     private float blockHeight(int index){StaticLayout text=layout(index),translation=translation(index);return text.getHeight()+(translation==null?0:dp(10)+translation.getHeight());}
@@ -111,7 +111,7 @@ final class LyricsStageView extends View {
             if(compactStage())scale=Math.min(scale,Math.max(dp(45),getHeight()*(i==target?.57f:appearance.style==13?.30f+.27f*handoff:.30f))/Math.max(1,block));
             float pivot=(appearance.centered||compactStage())?text.getWidth()/2f:0;canvas.scale(scale,scale,pivot,block/2f);
             if(current&&appearance.style==11&&timeline.timed&&!appearance.quiet())stageEffects.page(canvas,text.getWidth(),block,LyricsStageEffects.entrance(position,line.start,line.end)*appearance.strength/100f,getResources().getDisplayMetrics().density);
-            paint.setShader(null);paint.clearShadowLayer();paint.setTextSize(textSize);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
+            paint.setShader(null);paint.clearShadowLayer();paint.setTextSize(textSize);paint.setTypeface(Typeface.create(appearance.font==1?"serif":appearance.font==2?"monospace":"sans-serif",Typeface.BOLD));
             if(current&&effect==0&&!line.words.isEmpty()&&text.getParagraphDirection(0)>0&&!hasRtl(text,line.text))drawCharacters(canvas,text,line,i,position);
             else{
                 paint.setColor(current?(appearance.style==2?0xff647085:0xff777f97):Color.argb((int)(appearance.style==4?135+60*focus:appearance.style==1?35+70*focus:50+65*focus),210,217,235));text.draw(canvas);

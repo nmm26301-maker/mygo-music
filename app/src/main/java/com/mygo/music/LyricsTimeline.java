@@ -25,7 +25,7 @@ final class LyricsTimeline {
         final long start;
         long end;
         final String text;
-        String translation;
+        String translation;String romanization="";
         List<Word> words;
         boolean estimated;
         Line(long start,long end,String text,String translation,List<Word> words) {
@@ -78,16 +78,17 @@ final class LyricsTimeline {
                         parsed.add(new Word(value,text.length(),from,to));text.append(value);end=Math.max(end,to);count++;
                     }
                     String value=parsed.isEmpty()?line.optString("text",""):text.toString();
-                    if(!value.trim().isEmpty())lines.add(new Line(start,end,value,line.optString("translation",""),parsed));
+                    if(!value.trim().isEmpty()){Line entry=new Line(start,end,value,line.optString("translation",""),parsed);entry.romanization=line.optString("romanization",line.optString("romaji",""));lines.add(entry);}
                 }
-                if(!lines.isEmpty()){LyricsTimeline result=new LyricsTimeline(lines,true);attachTranslation(result,root.optString("translation",""));return result;}
+                if(!lines.isEmpty()){LyricsTimeline result=new LyricsTimeline(lines,true);attachTranslation(result,root.optString("translation",""));attachRomanization(result,root.optString("romanization",root.optString("romaji",root.optString("romalrc",""))));return result;}
             }
             String lrc=root.optString("lrc","");if(lrc.isEmpty())lrc=root.optString("syncedLyrics","");
             if(lrc.isEmpty())lrc=root.optString("plainLyrics","");
-            LyricsTimeline result=parseLrc(lrc);attachTranslation(result,root.optString("translation",""));return result;
+            LyricsTimeline result=parseLrc(lrc);attachTranslation(result,root.optString("translation",""));attachRomanization(result,root.optString("romanization",root.optString("romaji",root.optString("romalrc",""))));return result;
         }
         return parseLrc(raw);
     }
+    private static void attachRomanization(LyricsTimeline target,String raw){if(raw==null||raw.trim().isEmpty())return;LyricsTimeline extra=parseLrc(raw);for(Line line:target.lines){if(!line.romanization.isEmpty())continue;for(Line roman:extra.lines)if(Math.abs(roman.start-line.start)<=120){line.romanization=roman.text;break;}}}
     private static long time(long value){return Math.max(0,Math.min(MAX_TIME,value));}
     /** Same fallback as upstream internal/lyrics: CJK characters, other words by length, 85% singing. */
     private static List<Word> spread(String text,long start,long end){
