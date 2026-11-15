@@ -1,0 +1,34 @@
+package com.mygo.music;
+import android.content.*;
+import android.graphics.*;
+import android.graphics.drawable.Drawable;
+import android.os.*;
+import java.io.*;
+import java.util.concurrent.*;
+
+/** One owned, bounded photo texture per visible page, with cached blur and cover-derived flow. */
+final class ThemeBackdrop extends Drawable {
+ private final Context context;private final SharedPreferences prefs;private final Paint paint=new Paint(3);private final RectF target=new RectF();
+ private final LyricsBackdrop flow=new LyricsBackdrop();private final LyricsAppearance options=new LyricsAppearance();private final Handler main=new Handler(Looper.getMainLooper());
+ private final ExecutorService worker=Executors.newSingleThreadExecutor();private final boolean preview;private Bitmap original,texture,art;
+ private String theme="dynamic";private int token,mode=-1,blur=-1,shade=44,opacity=100,brightness=100;private boolean closed,playing,quiet,light;private long position,stamp;
+ private ColorMatrixColorFilter filter;
+ ThemeBackdrop(Context c,boolean preview){context=c.getApplicationContext();prefs=c.getSharedPreferences("library",0);this.preview=preview;}
+ static File photo(Context c,String id){return new File(c.getFilesDir(),"player-background-"+PlayerThemes.valid(id)+".jpg");}
+ static void importPhoto(Context c,android.net.Uri uri,String id)throws IOException{File input=File.createTempFile("theme-image-",".tmp",c.getCacheDir()),out=File.createTempFile("theme-ready-",".jpg",c.getFilesDir());Bitmap b=null;try{try(InputStream in=c.getContentResolver().openInputStream(uri);OutputStream dest=new FileOutputStream(input)){if(in==null)throw new IOException("图片不可读取");byte[] buf=new byte[16384];int n;long size=0;while((n=in.read(buf))!=-1){size+=n;if(size>32L*1024*1024)throw new IOException("图片超过 32 MB");dest.write(buf,0,n);}}b=PlayerBackground.decode(input);try(FileOutputStream dest=new FileOutputStream(out)){if(!b.compress(Bitmap.CompressFormat.JPEG,94,dest))throw new IOException("无法保存图片");dest.getFD().sync();}if(!out.renameTo(photo(c,id)))throw new IOException("背景保存失败");c.getSharedPreferences("library",0).edit().putInt(PlayerThemes.key(id,"background_mode"),1).commit();}finally{input.delete();out.delete();if(b!=null)b.recycle();}}
+ void scene(String id){id=PlayerThemes.valid(id);if(!theme.equals(id)){theme=id;mode=-1;art=null;token++;}configure();}
+ void configure(){shade=Math.max(15,Math.min(85,prefs.getInt(PlayerThemes.key(theme,"shade"),44)));opacity=Math.max(0,Math.min(100,prefs.getInt(PlayerThemes.key(theme,"opacity"),100)));brightness=Math.max(40,Math.min(160,prefs.getInt(PlayerThemes.key(theme,"brightness"),100)));light=theme.equals("minimal")&&prefs.getBoolean(PlayerThemes.key(theme,"light"),false);float scale=brightness/100f;filter=brightness==100?null:new ColorMatrixColorFilter(new float[]{scale,0,0,0,0,0,scale,0,0,0,0,0,scale,0,0,0,0,0,1,0});invalidateSelf();}
+ int accent(){return prefs.getInt(PlayerThemes.key(theme,"accent"),flow.accent);}
+ void state(long p,boolean play,boolean reduce){position=p;stamp=SystemClock.uptimeMillis();playing=play;quiet=reduce;options.reduceMotion=reduce;options.background=play&&!reduce?0:1;}
+ void artwork(Bitmap bitmap,boolean force){int next=prefs.getInt(PlayerThemes.key(theme,"background_mode"),0),nextBlur=Math.max(0,Math.min(100,prefs.getInt(PlayerThemes.key(theme,"blur"),24)));boolean reload=force||mode!=next||(next==0&&art!=bitmap);art=bitmap;mode=next;configure();if(reload){final int request=++token;releaseImage();if(mode==0&&bitmap!=null&&!bitmap.isRecycled()){original=smallCopy(bitmap,1024);flow.artwork(original);}else if(mode==1&&!preview){final File file=photo(context,theme);worker.execute(()->{Bitmap b=null;try{b=PlayerBackground.decode(file);}catch(Exception ignored){}Bitmap result=b;main.post(()->{if(closed||request!=token){if(result!=null)result.recycle();return;}releaseImage();original=result;flow.artwork(result);makeTexture();invalidateSelf();});});}}if(reload||blur!=nextBlur){blur=nextBlur;makeTexture();}invalidateSelf();}
+ void previewPhoto(Bitmap bitmap){releaseImage();if(bitmap!=null)original=smallCopy(bitmap,1024);flow.artwork(original);makeTexture();}
+ private Bitmap smallCopy(Bitmap b,int max){float f=Math.min(1,max/(float)Math.max(b.getWidth(),b.getHeight()));Bitmap out=Bitmap.createScaledBitmap(b,Math.max(1,Math.round(b.getWidth()*f)),Math.max(1,Math.round(b.getHeight()*f)),true);return out==b?b.copy(Bitmap.Config.ARGB_8888,false):out;}
+ private void makeTexture(){if(texture!=null&&texture!=original)texture.recycle();texture=null;if(original==null)return;float max=blur==0?1600:Math.max(16,1024f/(1+blur*.30f)),f=Math.min(1,max/Math.max(original.getWidth(),original.getHeight()));texture=Bitmap.createScaledBitmap(original,Math.max(1,Math.round(original.getWidth()*f)),Math.max(1,Math.round(original.getHeight()*f)),true);}
+ @Override public void draw(Canvas c){Rect r=getBounds();c.drawColor(light?0xfff3f2ed:0xff15232c);if(theme.equals("minimal"))return;
+  if(mode==0&&(theme.equals("dynamic")||theme.equals("glass")||theme.equals("professional")||theme.equals("immersive"))){flow.draw(c,position+(playing&&!quiet?Math.min(500,SystemClock.uptimeMillis()-stamp):0),options,r.width(),r.height());if(brightness<100)c.drawColor(Color.argb((100-brightness)*255/100,0,0,0));else if(brightness>100)c.drawColor(Color.argb((brightness-100)*150/60,255,255,255));if(opacity<100)c.drawColor(Color.argb((100-opacity)*255/100,21,35,44));}
+  else if(mode!=2&&texture!=null&&!texture.isRecycled()){float scale=Math.max(r.width()/(float)texture.getWidth(),r.height()/(float)texture.getHeight()),w=texture.getWidth()*scale,h=texture.getHeight()*scale;target.set(r.centerX()-w/2,r.centerY()-h/2,r.centerX()+w/2,r.centerY()+h/2);paint.setColorFilter(filter);paint.setAlpha(opacity*255/100);c.drawBitmap(texture,null,target,paint);paint.setAlpha(255);paint.setColorFilter(null);}paint.setColor(Color.argb(shade*255/100,4,10,18));c.drawRect(r,paint);
+ }
+ private void releaseImage(){if(texture!=null&&texture!=original)texture.recycle();texture=null;if(original!=null)original.recycle();original=null;}
+ void release(){closed=true;token++;worker.shutdownNow();releaseImage();flow.release();art=null;}
+ @Override public void setAlpha(int alpha){}@Override public void setColorFilter(ColorFilter f){}@Override public int getOpacity(){return PixelFormat.OPAQUE;}
+}

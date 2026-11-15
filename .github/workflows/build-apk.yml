@@ -1,7 +1,7 @@
 name: Build MyGo Music APK
 on:
   push:
-    branches: [ main ]
+    branches: [ main, codex/player-themes-20261115 ]
   workflow_dispatch:
 permissions:
   contents: read

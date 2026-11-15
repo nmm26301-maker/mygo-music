@@ -11,7 +11,7 @@ import android.widget.*;
 import org.json.*;
 
 /** A full native player over the existing service. Opening, dismissing and browsing never restart audio. */
-final class NowPlayingDialog extends Dialog {
+final class NowPlayingDialog extends Dialog implements PlayerLyricsTarget {
     interface Host {
         PlaybackService.Snapshot state();Bitmap artwork(String uri);String source(PlaybackService.Snapshot state);
         boolean liked(String uri);boolean likePending(String uri);boolean canLike(String uri);
@@ -76,9 +76,9 @@ final class NowPlayingDialog extends Dialog {
     private void more(View anchor){PopupMenu menu=new PopupMenu(getContext(),anchor);String[] names={"音效与均衡器","定时暂停","播放音量","歌曲评论"};menu.getMenu().add(0,5,4,"唱片页歌词设置");menu.getMenu().add(0,6,5,"调整歌词同步");menu.getMenu().add(0,7,6,"回到正在演唱的歌词");for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);if(host.devices())menu.getMenu().add(0,4,4,"远程播放设备");menu.getMenu().findItem(0).setIcon(R.drawable.player_sliders_horizontal);menu.getMenu().findItem(1).setIcon(R.drawable.player_moon);menu.getMenu().findItem(2).setIcon(R.drawable.player_volume_2);if(Build.VERSION.SDK_INT>=29)menu.setForceShowIcon(true);menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){case 0:host.effects();break;case 1:host.sleep();break;case 2:host.volume();break;case 3:host.comments();break;case 4:host.showDevices();break;case 5:showLyricSettings();break;case 6:showTiming();break;case 7:stage.follow();break;}return true;});menu.show();}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);handler.removeCallbacks(tick);focused=hasFocus;cover.setActive(hasFocus);stage.setRenderActive(hasFocus);if(hasFocus&&isShowing()){getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);applyLyricAppearance();handler.post(tick);}}
     void sessionChanged(){if(stopped||!isShowing())return;PlaybackService.Snapshot state=host.state();if(state==null||(state.uri.equals(uri)&&state.generation==observedGeneration))return;if(deferredGeneration!=state.generation||!deferredUri.equals(state.uri)){deferredGeneration=state.generation;deferredUri=state.uri;stage.cancelInteraction();stage.follow();lyricGestureGeneration=-1;if(timingDialog!=null&&timingDialog.isShowing()&&!state.uri.equals(uri))timingDialog.dismiss();}if(focused)refresh();}
-    String trackUri(){return uri;}
-    void setTimeline(LyricsTimeline value){stage.setTimeline(value);if(value.lines.isEmpty())stage.setMessage("暂无歌词，点按歌词按钮可导入");}
-    void setLyricMessage(String value){stage.setMessage(value);}
+    public String trackUri(){return uri;}
+    public void setTimeline(LyricsTimeline value){stage.setTimeline(value);if(value.lines.isEmpty())stage.setMessage("暂无歌词，点按歌词按钮可导入");}
+    public void setLyricMessage(String value){stage.setMessage(value);}
     void backgroundChanged(){if(stopped)return;backdrop.update(artwork,true);}
     private void preferenceChanged(SharedPreferences p,String key){if(key==null||stopped)return;if(key.equals("lyrics_offsets")){timing.select(uri);stage.invalidate();}else if(key.equals("lyrics_style")||key.equals("lyrics_size")||key.equals("lyrics_spacing")||key.equals("lyrics_strength")||key.equals("lyrics_color")||key.equals("lyrics_centered")||key.equals("lyrics_translation")||key.equals("lyrics_reduce_motion")){handler.removeCallbacks(appearanceRefresh);handler.post(appearanceRefresh);}}
     private LyricsAppearance readLyricAppearance(){LyricsAppearance value=LyricsAppearance.read(prefs);if(!prefs.contains("lyrics_style"))value.style=4;if(!prefs.contains("lyrics_spacing"))value.spacing=75;if(!prefs.contains("lyrics_centered"))value.centered=true;if(!prefs.contains("lyrics_color"))value.color=1;try{value.systemReduceMotion=android.provider.Settings.Global.getFloat(getContext().getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0;}catch(Exception ignored){}return value;}
