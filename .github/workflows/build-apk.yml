@@ -89,6 +89,12 @@ jobs:
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/audio-experience.png audio-experience.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/web-qr-test.png web-qr-test.png || true
             grep -F MYGO_TESTS_OK plugin-test-results.txt
+            adb shell am instrument -w -e themeRestart prepare com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee theme-restart-prepare.txt
+            grep -F MYGO_THEME_RESTART_PREPARED theme-restart-prepare.txt
+            adb shell am force-stop com.mygo.music
+            adb shell am instrument -w -e themeRestart verify com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee theme-restart-verify.txt
+            grep -F MYGO_THEME_RESTART_VERIFIED theme-restart-verify.txt
+            adb logcat -d > android-logcat.txt
             adb shell am instrument -w -e marketAudit true com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee market-test-results.txt
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/market-audit.json market-audit.json
             grep -F MYGO_MARKET_AUDIT_OK market-test-results.txt
@@ -102,6 +108,8 @@ jobs:
           name: android-plugin-test-results
           path: |
             plugin-test-results.txt
+            theme-restart-prepare.txt
+            theme-restart-verify.txt
             android-logcat.txt
             market-test-results.txt
             market-audit.json
