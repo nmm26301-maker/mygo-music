@@ -34,7 +34,7 @@ public final class PluginRuntime {
     private PluginResources resources;private PluginTypeScript typescript;
     private boolean loaded, starting;
     private volatile boolean closed;
-    private PluginProcesses processes;
+    private PluginProcesses processes;private PluginSecrets secrets;
     private final Set<PluginRedirect> redirects=java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final ThreadPoolExecutor ioWorkers=new ThreadPoolExecutor(2,6,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(64));
     private String id, loadError="";
@@ -73,7 +73,7 @@ public final class PluginRuntime {
         try{
             JSONObject manifest=new JSONObject(read(new FileInputStream(new File(directory,"plugin.json"))));
             id=PluginIdentity.instance(directory,manifest);PluginProtocol.validate(manifest);PluginMedia.validate(manifest);JSONObject p=manifest.optJSONObject("permissions");if(p!=null&&p.optJSONArray("network")!=null)hosts=p.getJSONArray("network");
-            storage=context.getSharedPreferences("plugin_data_"+id,Context.MODE_PRIVATE);permissions=context.getSharedPreferences("library",Context.MODE_PRIVATE);processes=new PluginProcesses(context,directory,id,p==null?null:p.opt("process"));
+            storage=context.getSharedPreferences("plugin_data_"+id,Context.MODE_PRIVATE);permissions=context.getSharedPreferences("library",Context.MODE_PRIVATE);processes=new PluginProcesses(context,directory,id,p==null?null:p.opt("process"));secrets=new PluginSecrets(context,id);
             File entry=new File(directory,manifest.optString("main","index.js"));
             if(!entry.getCanonicalPath().startsWith(directory.getCanonicalPath()+File.separator))throw new IOException("无效插件入口");
             typescript=new PluginTypeScript(context,directory);
@@ -209,6 +209,8 @@ public final class PluginRuntime {
 
     private boolean submitHost(String request,Runnable action){try{ioWorkers.execute(action);return true;}catch(RejectedExecutionException error){hostReply(request,false,"插件任务已关闭或队列已满");return false;}}
     private final class NativeHost {
+        @JavascriptInterface public String secret(String operation,String name,String raw){try{if(closed)throw new IOException("插件已关闭");if(operation.equals("get"))return result(true,secrets.lookup(name));if(operation.equals("set"))secrets.set(name,raw);else if(operation.equals("remove"))secrets.remove(name);else throw new IOException("未知安全存储操作");return result(true,null);}catch(Exception error){return result(false,error.getMessage());}}
+        @JavascriptInterface public String proxy(String address,String kind){try{java.net.URI uri=new java.net.URI(address);if(!"http".equalsIgnoreCase(uri.getScheme())&&!"https".equalsIgnoreCase(uri.getScheme()))throw new IOException("代理仅支持 HTTP 或 HTTPS 地址");java.net.ProxySelector selector=java.net.ProxySelector.getDefault();if(selector!=null)for(java.net.Proxy value:selector.select(uri)){if(value.type()==java.net.Proxy.Type.DIRECT) return result(true,"");if(!(value.address() instanceof java.net.InetSocketAddress))continue;if(kind.equals("http")&&value.type()!=java.net.Proxy.Type.HTTP)continue;java.net.InetSocketAddress target=(java.net.InetSocketAddress)value.address();String scheme=value.type()==java.net.Proxy.Type.SOCKS?"socks5":"http";return result(true,new java.net.URI(scheme,null,target.getHostString(),target.getPort(),null,null,null).toASCIIString());}return result(true,"");}catch(Exception error){return result(false,"无法读取网络代理设置");}}
         @JavascriptInterface public String processSpawn(String command,String args){try{return result(true,processes.spawn(command,new JSONArray(args)));}catch(Exception e){return result(false,e.getMessage()==null?e.toString():e.getMessage());}}
         @JavascriptInterface public String processSync(long pid,String method,String value){try{if(method.equals("write"))processes.write(pid,value);else if(method.equals("closeStdin"))processes.closeStdin(pid);else if(method.equals("kill"))processes.kill(pid);else if(method.equals("errorOutput"))return result(true,processes.errors(pid));else throw new IOException("未知辅助程序操作");return result(true,null);}catch(Exception e){return result(false,e.getMessage()==null?e.toString():e.getMessage());}}
         @JavascriptInterface public void processTask(String request,long pid,String method){submitHost(request,()->{try{Object value;if(method.equals("readLine"))value=processes.readLine(pid);else if(method.equals("wait"))value=processes.waitFor(pid);else throw new IOException("未知辅助程序任务");hostReply(request,true,value);}catch(Exception e){hostReply(request,false,e.getMessage()==null?e.toString():e.getMessage());}});}

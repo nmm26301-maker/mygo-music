@@ -113,6 +113,8 @@
   };
   window.host = {
     platform:'android', arch:__pluginConfig.arch, dir:__pluginConfig.dir, dataDir:__pluginConfig.dir + '/data',
+    secrets:{get:k=>{const r=nativeResult(nativeHost.secret("get",String(k),""));return r.found?r.value:undefined;}, set:(k,v)=>{const raw=JSON.stringify(v);if(raw===undefined)throw new TypeError("安全凭据必须是 JSON 值");return nativeResult(nativeHost.secret("set",String(k),raw));},remove:k=>nativeResult(nativeHost.secret("remove",String(k),""))},
+    proxy:(url,kind)=>nativeResult(nativeHost.proxy(String(url),kind===undefined?"":String(kind))),
     storage:{get:k => {const v=nativeHost.storageGet(String(k)); return v === '' ? undefined : JSON.parse(v);},
       set:(k,v) => nativeHost.storageSet(String(k), JSON.stringify(v)), remove:k => nativeHost.storageRemove(String(k))},
     setting:k => nativeHost.setting(String(k)), language:()=>'zh-CN', t:x=>__pluginConfig.translations?.[x] || x,
