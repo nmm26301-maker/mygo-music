@@ -76,7 +76,7 @@ final class MarketAudit {
             try(PluginMedia.Connection connection=PluginMedia.open(address,headers,true)){
                 row.put("stream","http_passed").put("httpStatus",connection.http.getResponseCode());
                 String resolved=connection.http.getURL().toString();HashMap<String,String> playerHeaders=new HashMap<>(connection.headers);playerHeaders.put("android-allow-cross-domain-redirect","0");
-                HlsPlayback transport=null;String kind=value.optString("type",value.optString("codec"));Uri playable=Uri.parse(resolved);Map<String,String> nativeHeaders=playerHeaders;
+                HlsPlayback transport=null;String kind=value.optString("type",value.optString("codec"));Uri playable=Uri.parse(resolved);Map<String,String> nativeHeaders=PluginMedia.progressiveHeaders(playerHeaders);
                 if(HlsPlayback.matches(playable,kind)){transport=new HlsPlayback(manager,id,resolved,new HashMap<>(connection.headers));playable=transport.address;nativeHeaders=new HashMap<>();row.put("androidTransport","app per-resource HLS");}else row.put("androidTransport","native direct");
                 try{DecoderProbe decoder=prepare(playable,nativeHeaders);
                     if(!decoder.ready&&(transport==null||transport.failure().isEmpty())&&(decoder.error==0||AudioDecodeJob.candidate(Uri.parse(resolved),kind,decoder.error))&&AudioDecodeJob.candidate(Uri.parse(resolved),kind,-1010)){

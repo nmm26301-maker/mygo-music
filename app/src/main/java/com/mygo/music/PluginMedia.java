@@ -73,15 +73,39 @@ final class PluginMedia {
         Connection(HttpURLConnection http,HashMap<String,String> headers){this.http=http;this.headers=headers;}
         public void close(){http.disconnect();}
     }
+    /** A progressive audio server may accept ranges while rejecting an unbounded GET. */
+    static HashMap<String,String> progressiveHeaders(Map<String,String> values){
+        HashMap<String,String> headers=new HashMap<>(values);
+        if(!contains(headers,"Range"))headers.put("Range","bytes=0-");
+        return headers;
+    }
+    /** Download the complete representation, never a source's partial byte window. */
+    static Connection openFullAudio(String address,Map<String,String> values)throws Exception{
+        Connection result=open(address,values,false,true);
+        try{fullAudioLength(result.http);return result;}catch(Exception error){result.close();throw error;}
+    }
+    static long fullAudioLength(HttpURLConnection http)throws Exception{
+        if(http.getResponseCode()==200)return http.getContentLengthLong();
+        if(http.getResponseCode()!=206)throw new IOException("完整音频返回 HTTP "+http.getResponseCode());
+        String range=http.getHeaderField("Content-Range");Matcher match=Pattern.compile("(?i)bytes 0-([0-9]+)/([0-9]+)").matcher(range==null?"":range.trim());
+        if(!match.matches())throw new IOException("音频分段未覆盖完整文件");
+        long end=Long.parseLong(match.group(1)),total=Long.parseLong(match.group(2)),length=http.getContentLengthLong();
+        if(total<=0||end!=total-1||length>=0&&length!=total)throw new IOException("音频分段未覆盖完整文件");
+        return total;
+    }
     /** Follow redirects ourselves: a token cannot follow a change of host, port or scheme. */
     static Connection open(String address,Map<String,String> values,boolean probe)throws Exception{
+        return open(address,values,probe,false);
+    }
+    private static Connection open(String address,Map<String,String> values,boolean probe,boolean fullAudio)throws Exception{
         URL current=new URL(address);HashMap<String,String> headers=new HashMap<>(values);
         for(int redirects=0;redirects<=8;redirects++){
             if(!Arrays.asList("https","http").contains(current.getProtocol()))throw new IOException("资源重定向协议无效");
-            HttpURLConnection connection=(HttpURLConnection)current.openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(10000);connection.setReadTimeout(12000);
+            HttpURLConnection connection=(HttpURLConnection)current.openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(fullAudio?12000:10000);connection.setReadTimeout(fullAudio?20000:12000);
             try{
                 for(Map.Entry<String,String> entry:headers.entrySet())connection.setRequestProperty(entry.getKey(),entry.getValue());
                 if(probe)connection.setRequestProperty("Range","bytes=0-0");
+                else if(fullAudio){connection.setRequestProperty("Range","bytes=0-");connection.setRequestProperty("Accept-Encoding","identity");}
                 int status=connection.getResponseCode();
                 if(Arrays.asList(301,302,303,307,308).contains(status)){
                     String location=connection.getHeaderField("Location");if(location==null)throw new IOException("资源重定向缺少地址");URL next=new URL(current,location);
