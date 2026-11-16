@@ -24,7 +24,7 @@ final class LyricsStageView extends View {
     private LyricsTimeline timeline=LyricsTimeline.empty();
     private int anchor=-1,effect=0;
     private float offset,downY,lastY;
-    private boolean fitInline;private boolean dragging,following=true,paintBackdrop=true,renderActive=true,softEdges;
+    private boolean fitInline;private boolean dragging,following=true,paintBackdrop=true,renderActive=true,softEdges;private int frameIntervalMs;
     private int interactionVersion,downVersion=-1;
     private Runnable browseListener;
     void setBrowseListener(Runnable listener){browseListener=listener;notifyBrowse();}
@@ -36,7 +36,8 @@ final class LyricsStageView extends View {
     private String message="正在获取歌词";
     LyricsStageView(Context context,Clock clock){super(context);this.clock=clock;setLayerType(View.LAYER_TYPE_SOFTWARE,null);setContentDescription("全屏歌词，滑动浏览，点按歌词跳转播放");}
     private float dp(float value){return value*getResources().getDisplayMetrics().density;}
-    private void invalidateBackdrop(boolean animate){View owner=getParent() instanceof View?(View)getParent():null;if(owner instanceof LyricsPlayerBody&&owner.getParent() instanceof View)owner=(View)owner.getParent();if(owner!=null){if(!animate)owner.invalidate();else if(appearance.quiet())owner.postInvalidateDelayed(40);else owner.postInvalidateOnAnimation();}}
+    private void invalidateBackdrop(boolean animate){View owner=getParent() instanceof View?(View)getParent():null;if(owner instanceof LyricsPlayerBody&&owner.getParent() instanceof View)owner=(View)owner.getParent();if(owner!=null){if(!animate)owner.invalidate();else if(frameIntervalMs>0)owner.postInvalidateDelayed(frameIntervalMs);else if(appearance.quiet())owner.postInvalidateDelayed(40);else owner.postInvalidateOnAnimation();}}
+    void setFrameInterval(int millis){frameIntervalMs=Math.max(0,Math.min(1000,millis));}
     void setRenderActive(boolean enabled){if(renderActive==enabled)return;renderActive=enabled;frameTime=0;if(enabled)invalidate();}
     void setSoftEdges(boolean enabled){softEdges=enabled;invalidate();}
     void cancelInteraction(){interactionVersion++;downVersion=-1;dragging=false;drawnCenters.clear();}
@@ -130,7 +131,7 @@ final class LyricsStageView extends View {
         Iterator<Integer> keys=layouts.keySet().iterator();while(keys.hasNext()){int i=keys.next();if(i<lo-2||i>hi+2){keys.remove();glyphs.remove(i);translations.remove(i);}}
         interlude(canvas,position,active);
         paint.setShader(null);paint.clearShadowLayer();
-        if(renderActive&&isShown()&&(clock.playing()||Math.abs(offset)>.3f)){if(appearance.quiet())postInvalidateDelayed(40);else postInvalidateOnAnimation();if(!paintBackdrop)invalidateBackdrop(true);}
+        if(renderActive&&isShown()&&(clock.playing()||Math.abs(offset)>.3f)){if(frameIntervalMs>0)postInvalidateDelayed(frameIntervalMs);else if(appearance.quiet())postInvalidateDelayed(40);else postInvalidateOnAnimation();if(!paintBackdrop)invalidateBackdrop(true);}
     }
     private void interlude(Canvas canvas,long position,int active){
         if(!timeline.timed||timeline.lines.isEmpty())return;long from=0,to=timeline.lines.get(0).start;

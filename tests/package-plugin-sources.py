@@ -4,6 +4,17 @@ root=pathlib.Path(__file__).resolve().parents[1]
 version=re.search(r"versionName '([^']+)'",(root/'app/build.gradle').read_text()).group(1)
 archive=root/f'app/build/outputs/release/mygo-music-v{version}-sources.zip'
 pins=json.loads((root/'tests/native-tools-pins.json').read_text())
+# Publish rebuildable sources without the legacy checkout's signing passwords.
+clean=archive.with_suffix('.clean.zip')
+with zipfile.ZipFile(archive) as source,zipfile.ZipFile(clean,'w',zipfile.ZIP_DEFLATED) as target:
+ for item in source.infolist():
+  data=source.read(item.filename)
+  if item.filename=='mygo-music/app/build.gradle':
+   text=data.decode();text=re.sub(r"storePassword '[^']*'","storePassword System.getenv('MYGO_STORE_PASSWORD')",text);text=re.sub(r"keyPassword '[^']*'","keyPassword System.getenv('MYGO_KEY_PASSWORD')",text);data=text.encode()
+  target.writestr(item,data)
+ clean_note='Release signing material is excluded. Supply your own keystore at signing/mygo-release.keystore and set MYGO_STORE_PASSWORD and MYGO_KEY_PASSWORD before a release rebuild. No original signing passwords are included. Debug builds do not need the release key.\n'
+ target.writestr('SIGNING-REBUILD.txt',clean_note)
+clean.replace(archive)
 with zipfile.ZipFile(archive,'a',zipfile.ZIP_DEFLATED) as z:
  names=set(z.namelist())
  def add(path,name):
