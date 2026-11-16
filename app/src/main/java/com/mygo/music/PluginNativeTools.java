@@ -35,7 +35,7 @@ final class PluginNativeTools {
  static File runtime(Context c,File lib)throws Exception{synchronized(LOCK){
   ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=c.getAssets().open("native-tools.json")){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)bytes.write(b,0,n);}JSONObject info=new JSONObject(bytes.toString("UTF-8"));
   File bundle=new File(lib,"libpythonbundle.so");String hash=sha(bundle),scriptHash=info.getString("ytDlpSha256");boolean known=false;JSONArray hashes=info.getJSONArray("bundleHashes");for(int i=0;i<hashes.length();i++)if(hash.equals(hashes.getString(i)))known=true;if(!known)throw new IOException("解析环境校验失败");
-  String identity="ca2-"+hash.substring(0,16)+scriptHash.substring(0,16);File parent=new File(c.getNoBackupFilesDir(),"plugin-tools"),target=new File(parent,identity),ready=new File(target,".ready");
+  String identity="ca3-"+hash.substring(0,16)+scriptHash.substring(0,16);File parent=new File(c.getNoBackupFilesDir(),"plugin-tools"),target=new File(parent,identity),ready=new File(target,".ready");
   if(ready.isFile()&&new File(target,"sitecustomize.py").isFile()&&new File(target,"android-ca.pem").isFile()&&sha(new File(target,"yt-dlp")).equals(scriptHash))return target;
   if(!parent.isDirectory()&&!parent.mkdirs())throw new IOException("无法准备解析环境");File stage=new File(parent,identity+".staging");remove(stage);if(!stage.mkdirs())throw new IOException("无法准备解析环境");
   try{String root=stage.getCanonicalPath()+File.separator;long total=0;int entries=0;
@@ -43,8 +43,8 @@ final class PluginNativeTools {
    copy(c.getAssets().open("plugin-sitecustomize.py"),new File(stage,"sitecustomize.py"));
    File script=new File(stage,"yt-dlp");copy(c.getAssets().open("vendor/yt-dlp"),script);if(!sha(script).equals(scriptHash))throw new IOException("解析程序校验失败");
    TrustManagerFactory factory=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());factory.init((KeyStore)null);int roots=0;
-   try(Writer writer=new OutputStreamWriter(new FileOutputStream(new File(stage,"android-ca.pem")),"US-ASCII")){for(TrustManager manager:factory.getTrustManagers())if(manager instanceof X509TrustManager)for(X509Certificate cert:((X509TrustManager)manager).getAcceptedIssuers()){writer.write("-----BEGIN CERTIFICATE-----\n");writer.write(android.util.Base64.encodeToString(cert.getEncoded(),android.util.Base64.NO_WRAP).replaceAll("(.{64})","$1\n"));writer.write("\n-----END CERTIFICATE-----\n");roots++;}}
-   if(roots==0)throw new IOException("系统未提供可信 TLS 证书");copy(new ByteArrayInputStream(identity.getBytes("US-ASCII")),new File(stage,".ready"));remove(target);if(!stage.renameTo(target))throw new IOException("解析环境保存失败");return target;
+   try(Writer writer=new OutputStreamWriter(new FileOutputStream(new File(stage,"android-ca.pem")),"US-ASCII")){for(TrustManager manager:factory.getTrustManagers())if(manager instanceof X509TrustManager)for(X509Certificate cert:((X509TrustManager)manager).getAcceptedIssuers()){writer.write("-----BEGIN CERTIFICATE-----\n");String encoded=android.util.Base64.encodeToString(cert.getEncoded(),android.util.Base64.NO_WRAP);for(int offset=0;offset<encoded.length();offset+=64){writer.write(encoded,offset,Math.min(64,encoded.length()-offset));writer.write(10);}writer.write("-----END CERTIFICATE-----\n");roots++;}}
+   if(roots==0)throw new IOException("系统未提供可信 TLS 证书");try(InputStream pem=new FileInputStream(new File(stage,"android-ca.pem"))){if(java.security.cert.CertificateFactory.getInstance("X.509").generateCertificates(pem).size()!=roots)throw new IOException("系统 TLS 证书导出校验失败");}copy(new ByteArrayInputStream(identity.getBytes("US-ASCII")),new File(stage,".ready"));remove(target);if(!stage.renameTo(target))throw new IOException("解析环境保存失败");return target;
   }catch(Exception e){remove(stage);throw e;}
  }}
 }
