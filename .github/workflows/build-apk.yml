@@ -167,7 +167,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 43675095511 --name mygo-music-android-release --dir tests/baseline-v535
-      - name: Verify upgrades from signed v5.6.0 and v5.35.0 on Android
+      - name: Download previously delivered signed v5.38.0 for upgrade verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 43786015134 --name mygo-music-android-release --dir tests/baseline-v538
+      - name: Verify upgrades from signed v5.6.0, v5.35.0 and v5.38.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -177,6 +181,13 @@ jobs:
           script: |
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=89'
+            adb shell am start -W -n com.mygo.music/.MainActivity
+            adb uninstall com.mygo.music
+            adb install tests/baseline-v538/mygo-music-v5.38.0.apk
+            adb shell am start -W -n com.mygo.music/.MainActivity
+            adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.mygo.music | grep 'versionCode=89'
             adb shell am start -W -n com.mygo.music/.MainActivity
