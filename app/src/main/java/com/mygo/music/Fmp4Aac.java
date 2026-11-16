@@ -8,7 +8,9 @@ import java.nio.ByteBuffer;
 /** Copies clear AAC access units from a complete init+fragment into timestamped packed audio. No codec conversion. */
 final class Fmp4Aac {
  static final int MAX_INIT=1024*1024,MAX_FRAGMENT=8*1024*1024;
- static byte[] pack(File directory,byte[] init,byte[] fragment,NativeAudio.Check check)throws Exception{
+ static byte[] pack(File directory,byte[] init,byte[] fragment,NativeAudio.Check check)throws Exception{return pack(directory,init,fragment,check,0);}
+ static byte[] pack(File directory,byte[] init,byte[] fragment,NativeAudio.Check check,long startUs)throws Exception{
+  if(startUs<0)throw new IOException("分段播放时间无效");
   if(init.length>MAX_INIT||fragment.length>MAX_FRAGMENT)throw new IOException("分段音频超过处理大小限制");
   File input=File.createTempFile("mygo-fmp4-",".mp4",directory);MediaExtractor extractor=new MediaExtractor();
   try{
@@ -23,7 +25,7 @@ final class Fmp4Aac {
     int length=n+7;if(n<=0||length>8191||audio.size()+length>MAX_FRAGMENT)throw new IOException("分段 AAC 帧超过处理大小限制");
     audio.write(255);audio.write(241);audio.write(((object-1)<<6)|(rate<<2)|(channels>>2));audio.write(((channels&3)<<6)|(length>>11));audio.write((length>>3)&255);audio.write(((length&7)<<5)|31);audio.write(252);audio.write(sample.array(),0,n);frames++;extractor.advance();
    }
-   if(frames==0)throw new IOException("分段 AAC 音频为空");check.run();return LiveAacPlayback.packed(audio.toByteArray(),first*9/100);
-  }finally{extractor.release();input.delete();}
+   if(frames==0)throw new IOException("分段 AAC 音频为空");check.run();return LiveAacPlayback.packed(audio.toByteArray(),startUs*9/100);
+  }finally{try{extractor.release();}finally{input.delete();}}
  }
 }
