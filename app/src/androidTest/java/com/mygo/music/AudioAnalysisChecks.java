@@ -33,7 +33,7 @@ final class AudioAnalysisChecks {
         Dialog[] window={null};ThemeSeekBar[] bar={null};FrameLayout[] root={null};AtomicInteger draws=new AtomicInteger();
         try{
             ui(()->{window[0]=new Dialog(activity);root[0]=new FrameLayout(activity);root[0].setBackgroundColor(0xff111c24);bar[0]=new ThemeSeekBar(activity);bar[0].style=2;bar[0].active=true;bar[0].rendering(false,false);root[0].addView(bar[0],new FrameLayout.LayoutParams(280,48,Gravity.CENTER));root[0].getViewTreeObserver().addOnDrawListener(()->draws.incrementAndGet());window[0].setContentView(root[0]);window[0].show();window[0].getWindow().setLayout(320,160);});
-            helper.await(()->root[0].hasWindowFocus(),"waveform budget window did not gain focus");ui(()->AudioAnalysis.demand(true,service.snapshot().playing,false));helper.await(()->AudioAnalysis.frame().time>0,"real PCM did not reach waveform window");SystemClock.sleep(200);
+            helper.await(()->root[0].hasWindowFocus(),"waveform budget window did not gain focus");ui(()->AudioAnalysis.demand(true,service.snapshot().playing,false));helper.await(()->AudioAnalysis.frame().time>0,"real PCM did not reach waveform window");ui(()->bar[0].invalidate());SystemClock.sleep(200);
             int normal=windowDraws(draws,1000);ui(()->bar[0].rendering(false,true));SystemClock.sleep(200);int low=windowDraws(draws,1000);
             check(normal>18&&low>2&&low<=20&&low<normal*.8f,"waveform draw budget ineffective normal="+normal+" low="+low);
             ui(()->service.pause());helper.await(()->AudioAnalysis.frame().time==0,"unfocused theme retained PCM after native pause");SystemClock.sleep(200);int paused=windowDraws(draws,600);check(paused<=2,"paused waveform kept scheduling draws "+paused);
