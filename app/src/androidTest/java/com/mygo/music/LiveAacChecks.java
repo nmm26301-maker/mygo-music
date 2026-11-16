@@ -28,10 +28,6 @@ final class LiveAacChecks {
  }
  MainActivity launch()throws Exception{return (MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
  PlaybackService service(MainActivity activity)throws Exception{PlaybackService[] result={null};helper.await(()->{result[0]=(PlaybackService)FullPortChecks.field(activity,"playbackService");return result[0]!=null;},"live AAC playback service missing");return result[0];}
- ThemedPlayerDialog capture(MainActivity activity)throws Exception{
-  ThemedPlayerDialog[] page={null};test.runOnMainSync(()->{try{NowPlayingChecks.invoke(activity,"showNowPlaying");page[0]=(ThemedPlayerDialog)FullPortChecks.field(activity,"themedPlayer");PlayerAudioPermissions.request(activity);}catch(Exception e){throw new RuntimeException(e);}});
-  if(activity.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)SourcePlaylistUiChecks.click(test,"While using the app");SourcePlaylistUiChecks.click(test,"Start now");helper.await(()->AudioAnalysis.authorized,"live AAC output capture not authorized");return page[0];
- }
  boolean audible(){AudioAnalysis.Frame f=AudioAnalysis.frame();return f.stereo&&f.rmsLeft>.002f&&f.rmsRight>.002f&&f.time>0;}
  JSONObject output()throws Exception{AudioAnalysis.Frame f=AudioAnalysis.frame();return new JSONObject().put("sameUidPcm",true).put("stereo",f.stereo).put("rmsLeft",f.rmsLeft).put("rmsRight",f.rmsRight).put("peakLeftHz",f.peakLeft).put("peakRightHz",f.peakRight).put("frameTime",f.time);}
  void save(String filename,JSONObject report)throws Exception{File dir=new File(context.getExternalFilesDir(null),"qa/live-aac");dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,filename))){out.write(report.toString(2).getBytes(StandardCharsets.UTF_8));}}
