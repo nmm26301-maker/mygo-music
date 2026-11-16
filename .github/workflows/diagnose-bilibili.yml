@@ -101,7 +101,8 @@ jobs:
 
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
-          adb shell am instrument -w com.mygo.music.test/com.mygo.music.BilibiliTransportDiagnostic | tee bilibili-diagnostic.txt
+          adb shell am instrument -w -e bilibiliTransport true com.mygo.music.test/com.mygo.music.PluginInstrumentation
+          | tee bilibili-diagnostic.txt
 
           adb logcat -d > bilibili-logcat.txt
 

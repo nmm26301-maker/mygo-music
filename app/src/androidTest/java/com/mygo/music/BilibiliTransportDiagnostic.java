@@ -12,10 +12,15 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Anonymous, read-only comparison of source-authorized HTTP transports. No credentials are exported. */
-public final class BilibiliTransportDiagnostic extends Instrumentation {
+final class BilibiliTransportDiagnostic {
+    final Instrumentation test;
+    BilibiliTransportDiagnostic(Instrumentation test){this.test=test;}
+    Context getTargetContext(){return test.getTargetContext();}
+    Context getContext(){return test.getContext();}
+    void runOnMainSync(Runnable task){test.runOnMainSync(task);}
+    Activity startActivitySync(Intent intent){return test.startActivitySync(intent);}
     static final String REPO="GentleM4dman/mygo-music-bilibili";
     final JSONArray rows=new JSONArray();
-    @Override public void onCreate(Bundle args){super.onCreate(args);start();}
     String read(InputStream input)throws Exception{try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return out.toString("UTF-8");}}
     static final class Answer {boolean ok;String value="timeout";}
     Answer call(PluginManager manager,String id,String method,JSONObject args)throws Exception{Answer a=new Answer();CountDownLatch done=new CountDownLatch(1);manager.export(id,method,args,(ok,raw)->{a.ok=ok;a.value=raw;done.countDown();});if(!done.await(40,TimeUnit.SECONDS))throw new IOException("source call deadline: "+method);return a;}
@@ -44,14 +49,14 @@ public final class BilibiliTransportDiagnostic extends Instrumentation {
         row.put("httpOneByte",http(address,headers,"bytes=0-0"));save();
     }
     void save()throws Exception{File dir=new File(getTargetContext().getExternalFilesDir(null),"qa/bilibili-transport");dir.mkdirs();JSONObject report=new JSONObject().put("scope","anonymous read-only source and media requests; same signed URL and headers per pair; no account login, remote mutation or credential export").put("rows",rows);try(FileOutputStream out=new FileOutputStream(new File(dir,"comparison.json"))){out.write(report.toString(2).getBytes("UTF-8"));}}
-    @Override public void onStart(){Bundle result=new Bundle();MainActivity activity=null;PluginManager manager=null;
+    void run()throws Exception{MainActivity activity=null;PluginManager manager=null;
         try{
             JSONArray pins=new JSONArray(read(getContext().getAssets().open("market-audit/index.json")));JSONObject pin=null;for(int i=0;i<pins.length();i++)if(REPO.equals(pins.getJSONObject(i).getString("repo")))pin=pins.getJSONObject(i);if(pin==null)throw new IOException("pinned Bilibili source missing");
             activity=(MainActivity)startActivitySync(new Intent(getTargetContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));manager=new PluginManager(activity);CountDownLatch installed=new CountDownLatch(1);boolean[] ok={false};manager.installZipStream(getContext().getAssets().open("market-audit/"+pin.getString("archive")),REPO,(yes,raw)->{ok[0]=yes;installed.countDown();});if(!installed.await(35,TimeUnit.SECONDS)||!ok[0])throw new IOException("source install failed");String id=null;for(PluginManager.PluginInfo p:manager.list())if(REPO.equals(p.repository))id=p.id;if(id==null)throw new IOException("installed source unavailable");
-            getTargetContext().getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+id,false).putBoolean("plugin_process_"+id,false).commit();CountDownLatch allowed=new CountDownLatch(1);manager.authorizeNetwork(id,(yes,raw)->{ok[0]=yes;allowed.countDown();});SourcePlaylistUiChecks.click(this,"允许并继续");if(!allowed.await(10,TimeUnit.SECONDS)||!ok[0])throw new IOException("source network not authorized");
+            getTargetContext().getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+id,false).putBoolean("plugin_process_"+id,false).commit();CountDownLatch allowed=new CountDownLatch(1);manager.authorizeNetwork(id,(yes,raw)->{ok[0]=yes;allowed.countDown();});SourcePlaylistUiChecks.click(test,"允许并继续");if(!allowed.await(10,TimeUnit.SECONDS)||!ok[0])throw new IOException("source network not authorized");
             LinkedHashSet<String> tracks=new LinkedHashSet<>();tracks.add("BV137KPezEe9");Answer search=call(manager,id,"search",new JSONObject().put("query","love").put("kind","tracks").put("offset",0));if(search.ok){JSONArray found=new JSONObject(search.value).optJSONArray("tracks");if(found!=null)for(int i=0;i<Math.min(2,found.length());i++)tracks.add(found.getJSONObject(i).getString("id"));}
-            int n=0;for(String track:tracks)probe(manager,id,track,n++%2!=0);result.putString("stream","MYGO_BILIBILI_DIAGNOSTIC_OK samples="+rows.length()+"; see comparison.json for actual HTTP and native-clock outcomes");finish(Activity.RESULT_OK,result);
-        }catch(Throwable e){try{save();}catch(Exception ignored){}result.putString("stream","MYGO_BILIBILI_DIAGNOSTIC_FAILED: "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result);}
+            int n=0;for(String track:tracks)probe(manager,id,track,n++%2!=0);
+        }
         finally{PluginManager last=manager;MainActivity page=activity;runOnMainSync(()->{if(last!=null)last.close();if(page!=null)page.finish();});}
     }
 }
