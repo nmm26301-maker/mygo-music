@@ -11,10 +11,11 @@ import java.util.concurrent.*;
 
 /** Runs against the actual Android WebView and native network bridge, not a mock JS engine. */
 public class PluginInstrumentation extends Instrumentation {
-    private String liveResult="",themeRestart="";private boolean marketAudit,bilibiliTransport,roamLive,soundgoDiagnostic;
+    private String liveResult="",themeRestart="";private boolean marketAudit,bilibiliTransport,roamLive,soundgoDiagnostic,soundgoPlayback;
     private final ArrayList<PluginRuntime> runtimes=new ArrayList<>();
-    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);themeRestart=arguments==null?"":arguments.getString("themeRestart","");soundgoDiagnostic=arguments!=null&&"true".equals(arguments.getString("soundgoDiagnostic"));roamLive=arguments!=null&&"true".equals(arguments.getString("roamLive"));bilibiliTransport=arguments!=null&&"true".equals(arguments.getString("bilibiliTransport"));marketAudit=arguments!=null&&"true".equals(arguments.getString("marketAudit"));start();}
+    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);themeRestart=arguments==null?"":arguments.getString("themeRestart","");soundgoPlayback=arguments!=null&&"true".equals(arguments.getString("soundgoPlayback"));soundgoDiagnostic=arguments!=null&&"true".equals(arguments.getString("soundgoDiagnostic"));roamLive=arguments!=null&&"true".equals(arguments.getString("roamLive"));bilibiliTransport=arguments!=null&&"true".equals(arguments.getString("bilibiliTransport"));marketAudit=arguments!=null&&"true".equals(arguments.getString("marketAudit"));start();}
     @Override public void onStart(){Bundle result=new Bundle();try{
+        if(soundgoPlayback){new Fmp4AacChecks(this).run();new Fmp4AacChecks(this).originalSoundGo();result.putString("stream","MYGO_SOUNDGO_PLAYBACK_OK");finish(Activity.RESULT_OK,result);return;}
         if(soundgoDiagnostic){new SoundGoDiagnostic(this).run();result.putString("stream","MYGO_SOUNDGO_DIAGNOSTIC_OK");finish(Activity.RESULT_OK,result);return;}
         if(roamLive){new LiveAacChecks(this).realRoamDial();result.putString("stream","MYGO_ROAMDIAL_LIVE_OK");finish(Activity.RESULT_OK,result);return;}
         if(bilibiliTransport){new BilibiliTransportDiagnostic(this).run();result.putString("stream","MYGO_BILIBILI_DIAGNOSTIC_OK: see comparison.json for actual HTTP and native-clock outcomes");finish(Activity.RESULT_OK,result);return;}

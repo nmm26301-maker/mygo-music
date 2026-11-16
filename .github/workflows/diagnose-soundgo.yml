@@ -104,14 +104,14 @@ jobs:
 
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
-          adb shell am instrument -w -e soundgoDiagnostic true com.mygo.music.test/com.mygo.music.PluginInstrumentation
+          adb shell am instrument -w -e soundgoPlayback true com.mygo.music.test/com.mygo.music.PluginInstrumentation
           | tee soundgo-diagnostic.txt
 
           adb logcat -d > soundgo-logcat.txt
 
-          adb pull /sdcard/Android/data/com.mygo.music/files/qa/soundgo soundgo || true
+          adb pull /sdcard/Android/data/com.mygo.music/files/qa/fmp4-aac fmp4-aac || true
 
-          grep -F MYGO_SOUNDGO_DIAGNOSTIC_OK soundgo-diagnostic.txt'
+          grep -F MYGO_SOUNDGO_PLAYBACK_OK soundgo-diagnostic.txt'
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -120,4 +120,4 @@ jobs:
 
           soundgo-logcat.txt
 
-          soundgo/'
+          fmp4-aac/'

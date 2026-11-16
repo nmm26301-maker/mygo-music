@@ -27,7 +27,8 @@ final class HlsPlaybackChecks {
             if(path.startsWith("redirect-")){out.write(("HTTP/1.1 302 Found\r\nLocation: "+child+"/"+path.substring(9)+"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes("US-ASCII"));return;}
             byte[] data;
             if(path.equals("stall.wav")){data=BackgroundPlaybackChecks.wav(60000);out.write(("HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: "+data.length+"\r\nConnection: close\r\n\r\n").getBytes("US-ASCII"));out.flush();stalled.countDown();release.await(35,TimeUnit.SECONDS);return;}
-            if(path.equals("protected.m3u8"))data=asset("sample.m3u8");
+            if(path.equals("fmp4-cross.m3u8"))data=new String(asset("fmp4.m3u8"),"UTF-8").replace("fmp4-",child+"/fmp4-").getBytes("UTF-8");
+            else if(path.equals("protected.m3u8"))data=asset("sample.m3u8");
             else if(path.equals("redirected.m3u8"))data=new String(asset("sample.m3u8"),"UTF-8").replace("segment-","redirect-segment-").getBytes("UTF-8");
             else if(path.equals("cross.m3u8"))data=new String(asset("sample.m3u8"),"UTF-8").replace("segment-",child+"/segment-").getBytes("UTF-8");
             else if(path.equals("live.m3u8"))data=new String(asset("sample.m3u8"),"UTF-8").replace("#EXT-X-ENDLIST","").getBytes("UTF-8");

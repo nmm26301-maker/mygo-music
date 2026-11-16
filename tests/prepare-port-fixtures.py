@@ -32,3 +32,8 @@ print('Generated complete Opus HLS for native decoder fallback checks')
 
 # A genuine lossy AAC stream whose deliberately incorrect plugin label exercises honest quality reporting.
 subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=392:duration=20','-c:a','aac','-b:a','96k','-movflags','+faststart',str(target/'quality-aac.m4a')],check=True)
+
+# Clear fragmented MP4 AAC, matching the public SoundGo transport. Expected ADTS is independently remuxed by FFmpeg.
+subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=36','-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=36','-filter_complex','[0:a][1:a]amerge=inputs=2[a]','-map','[a]','-c:a','aac','-b:a','160k','-f','hls','-hls_time','4','-hls_playlist_type','vod','-hls_segment_type','fmp4','-hls_fmp4_init_filename','fmp4-init.mp4','-hls_segment_filename',str(target/'fmp4-%03d.m4s'),str(target/'fmp4.m3u8')],check=True)
+subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-i',str(target/'fmp4.m3u8'),'-c:a','copy','-f','adts',str(target/'fmp4-expected.aac')],check=True)
+print('Generated clear stereo fMP4 HLS and independently remuxed expected AAC access units')
