@@ -67,7 +67,7 @@ final class AudioCache implements Closeable {
     }
     private void checkEpoch(long epoch)throws IOException{synchronized(this){if(closed||generation!=epoch||Thread.currentThread().isInterrupted())throw new IOException("缓存任务已取消");}}
     private void download(String key,String track,String title,String quality,String address,Map<String,String> headers,long epoch,Callback callback){File temporary=new File(root,key+"-"+epoch+".part");PluginMedia.Connection source=null;HttpURLConnection connection=null;boolean ok=false;String message="";
-        try{checkEpoch(epoch);source=PluginMedia.openFullAudio(address,headers);connection=source.http;
+        try{checkEpoch(epoch);source=PluginMedia.openFullAudio(address,headers);connection=source.http;if(LiveAacPlayback.matches(connection))throw new IOException("直播音频没有完整时长，无法作为离线歌曲缓存");
             String type=connection.getContentType();if(type!=null)type=type.toLowerCase(Locale.ROOT);if(type!=null&&(type.contains("text/")||type.contains("json")||type.contains("html")||type.contains("mpegurl")||type.contains("dash+xml")))throw new IOException("来源返回的不是音频");long expected=PluginMedia.fullAudioLength(connection);long max;synchronized(this){max=Math.min(limit,MAX_TRACK);}if(expected>max)throw new IOException("单曲超过缓存大小限制");long total=0;
             try(InputStream in=connection.getInputStream();FileOutputStream out=new FileOutputStream(temporary)){byte[] buffer=new byte[32768];int n;while((n=in.read(buffer))!=-1){checkEpoch(epoch);total+=n;if(total>max)throw new IOException("单曲超过缓存大小限制");out.write(buffer,0,n);}out.getFD().sync();}
             if(total<=0||(expected>=0&&expected!=total))throw new IOException("音频未完整下载");
