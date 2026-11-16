@@ -29,12 +29,10 @@ jobs:
     - name: Build Android plugin launcher for all supported ABIs
       run: "export ANDROID_HOME=/usr/local/lib/android/sdk\nexport PATH=\"$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH\"\
         \nsdkmanager \"ndk;27.2.12479018\"\nTOOLCHAIN=\"$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin\"\
-        \nfor SPEC in \"arm64-v8a:aarch64-linux-android\" \"armeabi-v7a:armv7a-linux-androideabi\"\
-        \ \"x86_64:x86_64-linux-android\" \"x86:i686-linux-android\"; do\n  ABI=\"\
-        ${SPEC%%:*}\"\n  TARGET=\"${SPEC#*:}\"\n  mkdir -p \"app/src/main/jniLibs/$ABI\"\
-        \n  \"$TOOLCHAIN/${TARGET}23-clang\" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384\
-        \ app/src/main/cpp/plugin-launcher.c -o \"app/src/main/jniLibs/$ABI/libmygo-launcher.so\"\
-        \ndone\n"
+        \nfor SPEC in \"arm64-v8a:aarch64-linux-android\" \"armeabi-v7a:armv7a-linux-androideabi\" \"x86_64:x86_64-linux-android\"\
+        \ \"x86:i686-linux-android\"; do\n  ABI=\"${SPEC%%:*}\"\n  TARGET=\"${SPEC#*:}\"\n  mkdir -p \"app/src/main/jniLibs/$ABI\"\
+        \n  \"$TOOLCHAIN/${TARGET}23-clang\" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384 app/src/main/cpp/plugin-launcher.c\
+        \ -o \"app/src/main/jniLibs/$ABI/libmygo-launcher.so\"\ndone\n"
     - uses: actions/cache@v4
       id: native-audio-cache
       with:
@@ -54,19 +52,18 @@ jobs:
       id: plugin-tools-cache
       with:
         path: .plugin-tools-cache
-        key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json',
-          'app/src/main/cpp/plugin-python.c') }}
+        key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json', 'app/src/main/cpp/plugin-python.c')
+          }}
     - name: Build verified native plugin tools
       run: python3 tests/build-plugin-tools.py
     - uses: actions/cache/save@v4
       if: steps.plugin-tools-cache.outputs.cache-hit != 'true'
       with:
         path: .plugin-tools-cache
-        key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json',
-          'app/src/main/cpp/plugin-python.c') }}
+        key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json', 'app/src/main/cpp/plugin-python.c')
+          }}
     - name: Enable emulator KVM
-      run: 'echo ''KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"''
-        | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+      run: 'echo ''KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"'' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
 
         sudo udevadm control --reload-rules
 
@@ -104,13 +101,11 @@ jobs:
 
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
-          adb shell am instrument -w com.mygo.music.test/com.mygo.music.BilibiliTransportDiagnostic
-          | tee bilibili-diagnostic.txt
+          adb shell am instrument -w com.mygo.music.test/com.mygo.music.BilibiliTransportDiagnostic | tee bilibili-diagnostic.txt
 
           adb logcat -d > bilibili-logcat.txt
 
-          adb pull /sdcard/Android/data/com.mygo.music/files/qa/bilibili-transport
-          bilibili-transport || true
+          adb pull /sdcard/Android/data/com.mygo.music/files/qa/bilibili-transport bilibili-transport || true
 
           grep -F MYGO_BILIBILI_DIAGNOSTIC_OK bilibili-diagnostic.txt'
     - uses: actions/upload-artifact@v4
