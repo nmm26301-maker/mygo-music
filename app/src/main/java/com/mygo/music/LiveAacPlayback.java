@@ -57,7 +57,7 @@ final class LiveAacPlayback implements AutoCloseable {
     }
     private synchronized void publish(byte[] audio,long first,long count,int rate)throws IOException{
         if(closed)return;byte[] bytes=packed(audio,first*90000/rate);Segment item=new Segment(sequence++,bytes,count/(double)rate);segments.put(item.id,item);retainedBytes+=bytes.length;
-        while(segments.size()>MAX_SEGMENTS||retainedBytes>MAX_BYTES&&segments.size()>WINDOW){Long firstId=segments.keySet().iterator().next();retainedBytes-=segments.remove(firstId).bytes.length;}notifyAll();
+        while(segments.size()>MAX_SEGMENTS||retainedBytes>MAX_BYTES){Long firstId=segments.keySet().iterator().next();retainedBytes-=segments.remove(firstId).bytes.length;}notifyAll();
     }
     private synchronized byte[] playlist()throws Exception{
         long until=System.currentTimeMillis()+20000;while(!closed&&!ended&&sequence<3&&System.currentTimeMillis()<until)wait(300);
