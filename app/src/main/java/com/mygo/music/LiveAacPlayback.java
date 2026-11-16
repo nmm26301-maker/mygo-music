@@ -15,7 +15,7 @@ final class LiveAacPlayback implements AutoCloseable {
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(2,4,20,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16));
     private final Set<Socket> clients=ConcurrentHashMap.newKeySet();
     private final LinkedHashMap<Long,Segment> segments=new LinkedHashMap<>();
-    private volatile boolean closed,ended;private volatile String error="";
+    private volatile boolean closed,ended;private boolean paused;private volatile String error="";
     private volatile PluginMedia.Connection connection;
     private long sequence,totalSamples;private int retainedBytes,sampleRate,channels;
     static final class Segment {final long id;final byte[] bytes;final double seconds;Segment(long id,byte[] bytes,double seconds){this.id=id;this.bytes=bytes;this.seconds=seconds;}}
@@ -28,6 +28,7 @@ final class LiveAacPlayback implements AutoCloseable {
     }
     String address(){return "http://127.0.0.1:"+server.getLocalPort()+"/"+token+"/live.m3u8";}
     String failure(){return error;}
+    synchronized void setPaused(boolean value){paused=value;notifyAll();}
     synchronized int retainedBytes(){return retainedBytes;}
     synchronized long publishedSegments(){return sequence;}
     synchronized int sampleRate(){return sampleRate;}
@@ -37,7 +38,7 @@ final class LiveAacPlayback implements AutoCloseable {
             connection=active;if(closed)return;active.http.setReadTimeout(15000);int metadata=0;try{metadata=Integer.parseInt(active.http.getHeaderField("icy-metaint"));}catch(Exception ignored){}
             try(InputStream raw=active.http.getInputStream();InputStream input=new BufferedInputStream(new IcyInput(raw,metadata),32768)){
                 ByteArrayOutputStream body=new ByteArrayOutputStream();long first=0;int skipped=0;
-                while(!closed){int a=input.read();if(a<0)break;int b=input.read();if(b<0)break;
+                while(!closed){synchronized(this){while(paused&&!closed)wait(500);}if(closed)break;int a=input.read();if(a<0)break;int b=input.read();if(b<0)break;
                     if(a!=255||(b&246)!=240){if(++skipped>8192)throw new IOException("直播音频不是有效的 ADTS AAC");continue;}
                     byte[] header=new byte[7];header[0]=(byte)a;header[1]=(byte)b;readFully(input,header,2,5);int rateIndex=(header[2]>>2)&15;if(rateIndex>=RATES.length||(header[6]&3)!=0)throw new IOException("直播 AAC 帧参数不受支持");int rate=RATES[rateIndex],count=((header[2]&1)<<2)|((header[3]>>6)&3);int length=((header[3]&3)<<11)|((header[4]&255)<<3)|((header[5]&255)>>5);if(length<((b&1)!=0?7:9)||length>8191)throw new IOException("直播 AAC 帧长度无效");
                     synchronized(this){if(sampleRate==0){sampleRate=rate;channels=count;}else if(sampleRate!=rate||channels!=count)throw new IOException("直播音频格式已变化，请重新播放");}
