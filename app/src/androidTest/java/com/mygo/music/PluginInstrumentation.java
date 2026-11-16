@@ -11,10 +11,11 @@ import java.util.concurrent.*;
 
 /** Runs against the actual Android WebView and native network bridge, not a mock JS engine. */
 public class PluginInstrumentation extends Instrumentation {
-    private String liveResult="",themeRestart="";private boolean marketAudit,bilibiliTransport;
+    private String liveResult="",themeRestart="";private boolean marketAudit,bilibiliTransport,roamTransport;
     private final ArrayList<PluginRuntime> runtimes=new ArrayList<>();
-    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);themeRestart=arguments==null?"":arguments.getString("themeRestart","");bilibiliTransport=arguments!=null&&"true".equals(arguments.getString("bilibiliTransport"));marketAudit=arguments!=null&&"true".equals(arguments.getString("marketAudit"));start();}
+    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);themeRestart=arguments==null?"":arguments.getString("themeRestart","");roamTransport=arguments!=null&&"true".equals(arguments.getString("roamTransport"));bilibiliTransport=arguments!=null&&"true".equals(arguments.getString("bilibiliTransport"));marketAudit=arguments!=null&&"true".equals(arguments.getString("marketAudit"));start();}
     @Override public void onStart(){Bundle result=new Bundle();try{
+        if(roamTransport){new RoamDialDiagnostic(this).run();result.putString("stream","MYGO_ROAMDIAL_DIAGNOSTIC_OK");finish(Activity.RESULT_OK,result);return;}
         if(bilibiliTransport){new BilibiliTransportDiagnostic(this).run();result.putString("stream","MYGO_BILIBILI_DIAGNOSTIC_OK: see comparison.json for actual HTTP and native-clock outcomes");finish(Activity.RESULT_OK,result);return;}
         if(!themeRestart.isEmpty()){ThemeRestartChecks restart=new ThemeRestartChecks(this);if(themeRestart.equals("prepare")){restart.prepare();result.putString("stream","MYGO_THEME_RESTART_PREPARED");}else{restart.verify();result.putString("stream","MYGO_THEME_RESTART_VERIFIED");}finish(Activity.RESULT_OK,result);return;}
         if(marketAudit){new MarketAudit(this).run();result.putString("stream","MYGO_MARKET_AUDIT_OK: 64 pinned repositories attempted; detailed per-stage results in market-audit.json");finish(Activity.RESULT_OK,result);return;}
