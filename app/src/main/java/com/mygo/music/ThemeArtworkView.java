@@ -3,6 +3,7 @@ import android.content.Context;
 import android.graphics.*;
 import android.os.SystemClock;
 import android.view.View;
+import android.view.ViewConfiguration;
 
 /** Own bounded album copy; each scene has its own geometry. Sound-driven marks use measured data only. */
 final class ThemeArtworkView extends View {
@@ -10,6 +11,7 @@ final class ThemeArtworkView extends View {
  private String theme="dynamic",name="",artist="";private boolean playing,active=true,quiet,light;private float phase,progress,gain=1;private long frame;private int accent=0xffa0ddd8,style,frameIntervalMs;
  ThemeArtworkView(Context c){super(c);setLayerType(LAYER_TYPE_SOFTWARE,null);}
  void theme(String id,int color,boolean light,int style,float gain){this.theme=id;accent=color;this.light=light;this.style=style;this.gain=gain;invalidate();}
+ @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);setLayerType((long)w*h*4>ViewConfiguration.get(getContext()).getScaledMaximumDrawingCacheSize()?LAYER_TYPE_NONE:LAYER_TYPE_SOFTWARE,null);}
  void frameInterval(int millis){frameIntervalMs=Math.max(0,Math.min(1000,millis));}
  void art(Bitmap source){free();if(source!=null&&!source.isRecycled()){float f=Math.min(1,640f/Math.max(source.getWidth(),source.getHeight()));Bitmap b=Bitmap.createScaledBitmap(source,Math.max(1,Math.round(source.getWidth()*f)),Math.max(1,Math.round(source.getHeight()*f)),true);bitmap=b==source?source.copy(Bitmap.Config.ARGB_8888,false):b;shader=new BitmapShader(bitmap,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP);}invalidate();}
  void state(String n,String a,int position,int duration,boolean p,boolean visible,boolean reduce){advance();name=n;artist=a;progress=duration>0?Math.max(0,Math.min(1,position/(float)duration)):0;playing=p;active=visible;quiet=reduce;invalidate();}

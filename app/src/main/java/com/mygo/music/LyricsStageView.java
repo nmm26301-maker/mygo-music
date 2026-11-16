@@ -64,7 +64,7 @@ final class LyricsStageView extends View {
     int effect(){return effect;}
     void follow(){following=true;anchor=-1;offset=0;notifyBrowse();invalidate();}
     boolean following(){return following;}
-    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){cancelInteraction();clearLayouts();metrics();backdrop.resize(w,h);anchor=-1;offset=0;following=true;notifyBrowse();}
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){setLayerType((long)w*h*4>ViewConfiguration.get(getContext()).getScaledMaximumDrawingCacheSize()?LAYER_TYPE_NONE:LAYER_TYPE_SOFTWARE,null);cancelInteraction();clearLayouts();metrics();backdrop.resize(w,h);anchor=-1;offset=0;following=true;notifyBrowse();}
     private StaticLayout layout(int index){
         StaticLayout value=layouts.get(index);if(value!=null)return value;
         paint.setTextSize(textSize);paint.setTypeface(Typeface.create(appearance.font==1?"serif":appearance.font==2?"monospace":"sans-serif",Typeface.BOLD));
