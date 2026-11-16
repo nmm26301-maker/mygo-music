@@ -15,7 +15,7 @@ public class PluginInstrumentation extends Instrumentation {
     private final ArrayList<PluginRuntime> runtimes=new ArrayList<>();
     @Override public void onCreate(Bundle arguments){super.onCreate(arguments);themeRestart=arguments==null?"":arguments.getString("themeRestart","");soundgoPlayback=arguments!=null&&"true".equals(arguments.getString("soundgoPlayback"));roamLive=arguments!=null&&"true".equals(arguments.getString("roamLive"));bilibiliTransport=arguments!=null&&"true".equals(arguments.getString("bilibiliTransport"));marketAudit=arguments!=null&&"true".equals(arguments.getString("marketAudit"));start();}
     @Override public void onStart(){Bundle result=new Bundle();try{
-        if(soundgoPlayback){new Fmp4AacChecks(this).originalSoundGo();result.putString("stream","MYGO_SOUNDGO_PLAYBACK_OK");finish(Activity.RESULT_OK,result);return;}
+        if(soundgoPlayback){new Fmp4AacChecks(this).originalSoundGo();result.putString("stream","MYGO_SOUNDGO_PUBLIC_OK\nMYGO_SOUNDGO_PLAYBACK_OK");finish(Activity.RESULT_OK,result);return;}
         if(roamLive){new LiveAacChecks(this).realRoamDial();result.putString("stream","MYGO_ROAMDIAL_LIVE_OK");finish(Activity.RESULT_OK,result);return;}
         if(bilibiliTransport){new BilibiliTransportDiagnostic(this).run();result.putString("stream","MYGO_BILIBILI_DIAGNOSTIC_OK: see comparison.json for actual HTTP and native-clock outcomes");finish(Activity.RESULT_OK,result);return;}
         if(!themeRestart.isEmpty()){ThemeRestartChecks restart=new ThemeRestartChecks(this);if(themeRestart.equals("prepare")){restart.prepare();result.putString("stream","MYGO_THEME_RESTART_PREPARED");}else{restart.verify();result.putString("stream","MYGO_THEME_RESTART_VERIFIED");}finish(Activity.RESULT_OK,result);return;}
