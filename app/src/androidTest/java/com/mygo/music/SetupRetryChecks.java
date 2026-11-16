@@ -25,9 +25,10 @@ final class SetupRetryChecks {
         while(!nodes.isEmpty()){AccessibilityNodeInfo node=nodes.remove();CharSequence text=node.getText();if(text!=null&&text.toString().startsWith("允许启动辅助程序")){check(!node.isChecked()&&node.performAction(AccessibilityNodeInfo.ACTION_CLICK),"native helper grant could not be selected");return;}for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo child=node.getChild(i);if(child!=null)nodes.add(child);}}
         throw new AssertionError("native helper permission control missing");
     }
-    void startFailed(PlaybackService service,JSONArray queue,int position,String message)throws Exception{
+    void startFailed(PlaybackService service,JSONArray queue,int position,String message)throws Exception{startFailed(service,queue,position,message,false);}
+    void startFailed(PlaybackService service,JSONArray queue,int position,String message,boolean clear)throws Exception{
         long[] before={0};String expected=queue.getJSONObject(1).getString("uri");
-        ui(()->{before[0]=service.snapshot().generation;PlaybackService.startQueue(context,queue,1,position,37,true,true,"lossless");});
+        ui(()->{if(clear)service.clearQueue();before[0]=service.snapshot().generation;PlaybackService.startQueue(context,queue,1,position,37,true,true,"lossless");});
         helper.await(()->{PlaybackService.Snapshot state=service.snapshot();return state.generation>before[0]&&state.uri.equals(expected)&&!state.error.isEmpty();},message);
     }
     void run()throws Exception{
@@ -40,7 +41,7 @@ final class SetupRetryChecks {
             helper.install(manager,id,"stream",new JSONArray().put(new JSONObject().put("key","token").put("label","配置值").put("type","password")),code);
             File manifest=new File(context.getFilesDir(),"plugins/"+id+"/plugin.json");StringBuilder raw=new StringBuilder();try(Reader reader=new FileReader(manifest)){char[] buf=new char[2048];int n;while((n=reader.read(buf))!=-1)raw.append(buf,0,n);}try(Writer writer=new FileWriter(manifest)){writer.write(new JSONObject(raw.toString()).put("permissions",new JSONObject().put("process",new JSONArray().put("yt-dlp"))).toString());}manager.restart(id);
             JSONArray queue=new JSONArray().put(new JSONObject().put("uri",a).put("title","Setup A")).put(new JSONObject().put("uri",b).put("title","Setup B").put("scope","selected-list"));
-            ui(service::clearQueue);startFailed(service,queue,2300,"setup fixture did not fail");PlaybackService.Snapshot failed=service.snapshot();open();type("ready");helperPermission();save();
+            startFailed(service,queue,2300,"setup fixture did not fail",true);PlaybackService.Snapshot failed=service.snapshot();open();type("ready");helperPermission();save();
             helper.await(()->data.getString("pending","false").equals("true"),"configuration acknowledgement never started");check(service.snapshot().generation==failed.generation,"settings retried before source acknowledgement");playback.playing(service,b,failed.generation);playback.queue(service,queue);check(service.snapshot().position>=2300&&!data.getString("nativeVersion","").isEmpty(),"setup continuation lost position or skipped real helper");
 
             // Closing while a source write is pending must not resume playback later.
