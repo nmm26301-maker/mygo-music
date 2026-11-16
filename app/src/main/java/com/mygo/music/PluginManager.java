@@ -56,6 +56,7 @@ public final class PluginManager {
     private long bumpRevision(String id){long value=Math.max(System.nanoTime(),revision(id)+1);prefs.edit().putLong("plugin_revision_"+id,value).apply();return value;}
 
     private static String canonicalRepository(String value){return value!=null&&value.equalsIgnoreCase("Maker-World/mygo-music-migu")?"Maker-World/MygoMusicMigu":value;}
+    File audioTemporaryDirectory(){return context.getCacheDir();}
     public PluginManager(Context c){context=c;root=new File(context.getFilesDir(),"plugins");if(!root.exists())root.mkdirs();prefs=context.getSharedPreferences("library",Context.MODE_PRIVATE);}
 
     public ArrayList<PluginInfo> list(){ArrayList<PluginInfo> out=new ArrayList<>();File[] dirs=root.listFiles();if(dirs==null)return out;for(File d:dirs){if(!d.isDirectory()||d.getName().startsWith("."))continue;try{PluginInfo p=parse(new File(d,"plugin.json"));if(p!=null){p.directory=d.getAbsolutePath();File origin=new File(d,".origin.json");if(origin.isFile())try{p.repository=canonicalRepository(new JSONObject(read(origin)).optString("repo",""));}catch(Exception ignored){}File caps=new File(d,".runtime.json");if(caps.isFile())try{JSONArray names=new JSONObject(read(caps)).getJSONArray("exports");for(int i=0;i<names.length();i++)p.functions.add(names.getString(i));}catch(Exception ignored){}p.enabled=prefs.getBoolean("plugin_enabled_"+p.id,true);out.add(p);}}catch(Exception ignored){}}Collections.sort(out,(a,b)->a.name.compareToIgnoreCase(b.name));return out;}
