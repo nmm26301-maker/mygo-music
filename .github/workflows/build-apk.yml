@@ -178,14 +178,14 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=88'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=89'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v535/mygo-music-v5.35.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=88'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=89'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Refresh corresponding sources with the final source audit
         run: python3 tests/build-native-audio.py

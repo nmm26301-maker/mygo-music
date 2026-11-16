@@ -11,6 +11,7 @@ with zipfile.ZipFile(archive,'a',zipfile.ZIP_DEFLATED) as z:
  for path in (root/'app/src/main/assets/third-party').iterdir():
   if path.is_file():add(path,'mygo-music/app/src/main/assets/third-party/'+path.name)
  add(root/'app/src/main/assets/native-tools.json','mygo-music/app/src/main/assets/native-tools.json')
+ add(root/'app/src/main/assets/plugin-audit.json','mygo-music/app/src/main/assets/plugin-audit.json')
  add(root/'app/src/main/assets/vendor/yt-dlp','mygo-music/app/src/main/assets/vendor/yt-dlp')
  for key in ['flet','qjs','python','yt-source','ejs']:
   path=root/'.plugin-tools-cache'/pins[key]['file'];add(path,'third-party/plugin-tools/'+path.name)
