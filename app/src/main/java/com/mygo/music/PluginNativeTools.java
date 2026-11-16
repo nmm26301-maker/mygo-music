@@ -24,7 +24,7 @@ final class PluginNativeTools {
   if(!has(original,"--js-runtimes")){plan.args.add("--js-runtimes");plan.args.add("quickjs:"+new File(lib,"libmygo-qjs.so").getAbsolutePath());}
   if(!has(original,"--ffmpeg-location")){plan.args.add("--ffmpeg-location");plan.args.add(new File(lib,"libffmpeg.so").getAbsolutePath());}
   plan.args.add("--compat-options");plan.args.add("no-certifi");plan.args.addAll(original);
-  plan.env.put("PYTHONHOME",runtime.getAbsolutePath());plan.env.put("PYTHONPATH",runtime+":"+new File(runtime,"stdlib")+":"+new File(runtime,"modules"));
+  plan.env.put("PYTHONHOME",runtime.getAbsolutePath());plan.env.put("PYTHONPATH",new File(runtime,"stdlib")+":"+new File(runtime,"modules"));
   plan.env.put("PYTHONNOUSERSITE","1");plan.env.put("PYTHONDONTWRITEBYTECODE","1");plan.env.put("LD_LIBRARY_PATH",lib.getAbsolutePath());plan.env.put("TMPDIR",c.getCacheDir().getAbsolutePath());
   plan.env.put("SSL_CERT_FILE",new File(runtime,"android-ca.pem").getAbsolutePath());plan.env.put("REQUESTS_CA_BUNDLE",new File(runtime,"android-ca.pem").getAbsolutePath());return plan;
  }
@@ -35,12 +35,11 @@ final class PluginNativeTools {
  static File runtime(Context c,File lib)throws Exception{synchronized(LOCK){
   ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=c.getAssets().open("native-tools.json")){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)bytes.write(b,0,n);}JSONObject info=new JSONObject(bytes.toString("UTF-8"));
   File bundle=new File(lib,"libpythonbundle.so");String hash=sha(bundle),scriptHash=info.getString("ytDlpSha256");boolean known=false;JSONArray hashes=info.getJSONArray("bundleHashes");for(int i=0;i<hashes.length();i++)if(hash.equals(hashes.getString(i)))known=true;if(!known)throw new IOException("解析环境校验失败");
-  String identity="ca3-"+hash.substring(0,16)+scriptHash.substring(0,16);File parent=new File(c.getNoBackupFilesDir(),"plugin-tools"),target=new File(parent,identity),ready=new File(target,".ready");
-  if(ready.isFile()&&new File(target,"sitecustomize.py").isFile()&&new File(target,"android-ca.pem").isFile()&&sha(new File(target,"yt-dlp")).equals(scriptHash))return target;
+  String identity="ca1-"+hash.substring(0,16)+scriptHash.substring(0,16);File parent=new File(c.getNoBackupFilesDir(),"plugin-tools"),target=new File(parent,identity),ready=new File(target,".ready");
+  if(ready.isFile()&&new File(target,"android-ca.pem").isFile()&&sha(new File(target,"yt-dlp")).equals(scriptHash))return target;
   if(!parent.isDirectory()&&!parent.mkdirs())throw new IOException("无法准备解析环境");File stage=new File(parent,identity+".staging");remove(stage);if(!stage.mkdirs())throw new IOException("无法准备解析环境");
   try{String root=stage.getCanonicalPath()+File.separator;long total=0;int entries=0;
    try(ZipInputStream zip=new ZipInputStream(new FileInputStream(bundle))){ZipEntry e;byte[] b=new byte[32768];while((e=zip.getNextEntry())!=null){if(++entries>10000)throw new IOException("标准库文件过多");File f=new File(stage,e.getName());if(!f.getCanonicalPath().startsWith(root))throw new IOException("标准库路径无效");if(e.isDirectory()){if(!f.isDirectory()&&!f.mkdirs())throw new IOException("目录创建失败");continue;}if(!f.getParentFile().isDirectory()&&!f.getParentFile().mkdirs())throw new IOException("目录创建失败");try(OutputStream out=new FileOutputStream(f)){int n;while((n=zip.read(b))!=-1){if((total+=n)>160L*1024*1024)throw new IOException("标准库体积超过限制");out.write(b,0,n);}}}}
-   copy(c.getAssets().open("plugin-sitecustomize.py"),new File(stage,"sitecustomize.py"));
    File script=new File(stage,"yt-dlp");copy(c.getAssets().open("vendor/yt-dlp"),script);if(!sha(script).equals(scriptHash))throw new IOException("解析程序校验失败");
    TrustManagerFactory factory=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());factory.init((KeyStore)null);int roots=0;
    try(Writer writer=new OutputStreamWriter(new FileOutputStream(new File(stage,"android-ca.pem")),"US-ASCII")){for(TrustManager manager:factory.getTrustManagers())if(manager instanceof X509TrustManager)for(X509Certificate cert:((X509TrustManager)manager).getAcceptedIssuers()){writer.write("-----BEGIN CERTIFICATE-----\n");String encoded=android.util.Base64.encodeToString(cert.getEncoded(),android.util.Base64.NO_WRAP);for(int offset=0;offset<encoded.length();offset+=64){writer.write(encoded,offset,Math.min(64,encoded.length()-offset));writer.write(10);}writer.write("-----END CERTIFICATE-----\n");roots++;}}
