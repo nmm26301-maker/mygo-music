@@ -3,7 +3,7 @@ import android.content.Context;
 import android.graphics.*;
 import android.widget.SeekBar;
 /** All styles retain native seek/buffer behavior; the waveform uses measured samples only. */
-final class ThemeSeekBar extends SeekBar {
+class ThemeSeekBar extends SeekBar {
  private final Paint paint=new Paint(3);int style,color=0xffa8ded9;boolean active;private int frameIntervalMs;
  ThemeSeekBar(Context c){super(c);setLayerType(LAYER_TYPE_SOFTWARE,null);}
  void rendering(boolean quiet,boolean lowPerformance){frameIntervalMs=quiet?80:lowPerformance?66:0;invalidate();}

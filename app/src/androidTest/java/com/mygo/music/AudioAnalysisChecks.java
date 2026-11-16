@@ -28,19 +28,23 @@ final class AudioAnalysisChecks {
     }
     File directory(){File file=new File(context.getExternalFilesDir(null),"qa/audio-analysis");file.mkdirs();return file;}
     void shot(String name)throws Exception{test.waitForIdleSync();SystemClock.sleep(250);android.graphics.Bitmap image=test.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(directory(),name+".png"))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}finally{image.recycle();}}
-    int windowDraws(AtomicInteger draws,long millis){draws.set(0);SystemClock.sleep(millis);return draws.get();}
-    void budget(MainActivity activity,PlaybackService service)throws Exception{
-        Dialog[] window={null};ThemeSeekBar[] bar={null};FrameLayout[] root={null};AtomicInteger draws=new AtomicInteger();
+    static final class CountedWaveform extends ThemeSeekBar {
+        final AtomicInteger draws=new AtomicInteger();CountedWaveform(Context c){super(c);}
+        @Override protected void onDraw(android.graphics.Canvas canvas){super.onDraw(canvas);draws.incrementAndGet();}
+    }
+    int waveformDraws(AtomicInteger draws,long millis){draws.set(0);SystemClock.sleep(millis);return draws.get();}
+    void budget(ThemedPlayerDialog page,PlaybackService service)throws Exception{
+        CountedWaveform[] bar={null};
         try{
-            ui(()->{window[0]=new Dialog(activity);root[0]=new FrameLayout(activity);root[0].setBackgroundColor(0xff111c24);bar[0]=new ThemeSeekBar(activity);bar[0].style=2;bar[0].active=true;bar[0].rendering(false,false);root[0].addView(bar[0],new FrameLayout.LayoutParams(280,48,Gravity.CENTER));root[0].getViewTreeObserver().addOnDrawListener(()->draws.incrementAndGet());window[0].setContentView(root[0]);window[0].show();window[0].getWindow().setLayout(320,160);});
-            helper.await(()->root[0].hasWindowFocus(),"waveform budget window did not gain focus");ui(()->AudioAnalysis.demand(true,service.snapshot().playing,false));helper.await(()->AudioAnalysis.frame().time>0,"real PCM did not reach waveform window");ui(()->bar[0].invalidate());SystemClock.sleep(200);
-            int normal=windowDraws(draws,1000);ui(()->bar[0].rendering(false,true));SystemClock.sleep(200);int low=windowDraws(draws,1000);
+            ui(()->{bar[0]=new CountedWaveform(page.activity);bar[0].style=2;bar[0].active=true;bar[0].rendering(false,false);FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(page.dp(280),page.dp(48),Gravity.BOTTOM|Gravity.RIGHT);layout.bottomMargin=page.dp(132);page.root.addView(bar[0],layout);});
+            helper.await(()->page.root.hasWindowFocus()&&AudioAnalysis.authorized&&AudioAnalysis.visible&&AudioAnalysis.frame().time>0,"real PCM unavailable in focused waveform page: "+AudioAnalysis.status);ui(()->bar[0].invalidate());SystemClock.sleep(200);
+            int normal=waveformDraws(bar[0].draws,1000);ui(()->bar[0].rendering(false,true));SystemClock.sleep(200);int low=waveformDraws(bar[0].draws,1000);
             check(normal>18&&low>2&&low<=20&&low<normal*.8f,"waveform draw budget ineffective normal="+normal+" low="+low);
-            ui(()->service.pause());helper.await(()->AudioAnalysis.frame().time==0,"unfocused theme retained PCM after native pause");SystemClock.sleep(200);int paused=windowDraws(draws,600);check(paused<=2,"paused waveform kept scheduling draws "+paused);
-            JSONObject result=new JSONObject().put("normalWindowDrawsPer1000ms",normal).put("lowPerformanceWindowDrawsPer1000ms",low).put("pausedWindowDrawsPer600ms",paused).put("source","actual same-UID native audio capture").put("scope","emulator draw scheduling, not physical phone frame rate or power");
+            ui(()->service.pause());helper.await(()->AudioAnalysis.frame().time==0,"native pause retained PCM");SystemClock.sleep(200);int paused=waveformDraws(bar[0].draws,600);check(paused<=2,"paused waveform kept scheduling draws "+paused);
+            JSONObject result=new JSONObject().put("normalDrawsPer1000ms",normal).put("lowPerformanceDrawsPer1000ms",low).put("pausedDrawsPer600ms",paused).put("source","actual same-UID native audio capture on focused player page").put("scope","emulator waveform draw scheduling, not physical phone frame rate or power");
             try(FileOutputStream out=new FileOutputStream(new File(directory(),"render-budget.json"))){out.write(result.toString(2).getBytes("UTF-8"));}
             System.out.println("MYGO_WAVEFORM_BUDGET_OK realPcm=true normalDraws="+normal+" lowDraws="+low+" pausedDraws="+paused);
-        }finally{ui(()->{if(window[0]!=null)window[0].dismiss();});}
+        }finally{ui(()->{if(bar[0]!=null)page.root.removeView(bar[0]);});}
     }
     void run()throws Exception{
         SharedPreferences prefs=context.getSharedPreferences("library",0);Map<String,?> original=new HashMap<>(prefs.getAll());prefs.edit().remove("selected_source").putBoolean("auto_cache",false).putString("player_theme","spectrum").putBoolean("player_remember_theme",true).putFloat("play_speed",1).commit();
@@ -55,9 +59,9 @@ final class AudioAnalysisChecks {
             MediaPlayer core=service.snapshot().player;long generation=service.snapshot().generation;AudioAnalysis.Frame old=AudioAnalysis.frame();long oldRevision=AudioAnalysis.revision;
             ui(()->{service.seek(12000);check(AudioAnalysis.frame().time==0,"seek retained previous spectrum");check(!AudioAnalysis.publish(old,oldRevision),"old PCM callback crossed seek boundary");});helper.await(()->peaks(1320,1760),"seek did not capture the second real tone region");check(service.snapshot().player==core&&service.snapshot().generation==generation,"analysis seek replaced the audio core");shot("after-seek");
             ui(()->{for(int i=0;i<12;i++){service.pause();check(!AudioAnalysis.playing&&AudioAnalysis.frame().time==0,"native pause did not invalidate capture");service.resume();service.setVolume(0);check(!AudioAnalysis.playing&&AudioAnalysis.frame().time==0,"native mute did not invalidate capture");service.setVolume(80);}});helper.await(()->AudioAnalysis.authorized&&peaks(1320,1760),"rapid pause/mute/resume stopped output capture: "+AudioAnalysis.status);
-            ui(()->{service.next();check(AudioAnalysis.frame().time==0,"track replacement retained previous spectrum");});helper.await(()->service.snapshot().playing&&service.snapshot().uri.equals(Uri.fromFile(second).toString())&&peaks(660,990),"new audio session did not replace captured frequencies");shot("after-next");budget(activity,service);
-            ui(()->service.resume());helper.await(()->AudioAnalysis.authorized&&peaks(660,990),"capture did not return after budget window");MediaPlayer last=service.snapshot().player;ui(()->context.startService(new Intent(context,PlayerAudioCaptureService.class).setAction("stop")));helper.await(()->!AudioAnalysis.authorized&&AudioAnalysis.frame().time==0&&AudioAnalysis.status.equals("音频分析已关闭"),"explicit capture stop did not clear output");check(service.snapshot().player==last&&service.snapshot().playing,"stopping capture stopped music");
-            System.out.println("MYGO_AUDIO_ANALYSIS_OK nativeGrantFailurePreserved=true seekTone=1320/1760Hz nextTone=660/990Hz stalePcmRejected=true rapidPauseMuteResume=12 backgroundTransport=true captureStopKeepsMusic=true");
+            ui(()->{service.next();check(AudioAnalysis.frame().time==0,"track replacement retained previous spectrum");});helper.await(()->service.snapshot().playing&&service.snapshot().uri.equals(Uri.fromFile(second).toString())&&peaks(660,990),"new audio session did not replace captured frequencies");shot("after-next");budget(page[0],service);
+            ui(()->service.resume());helper.await(()->AudioAnalysis.authorized&&peaks(660,990),"capture did not return after waveform pause");MediaPlayer last=service.snapshot().player;ui(()->context.startService(new Intent(context,PlayerAudioCaptureService.class).setAction("stop")));helper.await(()->!AudioAnalysis.authorized&&AudioAnalysis.frame().time==0&&AudioAnalysis.status.equals("音频分析已关闭"),"explicit capture stop did not clear output");check(service.snapshot().player==last&&service.snapshot().playing,"stopping capture stopped music");
+            System.out.println("MYGO_AUDIO_ANALYSIS_OK nativeGrantFailurePreserved=true seekTone=1320/1760Hz nextTone=660/990Hz stalePcmRejected=true rapidPauseMuteResume=12 nativeTransport=true captureStopKeepsMusic=true");
         }finally{ui(()->{context.stopService(new Intent(context,PlayerAudioCaptureService.class));if(page[0]!=null)page[0].dismiss();service.clearQueue();activity.finish();});first.delete();second.delete();new TurntableLyricsChecks(test).restore(prefs,original);}
     }
 }
