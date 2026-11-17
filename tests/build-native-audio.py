@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='mygo-ffmpeg-') as workspace:
             '--enable-demuxer=hls,mov,mpegts,aac,mp3,flac,ogg,wav',
             '--enable-decoder=alac,aac,mp3,flac,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le',
             '--enable-parser=aac,aac_latm,mpegaudio,flac,opus,vorbis',
-            '--enable-libmp3lame', '--enable-encoder=flac,pcm_s16le,libmp3lame', '--enable-muxer=flac,wav,mp3',
+            '--enable-libmp3lame', '--enable-encoder=flac,pcm_s16le,libmp3lame', '--enable-muxer=flac,wav,mp3,ipod', '--enable-bsf=aac_adtstoasc',
             '--enable-filter=abuffer,abuffersink,aformat,anull,aresample',
             '--extra-cflags=-O2 -fPIE -I'+str(lame_prefix/'include'), '--extra-ldflags=-L'+str(lame_prefix/'lib')+' -pie -latomic -Wl,-z,relro,-z,now,-z,max-page-size=16384']
         configurations[abi] = [flag.replace(str(source), 'FFMPEG_SOURCE').replace(str(toolchain), 'NDK_TOOLCHAIN') for flag in flags]

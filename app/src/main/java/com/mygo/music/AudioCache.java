@@ -58,12 +58,18 @@ final class AudioCache implements Closeable {
         synchronized(this){if(closed){callback.done(false,"缓存已关闭");return;}if(entries.containsKey(key)){callback.done(true,"已有缓存");return;}if(!pending.add(key)){callback.done(false,"正在缓存");return;}epoch=generation;}
         try{worker.execute(()->{File temporary=new File(root,key+"-hls-"+epoch+".part");boolean ok=false;String message="";
             try{if(context==null)throw new IOException("缺少 Android 音频解码环境");URL origin=new URL(address);long max=trackLimit();
-                PluginManager media=new PluginManager(context);try(HlsAudioProxy proxy=new HlsAudioProxy(child->{JSONObject explicit=new JSONObject();URL next=new URL(child);if(PluginMedia.sameOrigin(origin,next))for(Map.Entry<String,String> entry:originalHeaders.entrySet())explicit.put(entry.getKey(),entry.getValue());android.net.Uri source=android.net.Uri.parse(track);String id="plugin".equals(source.getScheme())?source.getAuthority():"";return media.mediaHeaders(id==null?"":id,child,"audio",explicit);},()->checkEpoch(epoch),Math.max(4096,max*2))){
-                    try{NativeAudio.convert(context,proxy.address(address),temporary,max,()->checkEpoch(epoch));}catch(Exception error){if(!proxy.failure().isEmpty())throw new IOException(proxy.failure());throw error;}
+                PluginManager media=new PluginManager(context);try{
+                    try{JSONObject copied=writeHls(media,track,origin,address,originalHeaders,temporary,max,epoch,true);for(Iterator<String> keys=copied.keys();keys.hasNext();){String field=keys.next();metadata.put(field,copied.get(field));}}
+                    catch(NativeAudio.CopyUnsupported unsupported){checkEpoch(epoch);temporary.delete();writeHls(media,track,origin,address,originalHeaders,temporary,max,epoch,false);}
                 }finally{media.close();}
                 validate(temporary);publishFile(key,track,title,quality,metadata,temporary,epoch);ok=true;message="分段音频已完整缓存，可离线播放";
             }catch(Exception error){message=error.getMessage()==null?"分段缓存失败":error.getMessage();}finally{temporary.delete();synchronized(this){pending.remove(key);}callback.done(ok,message);}
         });}catch(RejectedExecutionException error){synchronized(this){pending.remove(key);}callback.done(false,"缓存任务已满");}
+    }
+    private JSONObject writeHls(PluginManager media,String track,URL origin,String address,Map<String,String> originalHeaders,File temporary,long max,long epoch,boolean copy)throws Exception{
+        try(HlsAudioProxy proxy=new HlsAudioProxy(child->{JSONObject explicit=new JSONObject();if(PluginMedia.sameOrigin(origin,new URL(child)))for(Map.Entry<String,String> entry:originalHeaders.entrySet())explicit.put(entry.getKey(),entry.getValue());android.net.Uri source=android.net.Uri.parse(track);String id="plugin".equals(source.getScheme())?source.getAuthority():"";return media.mediaHeaders(id==null?"":id,child,"audio",explicit);},()->checkEpoch(epoch),Math.max(4096,max*2))){
+            try{if(copy)return NativeAudio.copyM4a(context,proxy.address(address),temporary,max,()->checkEpoch(epoch));NativeAudio.convert(context,proxy.address(address),temporary,max,()->checkEpoch(epoch));if(!proxy.failure().isEmpty())throw new IOException(proxy.failure());return new JSONObject();}catch(Exception error){if(!proxy.failure().isEmpty())throw new IOException(proxy.failure());throw error;}
+        }
     }
     private void checkEpoch(long epoch)throws IOException{synchronized(this){if(closed||generation!=epoch||Thread.currentThread().isInterrupted())throw new IOException("缓存任务已取消");}}
     private void download(String key,String track,String title,String quality,String address,Map<String,String> headers,long epoch,Callback callback){File temporary=new File(root,key+"-"+epoch+".part");PluginMedia.Connection source=null;HttpURLConnection connection=null;boolean ok=false;String message="";

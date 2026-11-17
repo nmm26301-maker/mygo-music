@@ -1,0 +1,131 @@
+name: Verify complete HLS cache
+'on':
+  push:
+    branches:
+    - codex/hls-cache-check-20261117
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Install Android SDK
+      run: 'export ANDROID_HOME=/usr/local/lib/android/sdk
+
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+        yes | sdkmanager --licenses >/dev/null || true
+
+        sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+        '
+    - name: Build Android plugin launcher for all supported ABIs
+      run: "export ANDROID_HOME=/usr/local/lib/android/sdk\nexport PATH=\"$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH\"\
+        \nsdkmanager \"ndk;27.2.12479018\"\nTOOLCHAIN=\"$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin\"\
+        \nfor SPEC in \"arm64-v8a:aarch64-linux-android\" \"armeabi-v7a:armv7a-linux-androideabi\"\
+        \ \"x86_64:x86_64-linux-android\" \"x86:i686-linux-android\"; do\n  ABI=\"\
+        ${SPEC%%:*}\"\n  TARGET=\"${SPEC#*:}\"\n  mkdir -p \"app/src/main/jniLibs/$ABI\"\
+        \n  \"$TOOLCHAIN/${TARGET}23-clang\" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384\
+        \ app/src/main/cpp/plugin-launcher.c -o \"app/src/main/jniLibs/$ABI/libmygo-launcher.so\"\
+        \ndone\n"
+    - uses: actions/cache@v4
+      id: native-audio-cache
+      with:
+        path: .native-audio-cache
+        key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
+    - name: Build pinned Android audio decoder and corresponding source archive
+      run: python3 tests/build-native-audio.py
+    - uses: actions/cache/save@v4
+      if: steps.native-audio-cache.outputs.cache-hit != 'true'
+      with:
+        path: .native-audio-cache
+        key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: actions/cache@v4
+      id: plugin-tools-cache
+      with:
+        path: .plugin-tools-cache
+        key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json',
+          'app/src/main/cpp/plugin-python.c') }}
+    - name: Build verified native plugin tools
+      run: python3 tests/build-plugin-tools.py
+    - uses: actions/cache/save@v4
+      if: steps.plugin-tools-cache.outputs.cache-hit != 'true'
+      with:
+        path: .plugin-tools-cache
+        key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json',
+          'app/src/main/cpp/plugin-python.c') }}
+    - name: Enable emulator KVM
+      run: 'echo ''KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"''
+        | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+
+        sudo udevadm control --reload-rules
+
+        sudo udevadm trigger --name-match=kvm
+
+        '
+    - name: Prepare verified offline TypeScript compiler
+      run: python3 tests/prepare-typescript.py
+    - name: Prepare pinned upstream market packages for tests
+      run: python3 tests/prepare-market-audit.py
+    - name: Prepare original provider and HLS fixtures
+      run: 'sudo apt-get update -qq
+
+        sudo apt-get install -y ffmpeg
+
+        python3 tests/prepare-port-fixtures.py
+
+        python3 tests/prepare-live-aac.py
+
+        python3 tests/prepare-provider-fixes.py
+
+        node tests/prepare-lyric-motion.cjs
+
+        node --test tests/kugou-playback.test.mjs tests/qq-web-login.test.mjs tests/plugin-fetch-stream.test.mjs
+
+        '
+    - name: Build Android runtime tests
+      run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
+    - name: Verify complete HLS offline cache on Android
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 33
+        arch: x86_64
+        target: google_apis
+        disable-animations: true
+        script: 'adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+          adb shell am instrument -w -e hlsCache true com.mygo.music.test/com.mygo.music.PluginInstrumentation
+          | tee hls-cache-check-results.txt
+
+          adb logcat -d > hls-cache-check-logcat.txt
+
+          adb pull /sdcard/Android/data/com.mygo.music/files/qa/hls-cache hls-cache
+          || true
+
+          grep -F MYGO_HLS_CACHE_OK hls-cache-check-results.txt
+
+          grep -F MYGO_SOUNDGO_OFFLINE_OK hls-cache-check-results.txt'
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: hls-cache-check-results
+        path: 'hls-cache-check-results.txt
+
+          hls-cache-check-logcat.txt
+
+          hls-cache/
+
+          .native-audio-cache/*.log'
