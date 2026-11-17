@@ -42,3 +42,6 @@ print('Generated clear stereo fMP4 HLS and independently remuxed expected AAC ac
 subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','anoisesrc=color=white:sample_rate=48000:duration=12:seed=114','-f','lavfi','-i','anoisesrc=color=pink:sample_rate=48000:duration=12:seed=217','-filter_complex','[0:a][1:a]amerge=inputs=2[a]','-map','[a]','-c:a','aac','-b:a','128k','-f','hls','-hls_time','2','-hls_playlist_type','vod','-hls_segment_filename',str(target/'cache-noise-%03d.ts'),str(target/'cache-noise.m3u8')],check=True)
 (target/'cache-missing.m3u8').write_text('#EXTM3U\n#EXT-X-TARGETDURATION:8\n#EXTINF:8,\nsegment-000.ts\n#EXTINF:8,\ncache-absent.ts\n#EXT-X-ENDLIST\n')
 (target/'cache-truncated.m3u8').write_text('#EXTM3U\n#EXT-X-TARGETDURATION:8\n#EXTINF:8,\nsegment-000.ts\n#EXTINF:8,\ncache-truncated.ts\n#EXT-X-ENDLIST\n')
+
+# Native mirror checks require independently distinguishable stereo channels in an ordinary M4A.
+subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=20','-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=20','-filter_complex','[0:a][1:a]amerge=inputs=2[a]','-map','[a]','-c:a','aac','-b:a','160k','-movflags','+faststart',str(target/'bilibili-stereo.m4a')],check=True)

@@ -14,6 +14,10 @@ final class PluginAdapters {
         JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");if(!identity.equals("soundgo")&&!identity.equals("kugou")&&!identity.equals("kugou-lite")&&!identity.equals("qqmusic")&&!identity.equals("bilibili"))return;
         File file=new File(root,identity.equals("qqmusic")?manifest.optString("main","index.js"):"index.js");if(!file.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator)||!file.isFile())return;String source=PluginIdentity.read(file);StringBuilder hash=new StringBuilder();for(byte value:MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)))hash.append(String.format(Locale.ROOT,"%02x",value&255));String digest=hash.toString();
         if(identity.equals("bilibili")&&digest.equals("d2f013c26929710d2185975a078a5844b9c41f9c704df6995951127c270a8f28")){
+            String mirror="async function playableMirror(urls, headers) {";
+            if(source.indexOf(mirror)<0||source.indexOf(mirror)!=source.lastIndexOf(mirror))return;
+            source="import {selectBilibiliMirror as __androidBilibiliMirror} from 'https://plugin.invalid/.host/bilibili-playback.mjs';\n"+source.replace(mirror,"async function __androidOriginalMirror(urls, headers) {");
+            source+="\nasync function playableMirror(urls,headers){return host.platform==='android'?__androidBilibiliMirror(urls,headers):__androidOriginalMirror(urls,headers);}\n";
             String route="if (typeof host.webSignIn === \"function\") return signInOnPage();";
             if(source.indexOf(route)<0||source.indexOf(route)!=source.lastIndexOf(route))return;
             source=source.replace(route,"if (host.platform !== 'android' && typeof host.webSignIn === 'function') return signInOnPage();");
