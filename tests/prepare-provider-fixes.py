@@ -19,3 +19,24 @@ for name,repo,commit,digest in [
  assert hashlib.sha256(data).hexdigest()==digest
  (target/name).write_bytes(data)
 print('Verified original Bilibili and licensed Ximalaya login fixtures')
+
+# The current Bilibili release is checked against every blob of its immutable Git tree.
+# Keep the older market archive as an independent compatibility target.
+import io,json,zipfile
+pin=json.loads((root/'tests/bilibili-current-pin.json').read_text())
+with urllib.request.urlopen(pin['url'],timeout=45) as response:archive=response.read(32*1024*1024+1)
+assert len(archive)<=32*1024*1024,'Current Bilibili fixture archive too large'
+prefix='mygo-music-bilibili-'+pin['commit']+'/'
+with zipfile.ZipFile(io.BytesIO(archive)) as package:
+ assert all(name.endswith('/') or name.startswith(prefix) for name in package.namelist()),'Unexpected archive root'
+ files={name[len(prefix):]:package.read(name) for name in package.namelist() if not name.endswith('/') and name.startswith(prefix)}
+ assert set(files)==set(pin['gitBlobs']),'Current Bilibili archive tree differs from the pinned commit'
+ for name,data in files.items():
+  assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==pin['gitBlobs'][name],name
+ assert hashlib.sha256(files['index.js']).hexdigest()==pin['entrySha256']
+ assert files['LICENSE']==(root/'app/src/main/assets/third-party/Bilibili-MIT.txt').read_bytes()
+ manifest=json.loads(files['plugin.json']);assert manifest['id']=='bilibili' and manifest['version']=='0.4.2'
+ (target/'bilibili-current.js').write_bytes(files['index.js'])
+(target/'bilibili-current.zip').write_bytes(archive)
+(target/'bilibili-current-proof.json').write_text(json.dumps({'commit':pin['commit'],'sourceSha256':pin['entrySha256'],'archiveSha256':hashlib.sha256(archive).hexdigest(),'verifiedGitBlobs':len(files)},indent=2))
+print('Verified current Bilibili 0.4.2 and all',len(files),'pinned Git blobs')

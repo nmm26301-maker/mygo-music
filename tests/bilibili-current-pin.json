@@ -1,0 +1,24 @@
+{
+  "repo": "GentleM4dman/mygo-music-bilibili",
+  "commit": "48fe847fedfbf6f709df37d6074289906ab369f7",
+  "url": "https://codeload.github.com/GentleM4dman/mygo-music-bilibili/zip/48fe847fedfbf6f709df37d6074289906ab369f7",
+  "entrySha256": "59194627a11339056eff8d806f988bddf2657a0d18449b69f18162b6a9da1c9d",
+  "gitBlobs": {
+    ".gitignore": "646ac519ef2111a8c1f9698fa8331115601809be",
+    "LICENSE": "b8c22c26d4c9217ed175c959020d1c9f681989bc",
+    "README.md": "0ec28f69ee5a4f9e01d78c9cd39505c6fc962eea",
+    "index.js": "17caf3c8561fddc8faf790e6879e96fe35d56be6",
+    "locales/zh-CN.json": "a1c4c6fbfce344d1d641c94cb6535a813ddb0034",
+    "package.json": "fdc7e2bf7869ac98c2387b94dcd0e26831891be9",
+    "plugin.json": "ed4130cce5c7ee671c9ccd488db9d9f654c40530",
+    "tests/harness.mjs": "17ca1e853451018ea37e8c9d08041c89387afb72",
+    "tests/live.mjs": "8f63728419e9aaeff3532244cdf8f1a37989051d",
+    "tests/lyrics.mjs": "eafc84678ab508ddcf6cdc7d579dc4c78ec9b2b1",
+    "tests/paging.mjs": "1389a53e450ac689756ad21753f146e60f69cf09",
+    "tests/playlists.mjs": "a496d56fb00e820e6415111859edf056b381f206",
+    "tests/saved.mjs": "5574e756c4528c19bebe5757dce4f899a580b520",
+    "tests/signin.mjs": "d217d7cf345c337249365b4f0f3d3fdca53904d5",
+    "tests/stream.mjs": "94843ba6e5aa04b775756c2172a6e65bb3b614d1",
+    "tests/subtitles.mjs": "38fe2e54dab4b5d4d2a5b7f06cae6644cd2addd8"
+  }
+}
