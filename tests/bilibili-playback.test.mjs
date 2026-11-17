@@ -1,9 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {selectBilibiliMirror} from '../app/src/main/assets/bilibili-playback.mjs';
+import {selectBilibiliMirror,androidBilibiliHeAac} from '../app/src/main/assets/bilibili-playback.mjs';
 const a='https://one.bilivideo.com/audio.m4a?signature=first';
 const b='https://two.bilivideo.cn/audio.m4a?signature=second';
 const media=Buffer.from([0,0,0,24,...Buffer.from('ftypM4A '),0,0,0,0]);
+
+test('HE-AAC profiles use original readable media without claiming lossless or inventing sample precision',async()=>{
+ for(const [codec,expected] of [['mp4a.40.5','he-aac'],['mp4a.40.29','he-aac-v2']]){
+  const headers={Referer:'https://www.bilibili.com/','User-Agent':'original-agent'};
+  const result=await androidBilibiliHeAac({as:'he',codec,urls:[a,b],bandwidth:64000},'lossless',headers,{fetch:async u=>u===a?new Response('',{status:403}):response()});
+  assert.equal(result.url,b);assert.equal(result.type,'m4a');assert.equal(result.sourceCodec,expected);assert.equal(result.quality,'high');assert.equal(result.sourceQuality,'high');assert.equal(result.sourceBitRateUnit,'bps');assert.equal(result.bitRate,64000);assert.equal(result.headers,headers);assert.equal(result.sampleRate,undefined);assert.equal(result.bitDepth,undefined);
+ }
+});
+test('unknown codecs and existing AAC-LC or FLAC branches retain the original source behavior',async()=>{
+ for(const audio of [{as:'he',codec:'opus'},{as:'he',codec:'mp4a.40.42'},{as:'he',codec:''},{as:'m4a',codec:'mp4a.40.2'},{as:'flac',codec:'flac'}])assert.equal(await androidBilibiliHeAac(audio,'high',{}, {fetch:()=>{throw Error('unexpected request');}}),null);
+});
+test('standard HE-AAC quality is retained and an unreadable source is not converted into a desktop URL',async()=>{
+ assert.equal((await androidBilibiliHeAac({as:'he',codec:'mp4a.40.5',urls:[a]},'standard',{}, {fetch:async()=>response()})).quality,'standard');
+ await assert.rejects(androidBilibiliHeAac({as:'he',codec:'mp4a.40.29',urls:[a]},'high',{}, {fetch:async()=>new Response('',{status:403})}),e=>e.code==='unavailable');
+});
 function response(data=media,{status=206,headers={}}={}){return new Response(data,{status,headers:{'Content-Type':'video/mp4','Content-Length':String(data.length),...(status===206?{'Content-Range':`bytes 0-${data.length-1}/${data.length}`}:{ }),...headers}});}
 
 test('one-byte-success mirror is rejected by the real playback range and signed backup is retained',async()=>{

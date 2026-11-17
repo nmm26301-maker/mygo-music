@@ -11,12 +11,22 @@ final class PluginAdapters {
     static final String SOUNDGO_SHA="bd256059a8be720df5b79db6a8da90d7a0aba0d660fd4057afba8dac97c0196e";
     private File entry;private byte[] adapted;boolean deviceNetwork,qqWebLogin;
     PluginAdapters(File root){try{
-        JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");if(!identity.equals("soundgo")&&!identity.equals("kugou")&&!identity.equals("kugou-lite")&&!identity.equals("qqmusic")&&!identity.equals("bilibili"))return;
+        JSONObject manifest=new JSONObject(PluginIdentity.read(new File(root,"plugin.json")));String identity=manifest.optString("id");if(!identity.equals("soundgo")&&!identity.equals("kugou")&&!identity.equals("kugou-lite")&&!identity.equals("qqmusic")&&!identity.equals("bilibili")&&!identity.equals("ximalaya"))return;
         File file=new File(root,identity.equals("qqmusic")?manifest.optString("main","index.js"):"index.js");if(!file.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator)||!file.isFile())return;String source=PluginIdentity.read(file);StringBuilder hash=new StringBuilder();for(byte value:MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)))hash.append(String.format(Locale.ROOT,"%02x",value&255));String digest=hash.toString();
+        if(identity.equals("ximalaya")&&digest.equals("6a09ce6438ebc3787213f4c3319b7ee933576d104853878edf836db78e631abb")){
+            String marker="    throw new Error(`喜马拉雅接口暂不可用（";
+            if(source.indexOf(marker)<0||source.indexOf(marker)!=source.lastIndexOf(marker))return;
+            source="import {ximalayaResponseError as __androidXimalayaResponseError} from 'https://plugin.invalid/.host/ximalaya-response.mjs';\n"+source.replace(marker,"    const __regionalError=__androidXimalayaResponseError(body);if(__regionalError)throw __regionalError;\n"+marker);
+            adapted=source.getBytes(StandardCharsets.UTF_8);entry=file.getCanonicalFile();return;
+        }
         if(identity.equals("bilibili")&&(digest.equals("d2f013c26929710d2185975a078a5844b9c41f9c704df6995951127c270a8f28")||digest.equals("59194627a11339056eff8d806f988bddf2657a0d18449b69f18162b6a9da1c9d"))){
             String mirror="async function playableMirror(urls, headers) {";
             if(source.indexOf(mirror)<0||source.indexOf(mirror)!=source.lastIndexOf(mirror))return;
-            source="import {selectBilibiliMirror as __androidBilibiliMirror} from 'https://plugin.invalid/.host/bilibili-playback.mjs';\n"+source.replace(mirror,"async function __androidOriginalMirror(urls, headers) {");
+            source="import {selectBilibiliMirror as __androidBilibiliMirror,androidBilibiliHeAac as __androidBilibiliHeAac} from 'https://plugin.invalid/.host/bilibili-playback.mjs';\n"+source.replace(mirror,"async function __androidOriginalMirror(urls, headers) {");
+            String he="return { urls: urls(all[0]), as: \"he\", bandwidth: all[0].bandwidth };";
+            String streamHeaders="  const headers = { Referer: REFERER, \"User-Agent\": UA };";
+            if(source.indexOf(he)<0||source.indexOf(he)!=source.lastIndexOf(he)||source.indexOf(streamHeaders)<0||source.indexOf(streamHeaders)!=source.lastIndexOf(streamHeaders))return;
+            source=source.replace(he,"return { urls: urls(all[0]), as: 'he', bandwidth: all[0].bandwidth, codec:all[0].codecs||'' };").replace(streamHeaders,streamHeaders+"\n  if(host.platform==='android'){const direct=await __androidBilibiliHeAac(audio,tier,headers);if(direct)return direct;}");
             source+="\nasync function playableMirror(urls,headers){return host.platform==='android'?__androidBilibiliMirror(urls,headers):__androidOriginalMirror(urls,headers);}\n";
             String route="if (typeof host.webSignIn === \"function\") return signInOnPage();";
             if(source.indexOf(route)<0||source.indexOf(route)!=source.lastIndexOf(route))return;

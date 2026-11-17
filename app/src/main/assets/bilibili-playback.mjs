@@ -3,6 +3,17 @@
 const allowed = /\.bilivideo\.(com|cn)$/i;
 const unavailable = () => Object.assign(new Error('B站音频镜像暂时无法读取，请稍后重试或切换音源'), {code:'unavailable'});
 
+// Android decodes these MPEG-4 profiles in the shared native player. Other
+// codecs retain the original plugin path; a container label is not a codec.
+export async function androidBilibiliHeAac(audio, tier, headers, options) {
+  const profile = /^mp4a\.40\.(5|29)$/i.exec(audio?.codec || '');
+  if (audio?.as !== 'he' || !profile) return null;
+  const quality = tier === 'standard' ? 'standard' : 'high';
+  return {url:await selectBilibiliMirror(audio.urls,headers,options),type:'m4a',
+    quality,sourceQuality:quality,sourceCodec:profile[1]==='29'?'he-aac-v2':'he-aac',
+    bitRate:audio.bandwidth,sourceBitRateUnit:'bps',headers};
+}
+
 function candidate(value) {
   try {
     const url = new URL(value);
