@@ -64,7 +64,7 @@ final class OfflinePlaybackChecks {
         }
         check(missing.file.delete(),"could not simulate a missing cache file");
         check(cache.list().size()==1&&cache.bytes()==playing.bytes,"expired file remained in list or capacity total");
-        test.getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);
+        SourcePlaylistUiChecks.click(test,"关闭");
         helper.await(activity::hasWindowFocus,"close refreshed cache list");
         ui(()->{
             AlertDialog refreshed=(AlertDialog)invoke(activity,"showAudioCache",new Class<?>[]{});
