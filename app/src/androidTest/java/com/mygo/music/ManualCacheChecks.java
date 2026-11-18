@@ -119,8 +119,48 @@ final class ManualCacheChecks {
                     "offline lyrics lost the original word timestamps or translation");
                 stage[0].dismiss();
             });
+            verifyLibraryLyrics(activity,service,prefs,id,entry);
         }finally{prefs.edit().putBoolean("plugin_enabled_"+id,true).commit();}
         System.out.println("MYGO_MANUAL_CACHE_LYRICS_OK: cached audio and original word timestamps plus translation available in the actual offline lyric stage with the source disabled");
+    }
+
+    private void verifyLibraryLyrics(MainActivity activity,PlaybackService service,SharedPreferences prefs,
+            String source,AudioCache.Entry entry)throws Exception{
+        prefs.edit().putBoolean("player_remember_theme",true).putString("player_theme","immersive").commit();
+        actions.ui(()->{
+            @SuppressWarnings("unchecked")
+            java.util.List<android.net.Uri> tracks=(java.util.List<android.net.Uri>)OfflinePlaybackChecks.field(activity,"tracks");
+            @SuppressWarnings("unchecked")
+            Map<String,String> refs=(Map<String,String>)OfflinePlaybackChecks.field(activity,"pluginTrackRefs");
+            refs.put(entry.track,source+"\ndirect");
+            int index=tracks.indexOf(android.net.Uri.parse(entry.track));
+            OfflinePlaybackChecks.check(index>=0,"cached song did not appear in the normal library");
+            OfflinePlaybackChecks.invoke(activity,"playIndex",new Class<?>[]{int.class},index);
+        });
+        actions.helper.await(()->!service.snapshot().offlineOnly&&service.snapshot().playing
+            &&service.snapshot().uri.equals(entry.track)&&service.snapshot().stream.startsWith("file:"),
+            "normal library did not start the cached audio with the source disabled");
+        ThemedPlayerDialog[] player={null};
+        LyricsStageDialog[] stage={null};
+        actions.ui(()->{
+            service.pause();
+            OfflinePlaybackChecks.invoke(activity,"showNowPlaying",new Class<?>[]{});
+            player[0]=(ThemedPlayerDialog)OfflinePlaybackChecks.field(activity,"themedPlayer");
+        });
+        actions.helper.await(()->player[0]!=null&&player[0].stage.timeline().wordTimed,
+            "normal player did not load source timing from the cache");
+        actions.ui(()->{
+            player[0].dismiss();
+            OfflinePlaybackChecks.invoke(activity,"showLyrics",new Class<?>[]{});
+            stage[0]=(LyricsStageDialog)OfflinePlaybackChecks.field(activity,"lyricsStage");
+        });
+        actions.helper.await(()->stage[0].stage.timeline().wordTimed,"normal lyric stage did not load saved lyrics");
+        actions.ui(()->OfflinePlaybackChecks.invoke(activity,"loadStageLyrics",new Class<?>[]{boolean.class},true));
+        actions.helper.await(()->stage[0].stage.timeline().wordTimed
+            &&stage[0].stage.timeline().lines.get(0).text.equals(SAVED_LINE),
+            "a failed explicit lyric refresh discarded the saved lyrics");
+        actions.ui(()->stage[0].dismiss());
+        System.out.println("MYGO_LIBRARY_CACHE_LYRICS_OK: normal library playback, immersive theme and isolated lyric stage read cached lyrics; explicit refresh falls back after the disabled source fails");
     }
 
     private AudioCache.Entry verifyDecodedSave(MainActivity activity,PlaybackService service,AudioCache cache,
