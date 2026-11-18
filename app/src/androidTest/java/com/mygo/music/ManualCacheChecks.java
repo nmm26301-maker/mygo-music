@@ -117,7 +117,7 @@ final class ManualCacheChecks {
             prefs.edit().putBoolean("plugin_enabled_"+id,false).commit();
         }finally{release.countDown();}
         OfflinePlaybackChecks.check(cancelled.await(5,TimeUnit.SECONDS)&&!oldSucceeded.get(),"a cancelled save published audio");
-        actions.helper.await(()->cache.list().stream().anyMatch(entry->entry.track.equals(opus)&&entry.quality.equals("standard")),"queued save lost the compatible file after track switch: "+prefs.getString("cache_status",""));
+        actions.helper.await(()->!cache.busy()&&prefs.getString("cache_status","").equals("兼容音频已缓存，可离线播放")&&cache.list().stream().anyMatch(entry->entry.track.equals(opus)&&entry.quality.equals("standard")),"queued save lost the compatible file after track switch: "+prefs.getString("cache_status",""));
         AudioCache.Entry saved=cache.list().stream().filter(entry->entry.track.equals(opus)).findFirst().get();
         OfflinePlaybackChecks.check(!cache.busy()&&cache.list().size()==1&&Arrays.equals(Files.readAllBytes(saved.file.toPath()),expected),"wrong file, duplicate entry or incomplete compatible audio cached");
         OfflinePlaybackChecks.check(saved.info.optString("sourceCodec").equals("opus"),"compatible FLAC hid the original source codec");
