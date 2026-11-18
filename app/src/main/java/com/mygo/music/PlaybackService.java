@@ -111,7 +111,8 @@ public class PlaybackService extends Service {
         if(closed||index<0||index>=queue.size()||!ready){callback.done(false,"请先打开一首在线歌曲，等待音频就绪");return;}
         if(currentCached){callback.done(true,"已有缓存");return;}
         if(liveSource){callback.done(false,"直播音频无法保存为完整离线歌曲");return;}
-        if(remote.active()||!hasHttpStream()||!"plugin".equals(Uri.parse(queue.get(index).optString("uri")).getScheme())){
+        if(remote.active()||!"plugin".equals(Uri.parse(queue.get(index).optString("uri")).getScheme())||
+            !(hasHttpStream()||sourceResolved&&decodedFile!=null)){
             callback.done(false,"当前播放的音频不支持离线缓存");return;
         }
         storeCurrentStream(callback);
@@ -124,7 +125,8 @@ public class PlaybackService extends Service {
             prefs.edit().putString("cache_status",message).apply();
             callback.done(ok,message);
         };
-        if(HlsPlayback.matches(Uri.parse(stream),streamKind))cache.storeHls(track,title,activeQuality,stream,headers,audioInfo,done);
+        if(decodedFile!=null)cache.storeDecoded(track,title,activeQuality,audioInfo,decodedFile,done);
+        else if(HlsPlayback.matches(Uri.parse(stream),streamKind))cache.storeHls(track,title,activeQuality,stream,headers,audioInfo,done);
         else cache.store(track,title,activeQuality,stream,headers,audioInfo,done);
     }
     private void clearRadio(){radioRevision++;radioSource="";radioId="";radioFailure="";radioFetching=false;radioWaiting=false;}

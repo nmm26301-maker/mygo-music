@@ -21,6 +21,7 @@ final class AudioCache implements Closeable {
     }
     private Context context;private final File root;private final HashMap<String,Entry> entries=new HashMap<>();private final HashMap<String,Long> pending=new HashMap<>();
     private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16));
+    private final Set<FileInputStream> decodedInputs=new HashSet<>();
     private String pinned="",switchPinned="";
     private long limit,generation;private volatile boolean closed;
     AudioCache(Context context){this(new File(context.getNoBackupFilesDir(),"audio-cache"),DEFAULT_LIMIT);this.context=context.getApplicationContext();}
@@ -61,7 +62,73 @@ final class AudioCache implements Closeable {
         checkEpoch(epoch);long bytes=temporary.length();if(bytes<=0||bytes>trackLimit())throw new IOException("单曲超过缓存大小限制");File target=new File(root,key+".audio");if(!temporary.renameTo(target))throw new IOException("无法保存完整音频");Entry entry=new Entry(key,track,title,quality,target,bytes,System.currentTimeMillis());entry.info=AudioQuality.info(info);try{writeMetadata(entry);}catch(Exception error){target.delete();throw error;}entries.put(key,entry);trim(key);return target;
     }
     File importFile(String track,String title,String quality,JSONObject info,File input,long epoch)throws Exception{
-        String key=key(track,quality);File temporary=File.createTempFile(key+"-import-",".part",root);try{long count=0;try(InputStream in=new FileInputStream(input);FileOutputStream out=new FileOutputStream(temporary)){byte[] buffer=new byte[32768];int n;while((n=in.read(buffer))!=-1){checkEpoch(epoch);if((count+=n)>trackLimit())throw new IOException("单曲超过缓存大小限制");out.write(buffer,0,n);}out.getFD().sync();}validate(temporary);return publishFile(key,track,title,quality,info,temporary,epoch);}finally{temporary.delete();}
+        try(FileInputStream in=new FileInputStream(input)){
+            return copyDecoded(key(track,quality),track,title,quality,info,in,epoch,false);
+        }
+    }
+    private File copyDecoded(String key,String track,String title,String quality,JSONObject info,FileInputStream in,long epoch,boolean reuseExisting)throws Exception{
+        checkEpoch(epoch);
+        long expected=in.getChannel().size();
+        if(expected<=0||expected>trackLimit())throw new IOException("单曲超过缓存大小限制或音频为空");
+        File temporary=File.createTempFile(key+"-import-",".part",root);
+        try{
+            long count=0;
+            try(FileOutputStream out=new FileOutputStream(temporary)){
+                byte[] buffer=new byte[32768];int n;
+                while((n=in.read(buffer))!=-1){
+                    checkEpoch(epoch);
+                    if((count+=n)>trackLimit())throw new IOException("单曲超过缓存大小限制");
+                    out.write(buffer,0,n);
+                }
+                out.getFD().sync();
+            }
+            if(count!=expected)throw new IOException("音频保存不完整");
+            validate(temporary);
+            synchronized(this){
+                checkEpoch(epoch);
+                Entry saved=reuseExisting?existing(key):null;
+                if(saved!=null)return saved.file;
+                return publishFile(key,track,title,quality,info,temporary,epoch);
+            }
+        }finally{temporary.delete();}
+    }
+    void storeDecoded(String track,String title,String quality,JSONObject info,File file,Callback callback){
+        String key=key(track,quality);
+        JSONObject metadata=AudioQuality.info(info);
+        final FileInputStream input;
+        final long epoch;
+        synchronized(this){
+            if(closed){callback.done(false,"缓存已关闭");return;}
+            if(existing(key)!=null){callback.done(true,"已有缓存");return;}
+            if(pending.containsKey(key)){callback.done(false,"正在缓存");return;}
+            // Keep the open file valid even if changing tracks deletes its temporary path.
+            try{input=new FileInputStream(file);}catch(IOException error){callback.done(false,"当前音频文件已不可用");return;}
+            decodedInputs.add(input);
+            epoch=generation;
+            pending.put(key,epoch);
+        }
+        try{
+            worker.execute(()->{
+                boolean ok=false;
+                String message;
+                try{
+                    copyDecoded(key,track,title,quality,metadata,input,epoch,true);
+                    ok=true;message="兼容音频已缓存，可离线播放";
+                }catch(Exception error){message=error.getMessage()==null?"兼容音频缓存失败":error.getMessage();}
+                finally{finishDecoded(key,epoch,input);}
+                callback.done(ok,message);
+            });
+        }catch(RejectedExecutionException error){finishDecoded(key,epoch,input);callback.done(false,"缓存任务已满，请稍后重试");}
+    }
+    private synchronized void finishDecoded(String key,long epoch,FileInputStream input){
+        closeInput(input);
+        decodedInputs.remove(input);
+        finish(key,epoch);
+    }
+    private static void closeInput(FileInputStream input){try{input.close();}catch(IOException ignored){}}
+    private void closeDecodedInputs(){
+        for(FileInputStream input:decodedInputs)closeInput(input);
+        decodedInputs.clear();
     }
     void storeHls(String track,String title,String quality,String address,Map<String,String> headers,JSONObject info,Callback callback){
         String key=key(track,quality);final long epoch;Map<String,String> originalHeaders=new HashMap<>(headers);JSONObject metadata=AudioQuality.info(info);
@@ -102,6 +169,6 @@ final class AudioCache implements Closeable {
         entries.remove(entry.key);
         new File(root,entry.key+".json").delete();
     }
-    synchronized void clear(){generation++;pending.clear();pinned="";switchPinned="";entries.clear();File[] files=root.listFiles();if(files!=null)for(File file:files)file.delete();}
-    @Override public synchronized void close(){closed=true;generation++;worker.shutdownNow();}
+    synchronized void clear(){generation++;pending.clear();closeDecodedInputs();pinned="";switchPinned="";entries.clear();File[] files=root.listFiles();if(files!=null)for(File file:files)file.delete();}
+    @Override public synchronized void close(){closed=true;generation++;closeDecodedInputs();worker.shutdownNow();}
 }
