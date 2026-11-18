@@ -21,6 +21,7 @@ final class ManualCacheChecks {
     private final Instrumentation test;
     private final OfflinePlaybackChecks actions;
     private final Context context;
+    private static final String SAVED_LINE="离线逐字歌词";
 
     ManualCacheChecks(Instrumentation test){
         this.test=test;
@@ -43,7 +44,8 @@ final class ManualCacheChecks {
             actions.ui(service::clearQueue);
             cache.clear();
             actions.helper.install(manager,id,"stream",new JSONArray(),
-                "export function stream({id}){const path={hls:'fmp4.m3u8',opus:'opus.m3u8'}[id]||'bilibili-stereo.m4a';return {url:'"+server.base()+"/'+path,type:id==='direct'?'aac':'hls',sourceCodec:id==='opus'?'opus':'aac',quality:'high',headers:{'X-Audio':'native','Authorization':'Bearer native-fixture'}};}");
+                "export function stream({id}){const path={hls:'fmp4.m3u8',opus:'opus.m3u8'}[id]||'bilibili-stereo.m4a';return {url:'"+server.base()+"/'+path,type:id==='direct'?'aac':'hls',sourceCodec:id==='opus'?'opus':'aac',quality:'high',headers:{'X-Audio':'native','Authorization':'Bearer native-fixture'}};}"+
+                "export function lyrics({id}){return id==='direct'?{lines:[{start:0,end:6000,translation:'Saved translation',words:[{text:'"+SAVED_LINE+"',start:700,end:4300}]}]}:'';}");
             for(String kind:new String[]{"direct","hls"}){
                 String uri="plugin://"+id+"?id="+kind;
                 JSONArray queue=new JSONArray().put(new JSONObject().put("uri",uri).put("title","Manual cache "+kind));
@@ -68,6 +70,7 @@ final class ManualCacheChecks {
                     OfflinePlaybackChecks.check(Arrays.equals(hls.packets(entry.file),expected),"segmented save changed the source AAC packets");
                 }
                 actions.ui(()->picker[0].dismiss());
+                if(kind.equals("direct"))verifyOfflineLyrics(activity,service,cache,prefs,id,entry,picker);
             }
             AudioCache.Entry saved=verifyDecodedSave(activity,service,cache,prefs,id,server,picker);
             OfflinePlaybackChecks.check(!server.badHeader&&!prefs.getBoolean("auto_cache",true),"manual save lost authorized headers or changed automatic preference");
@@ -85,6 +88,39 @@ final class ManualCacheChecks {
             actions.helper.cleanup(id);
             new TurntableLyricsChecks(test).restore(prefs,old);
         }
+    }
+
+    private void verifyOfflineLyrics(MainActivity activity,PlaybackService service,AudioCache cache,
+            SharedPreferences prefs,String id,AudioCache.Entry entry,AlertDialog[] picker)throws Exception{
+        actions.helper.await(()->cache.hasLyrics(entry),"manual cache never saved source lyrics");
+        OfflinePlaybackChecks.check(!new JSONObject(prefs.getString("local_lyrics","{}")).has(entry.track),
+            "fixture opened lyrics online before saving");
+        prefs.edit().putBoolean("plugin_enabled_"+id,false).commit();
+        LyricsStageDialog[] stage={null};
+        try{
+            actions.ui(()->{
+                picker[0]=(AlertDialog)OfflinePlaybackChecks.invoke(activity,"showAudioCache",new Class<?>[]{});
+                View row=OfflinePlaybackChecks.described(picker[0].getWindow().getDecorView(),"播放离线缓存："+entry.key);
+                OfflinePlaybackChecks.check(row!=null&&row.performClick(),"saved song was missing from the actual cache list");
+            });
+            actions.helper.await(()->service.snapshot().offlineOnly&&service.snapshot().playing&&service.snapshot().uri.equals(entry.track),
+                "cached song failed to start after disabling its source");
+            actions.ui(()->{
+                service.pause();
+                OfflinePlaybackChecks.invoke(activity,"showLyrics",new Class<?>[]{});
+                stage[0]=(LyricsStageDialog)OfflinePlaybackChecks.field(activity,"lyricsStage");
+            });
+            actions.helper.await(()->stage[0].stage.timeline().wordTimed,"offline stage did not load the saved timing");
+            actions.ui(()->{
+                LyricsTimeline timeline=stage[0].stage.timeline();
+                LyricsTimeline.Line line=timeline.lines.get(0);
+                OfflinePlaybackChecks.check(!timeline.estimatedWordTiming&&line.text.equals(SAVED_LINE)
+                    &&line.words.get(0).start==700&&line.words.get(0).end==4300&&line.translation.equals("Saved translation"),
+                    "offline lyrics lost the original word timestamps or translation");
+                stage[0].dismiss();
+            });
+        }finally{prefs.edit().putBoolean("plugin_enabled_"+id,true).commit();}
+        System.out.println("MYGO_MANUAL_CACHE_LYRICS_OK: cached audio and original word timestamps plus translation available in the actual offline lyric stage with the source disabled");
     }
 
     private AudioCache.Entry verifyDecodedSave(MainActivity activity,PlaybackService service,AudioCache cache,

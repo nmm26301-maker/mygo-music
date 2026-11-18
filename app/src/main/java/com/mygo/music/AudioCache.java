@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever;
 import org.json.*;
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -26,10 +27,50 @@ final class AudioCache implements Closeable {
     private long limit,generation;private volatile boolean closed;
     AudioCache(Context context){this(new File(context.getNoBackupFilesDir(),"audio-cache"),DEFAULT_LIMIT);this.context=context.getApplicationContext();}
     AudioCache(File root,long limit){this.root=root;this.limit=Math.max(1,limit);worker.allowCoreThreadTimeOut(true);root.mkdirs();load();}
-    private void load(){File[] files=root.listFiles();if(files==null)return;for(File metadata:files){String name=metadata.getName();if(name.endsWith(".part")){metadata.delete();continue;}if(!name.matches("[a-f0-9]{64}\\.json"))continue;String key=name.substring(0,64);File audio=new File(root,key+".audio");try{JSONObject data;try(InputStream in=new FileInputStream(metadata)){byte[] bytes=new byte[(int)Math.min(metadata.length(),32768)];int n=in.read(bytes);data=new JSONObject(new String(bytes,0,Math.max(0,n),java.nio.charset.StandardCharsets.UTF_8));}String track=data.getString("track"),quality=data.getString("quality");long size=data.getLong("bytes");if(!key.equals(key(track,quality))||!audio.isFile()||size<=0||audio.length()!=size)throw new IOException("invalid audio cache");Entry entry=new Entry(key,track,data.optString("title",track),quality,audio,size,data.optLong("used",System.currentTimeMillis()));entry.info=AudioQuality.info(data.optJSONObject("audioInfo"));entries.put(key,entry);}catch(Exception error){metadata.delete();audio.delete();}}for(File file:files)if(file.getName().matches("[a-f0-9]{64}\\.audio")&&!entries.containsKey(file.getName().substring(0,64)))file.delete();trim(null);}
+    private void load(){File[] files=root.listFiles();if(files==null)return;for(File metadata:files){String name=metadata.getName();if(name.endsWith(".part")){metadata.delete();continue;}if(!name.matches("[a-f0-9]{64}\\.json"))continue;String key=name.substring(0,64);File audio=new File(root,key+".audio");try{JSONObject data;try(InputStream in=new FileInputStream(metadata)){byte[] bytes=new byte[(int)Math.min(metadata.length(),32768)];int n=in.read(bytes);data=new JSONObject(new String(bytes,0,Math.max(0,n),java.nio.charset.StandardCharsets.UTF_8));}String track=data.getString("track"),quality=data.getString("quality");long size=data.getLong("bytes");if(!key.equals(key(track,quality))||!audio.isFile()||size<=0||audio.length()!=size)throw new IOException("invalid audio cache");Entry entry=new Entry(key,track,data.optString("title",track),quality,audio,size,data.optLong("used",System.currentTimeMillis()));entry.info=AudioQuality.info(data.optJSONObject("audioInfo"));entries.put(key,entry);}catch(Exception error){metadata.delete();audio.delete();}}for(File file:files)if(file.getName().matches("[a-f0-9]{64}\\.(audio|lyrics)")&&!entries.containsKey(file.getName().substring(0,64)))file.delete();trim(null);}
     private static String key(String track,String quality){try{byte[] digest=MessageDigest.getInstance("SHA-256").digest((track+"\n"+quality).getBytes(java.nio.charset.StandardCharsets.UTF_8));StringBuilder value=new StringBuilder();for(byte b:digest)value.append(String.format(Locale.ROOT,"%02x",b&255));return value.toString();}catch(Exception error){throw new IllegalStateException(error);}}
     private Entry existing(String key){Entry entry=entries.get(key);if(entry!=null&&(!entry.file.isFile()||entry.file.length()!=entry.bytes)){removeEntry(entry);return null;}return entry;}
     synchronized File find(String track,String quality){Entry entry=existing(key(track,quality));if(entry==null)return null;entry.used=System.currentTimeMillis();try{writeMetadata(entry);}catch(Exception ignored){}return entry.file;}
+    synchronized Entry entry(String track,String quality){return existing(key(track,quality));}
+    private File lyricsFile(Entry entry){return new File(root,entry.key+".lyrics");}
+    synchronized Entry lyricsEntry(String track,String quality){
+        Entry preferred=entry(track,quality);
+        if(hasLyrics(preferred))return preferred;
+        for(Entry candidate:new ArrayList<>(entries.values())){
+            if(candidate.track.equals(track)&&hasLyrics(candidate))return candidate;
+        }
+        return null;
+    }
+    synchronized boolean hasLyrics(Entry entry){
+        if(entry==null||existing(entry.key)!=entry)return false;
+        long size=lyricsFile(entry).length();
+        return size>0&&size<=LyricsTimeline.MAX_INPUT;
+    }
+    synchronized String readLyrics(Entry entry)throws IOException{
+        if(!hasLyrics(entry))return "";
+        try(InputStream in=new FileInputStream(lyricsFile(entry));ByteArrayOutputStream output=new ByteArrayOutputStream()){
+            byte[] buffer=new byte[8192];
+            int count;
+            while((count=in.read(buffer))!=-1){
+                if(output.size()+count>LyricsTimeline.MAX_INPUT)return "";
+                output.write(buffer,0,count);
+            }
+            return new String(output.toByteArray(),StandardCharsets.UTF_8);
+        }
+    }
+    void saveLyrics(Entry entry,String raw)throws IOException,JSONException{
+        if(raw==null||raw.length()>LyricsTimeline.MAX_INPUT)return;
+        byte[] bytes=raw.getBytes(StandardCharsets.UTF_8);
+        if(bytes.length>LyricsTimeline.MAX_INPUT||LyricsTimeline.parse(raw).lines.isEmpty())return;
+        File temporary=File.createTempFile(entry.key+"-lyrics-",".part",root);
+        try{
+            try(FileOutputStream out=new FileOutputStream(temporary)){out.write(bytes);out.getFD().sync();}
+            synchronized(this){
+                if(closed||existing(entry.key)!=entry||hasLyrics(entry))return;
+                if(!temporary.renameTo(lyricsFile(entry)))throw new IOException("无法保存离线歌词");
+            }
+        }finally{temporary.delete();}
+    }
     synchronized ArrayList<Entry> list(){
         ArrayList<Entry> result=new ArrayList<>();
         for(String key:new ArrayList<>(entries.keySet())){
@@ -159,15 +200,14 @@ final class AudioCache implements Closeable {
         }catch(Exception error){message=error.getMessage()==null?"缓存失败":error.getMessage();}finally{if(source!=null)source.close();temporary.delete();finish(key,epoch);callback.done(ok,message);}
     }
     private void writeMetadata(Entry entry)throws Exception{JSONObject data=new JSONObject().put("track",entry.track).put("title",entry.title).put("quality",entry.quality).put("bytes",entry.bytes).put("used",entry.used).put("audioInfo",entry.info);File temporary=new File(root,entry.key+"-meta.part"),target=new File(root,entry.key+".json");try(FileOutputStream out=new FileOutputStream(temporary)){out.write(data.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));out.getFD().sync();}if(!temporary.renameTo(target)){temporary.delete();throw new IOException("无法保存缓存索引");}}
-    private void removeEntry(Entry entry){entries.remove(entry.key);entry.file.delete();new File(root,entry.key+".json").delete();}
+    private void removeEntry(Entry entry){entries.remove(entry.key);entry.file.delete();new File(root,entry.key+".json").delete();lyricsFile(entry).delete();}
     private void trim(String keep){ArrayList<Entry> sorted=new ArrayList<>(entries.values());Collections.sort(sorted,(a,b)->Long.compare(a.used,b.used));for(Entry entry:sorted){if(bytes()<=limit&&entries.size()<=512)break;if(!entry.key.equals(keep)&&!entry.key.equals(pinned)&&!entry.key.equals(switchPinned))removeEntry(entry);}}
     synchronized void remove(String track,String quality){Entry entry=entries.get(key(track,quality));if(entry!=null)removeEntry(entry);}
     synchronized void removeSaved(Entry entry)throws IOException{
         if(existing(entry.key)!=entry)throw new IOException("这份缓存已变化，请刷新后再试");
         if(entry.key.equals(pinned)||entry.key.equals(switchPinned))throw new IOException("这份缓存正在使用，请切换歌曲或音质后再删除");
         if(!entry.file.delete()&&entry.file.exists())throw new IOException("无法删除这份缓存，请稍后再试");
-        entries.remove(entry.key);
-        new File(root,entry.key+".json").delete();
+        removeEntry(entry);
     }
     synchronized void clear(){generation++;pending.clear();closeDecodedInputs();pinned="";switchPinned="";entries.clear();File[] files=root.listFiles();if(files!=null)for(File file:files)file.delete();}
     @Override public synchronized void close(){closed=true;generation++;closeDecodedInputs();worker.shutdownNow();}

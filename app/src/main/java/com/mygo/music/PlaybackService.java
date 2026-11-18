@@ -25,6 +25,7 @@ public class PlaybackService extends Service {
     private final Random random=new Random();private ArrayList<JSONObject> queue=new ArrayList<>();private int index=-1,percent=80,initialPosition;private volatile long generation=System.nanoTime(),errorId=System.nanoTime();
     private boolean ready,loading,wanted,shuffle,repeat,foreground,resumeAfterFocus,ducked,closed,trackReported,currentCached;private String error="",quality=AudioQuality.DEFAULT,stream="",streamKind="";
     private final java.util.concurrent.ExecutorService mediaWorkers=java.util.concurrent.Executors.newFixedThreadPool(2);
+    private final Set<AudioCache.Entry> pendingCacheLyrics=new HashSet<>();
     private String radioSource="",radioId="",radioFailure="";private long radioRevision;private boolean radioFetching,radioWaiting;
     private final PlaybackTone tone=new PlaybackTone(()->main.post(()->{if(!closed){applyVolume();publish();}}));
     private long sleepDeadline;private String sleepEndTrack="";
@@ -109,13 +110,36 @@ public class PlaybackService extends Service {
 
     void cacheCurrentSong(AudioCache.Callback callback){
         if(closed||index<0||index>=queue.size()||!ready){callback.done(false,"请先打开一首在线歌曲，等待音频就绪");return;}
-        if(currentCached){callback.done(true,"已有缓存");return;}
+        Uri source=Uri.parse(queue.get(index).optString("uri"));
+        String selectedQuality=activeQuality;
+        boolean saveLyrics=!offlineOnly()&&"plugin".equals(source.getScheme());
+        AudioCache.Callback done=(ok,message)->{
+            if(ok&&saveLyrics){
+                AudioCache.Entry saved=cache.entry(source.toString(),selectedQuality);
+                if(saved!=null)main.post(()->cacheSongLyrics(saved,source));
+            }
+            callback.done(ok,message);
+        };
+        if(currentCached){done.done(true,"已有缓存");return;}
         if(liveSource){callback.done(false,"直播音频无法保存为完整离线歌曲");return;}
-        if(remote.active()||!"plugin".equals(Uri.parse(queue.get(index).optString("uri")).getScheme())||
+        if(remote.active()||!"plugin".equals(source.getScheme())||
             !(hasHttpStream()||sourceResolved&&decodedFile!=null)){
             callback.done(false,"当前播放的音频不支持离线缓存");return;
         }
-        storeCurrentStream(callback);
+        storeCurrentStream(done);
+    }
+    private void cacheSongLyrics(AudioCache.Entry entry,Uri source){
+        String id=source.getQueryParameter("id"),provider=source.getAuthority();
+        if(closed||id==null||id.isEmpty()||provider==null||provider.isEmpty()
+            ||cache.entry(entry.track,entry.quality)!=entry||cache.hasLyrics(entry)||!pendingCacheLyrics.add(entry))return;
+        plugins.lyrics(provider,id,(ok,raw)->{
+            if(!ok||closed){pendingCacheLyrics.remove(entry);return;}
+            mediaWorkers.execute(()->{
+                try{cache.saveLyrics(entry,raw);}
+                catch(IOException|JSONException ignored){}
+                finally{main.post(()->pendingCacheLyrics.remove(entry));}
+            });
+        });
     }
     private boolean hasHttpStream(){return stream.startsWith("https://")||stream.startsWith("http://");}
     private void storeCurrentStream(AudioCache.Callback callback){

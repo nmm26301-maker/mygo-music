@@ -214,7 +214,7 @@ public class MainActivity extends Activity {
     private AlertDialog showAudioCache(){
         LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(16),dp(8),dp(16),dp(8));
         TextView capacity=text("",16,Color.WHITE);box.addView(capacity);
-        box.addView(text("点选后仅连续播放此处的缓存，每首保留自己的音质。自动缓存会额外下载完整音频；单曲上限 128 MB，总容量不足时清理较久未使用的歌曲。",13,Color.LTGRAY));
+        box.addView(text("点选后仅连续播放此处的缓存，每首保留自己的音质。自动缓存会额外下载完整音频，手动缓存也会尝试保存音源歌词。单曲音频上限 128 MB，总容量不足时清理较久未使用的歌曲。",13,Color.LTGRAY));
         Switch automatic=new Switch(this);automatic.setText("自动缓存播放过的插件歌曲");automatic.setChecked(prefs.getBoolean("auto_cache",true));automatic.setOnCheckedChangeListener((button,on)->prefs.edit().putBoolean("auto_cache",on).apply());box.addView(automatic);
         Button save=landscapeButton("缓存当前歌曲");box.addView(save,new LinearLayout.LayoutParams(-1,dp(48)));
         TextView status=text(audioCache.busy()?"正在缓存音频…":prefs.getString("cache_status",""),13,Color.LTGRAY);
@@ -315,7 +315,15 @@ public class MainActivity extends Activity {
     private void applyPlayerLyrics(String uri,PlayerLyricsTarget page,int request,String raw,boolean save){lyricsExecutor.execute(()->{try{LyricsTimeline timeline=LyricsTimeline.parse(raw);runOnUiThread(()->{if(!playerLyricsCurrent(uri,page,request))return;page.setTimeline(timeline);if(save&&!timeline.lines.isEmpty()){localLyrics.put(uri,raw);saveLocalLyrics();}});}catch(Exception error){runOnUiThread(()->{if(playerLyricsCurrent(uri,page,request))page.setLyricMessage("歌词格式无效，请重新导入");});}});}
     private void loadPlayerLyrics(String uri,PlayerLyricsTarget page){
         final int request=++playerLyricsRequest;if(playerLyricsFetch!=null)playerLyricsFetch.cancel(true);String saved=localLyrics.get(uri);if(saved!=null&&!saved.trim().isEmpty()){applyPlayerLyrics(uri,page,request,saved,false);return;}
-        PlaybackService.Snapshot state=fullPlayerState();if(state.offlineOnly){page.setLyricMessage("暂无离线歌词，可导入");return;}
+        PlaybackService.Snapshot state=fullPlayerState();
+        if(state.offlineOnly){
+            if(!loadCachedLyrics(uri,state.requestedQuality,timeline->{
+                if(!playerLyricsCurrent(uri,page,request))return;
+                if(timeline.lines.isEmpty())page.setLyricMessage("暂无离线歌词，可导入");
+                else page.setTimeline(timeline);
+            }))page.setLyricMessage("暂无离线歌词，可导入");
+            return;
+        }
         String ref=pluginTrackReference(uri);if(ref!=null){String[] parts=ref.split("\\n",2);pluginManager.lyrics(parts[0],parts.length>1?parts[1]:"",(ok,raw)->runOnUiThread(()->{if(!playerLyricsCurrent(uri,page,request))return;if(ok)applyPlayerLyrics(uri,page,request,raw,true);else page.setLyricMessage("暂无歌词，点歌词按钮重试");}));return;}
         String rawTitle=state.title;int cut=rawTitle.indexOf("  ·  ");String title=cut>0?rawTitle.substring(0,cut).trim():rawTitle.trim(),artist=cut>0?rawTitle.substring(cut+4).trim():"";
         playerLyricsFetch=playerLyricsNetwork.submit(()->{try{if(Thread.currentThread().isInterrupted())return;String raw="";if(uri.contains("type=url&id=")){String id=uri.substring(uri.indexOf("id=")+3);int amp=id.indexOf('&');if(amp>=0)id=id.substring(0,amp);raw=readLyricsUrl("https://api.qijieya.cn/meting/?server=netease&type=lrc&id="+URLEncoder.encode(id,"UTF-8"));}if(raw.trim().isEmpty())raw=fetchLrclib(title,artist);String value=raw;runOnUiThread(()->{if(playerLyricsCurrent(uri,page,request))applyPlayerLyrics(uri,page,request,value,true);});}catch(Exception error){runOnUiThread(()->{if(playerLyricsCurrent(uri,page,request))page.setLyricMessage("暂无歌词，点歌词按钮重试");});}});
@@ -531,6 +539,19 @@ public class MainActivity extends Activity {
     private void applyStageLyrics(String uri,String raw,int request,boolean save){
         lyricsExecutor.execute(()->{try{LyricsTimeline timeline=LyricsTimeline.parse(raw);runOnUiThread(()->{if(!lyricsRequestCurrent(uri,request))return;if(timeline.lines.isEmpty()){if(save&&restoreSavedLyrics(uri,request))return;lyricsStage.setTimeline(timeline);lyricsStage.setMessage("暂无歌词，可在设置中导入歌词文件");return;}if(save){localLyrics.put(uri,raw);saveLocalLyrics();}lyricsStage.setTimeline(timeline);if(nowPlayingDialog!=null&&nowPlayingDialog.trackUri().equals(uri))nowPlayingDialog.setTimeline(timeline);if(themedPlayer!=null&&themedPlayer.trackUri().equals(uri))themedPlayer.setTimeline(timeline);});}catch(Exception error){runOnUiThread(()->{if(lyricsRequestCurrent(uri,request)){if(save&&restoreSavedLyrics(uri,request))return;lyricsStage.setMessage("歌词格式无效，可在设置中重新获取或导入");Toast.makeText(this,"歌词读取失败："+error.getMessage(),Toast.LENGTH_LONG).show();}});}});
     }
+    private interface CachedLyricsCallback {void loaded(LyricsTimeline timeline);}
+    private boolean loadCachedLyrics(String uri,String quality,CachedLyricsCallback callback){
+        AudioCache.Entry entry=audioCache.lyricsEntry(uri,quality);
+        if(entry==null)return false;
+        lyricsExecutor.execute(()->{
+            LyricsTimeline timeline;
+            try{timeline=LyricsTimeline.parse(audioCache.readLyrics(entry));}
+            catch(IOException|JSONException error){timeline=LyricsTimeline.empty();}
+            LyricsTimeline result=timeline;
+            runOnUiThread(()->callback.loaded(result));
+        });
+        return true;
+    }
     private boolean restoreSavedLyrics(String uri,int request){String saved=localLyrics.get(uri);if(saved==null||saved.trim().isEmpty())return false;applyStageLyrics(uri,saved,request,false);Toast.makeText(this,"未能更新歌词，继续显示已保存的版本",Toast.LENGTH_SHORT).show();return true;}
     private String readLyricsUrl(String address)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(address).openConnection();c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setRequestProperty("User-Agent","MyGoMusic/3.8");int code=c.getResponseCode();if(code<200||code>=300){c.disconnect();return "";}BufferedReader br=new BufferedReader(new InputStreamReader(c.getInputStream(),"UTF-8"));StringBuilder out=new StringBuilder();String line;while((line=br.readLine())!=null){if(out.length()+line.length()>LyricsTimeline.MAX_INPUT){br.close();c.disconnect();throw new IOException("歌词文件超过 2 MB");}out.append(line).append('\n');}br.close();c.disconnect();return out.toString();}
     private String fetchLrclib(String title,String artist)throws Exception{String direct="https://lrclib.net/api/get?artist_name="+URLEncoder.encode(artist==null?"":artist,"UTF-8")+"&track_name="+URLEncoder.encode(title,"UTF-8");String raw=readLyricsUrl(direct);if(!raw.isEmpty())try{JSONObject o=new JSONObject(raw);String x=o.optString("syncedLyrics","");if(x.isEmpty())x=o.optString("plainLyrics","");if(!x.isEmpty())return x;}catch(Exception ignored){}String q=title+(artist==null||artist.isEmpty()?"":" "+artist);raw=readLyricsUrl("https://lrclib.net/api/search?q="+URLEncoder.encode(q,"UTF-8"));if(!raw.isEmpty())try{JSONArray a=new JSONArray(raw);for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String x=o.optString("syncedLyrics","");if(x.isEmpty())x=o.optString("plainLyrics","");if(!x.isEmpty())return x;}}catch(Exception ignored){}return "";}
@@ -546,7 +567,15 @@ public class MainActivity extends Activity {
         String saved=localLyrics.get(uri);if(!refresh&&saved!=null&&!saved.trim().isEmpty()){applyStageLyrics(uri,saved,request,false);return;}
         if(playbackSnapshot!=null&&playbackSnapshot.offlineOnly&&uri.equals(playbackSnapshot.uri)){
             if(saved!=null&&!saved.trim().isEmpty()){applyStageLyrics(uri,saved,request,false);if(refresh)Toast.makeText(this,"离线播放使用已保存的歌词",Toast.LENGTH_SHORT).show();}
-            else lyricsStage.setMessage("尚未保存此曲歌词，请联网获取一次，或在设置中导入歌词文件");return;
+            else{
+                String missing="尚未保存此曲歌词，请联网获取一次，或在设置中导入歌词文件";
+                if(!loadCachedLyrics(uri,playbackSnapshot.requestedQuality,timeline->{
+                    if(!lyricsRequestCurrent(uri,request))return;
+                    lyricsStage.setTimeline(timeline);
+                    if(timeline.lines.isEmpty())lyricsStage.setMessage(missing);
+                }))lyricsStage.setMessage(missing);
+            }
+            return;
         }
         String ref=pluginTrackReference(uri);
         if(ref!=null){String[] parts=ref.split("\\n",2);pluginManager.lyrics(parts[0],parts.length>1?parts[1]:"",(ok,value)->runOnUiThread(()->{
