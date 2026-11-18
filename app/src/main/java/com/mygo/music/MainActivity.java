@@ -212,13 +212,32 @@ public class MainActivity extends Activity {
     private String cacheSize(long bytes){return String.format(Locale.CHINA,"%.1f MB",bytes/(1024.0*1024));}
     private void stopCachedPlayback(){if(playbackService!=null&&playbackSnapshot!=null&&playbackSnapshot.stream.startsWith("file:")&&audioCache.owns(new File(Uri.parse(playbackSnapshot.stream).getPath())))playbackService.stopPlayback();}
     private AlertDialog showAudioCache(){
-        ArrayList<AudioCache.Entry> entries=audioCache.list();LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(16),dp(8),dp(16),dp(8));
-        box.addView(text(entries.size()+" 份缓存 · "+cacheSize(audioCache.bytes())+" / 512 MB",16,Color.WHITE));
+        LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(16),dp(8),dp(16),dp(8));
+        TextView capacity=text("",16,Color.WHITE);box.addView(capacity);
         box.addView(text("点选后仅连续播放此处的缓存，每首保留自己的音质。自动缓存会额外下载完整音频；单曲上限 128 MB，总容量不足时清理较久未使用的歌曲。",13,Color.LTGRAY));
         Switch automatic=new Switch(this);automatic.setText("自动缓存播放过的插件歌曲");automatic.setChecked(prefs.getBoolean("auto_cache",true));automatic.setOnCheckedChangeListener((button,on)->prefs.edit().putBoolean("auto_cache",on).apply());box.addView(automatic);
-        String status=audioCache.busy()?"正在缓存音频…":prefs.getString("cache_status","");if(!status.isEmpty())box.addView(text(status,13,Color.LTGRAY));
-        if(entries.isEmpty())box.addView(text("暂无完整缓存，联网播放歌曲并等待缓存完成后会显示在这里。",14,Color.LTGRAY));
+        Button save=landscapeButton("缓存当前歌曲");box.addView(save,new LinearLayout.LayoutParams(-1,dp(48)));
+        TextView status=text(audioCache.busy()?"正在缓存音频…":prefs.getString("cache_status",""),13,Color.LTGRAY);
+        status.setVisibility(status.getText().length()==0?View.GONE:View.VISIBLE);box.addView(status);
+        LinearLayout songs=new LinearLayout(this);songs.setOrientation(LinearLayout.VERTICAL);box.addView(songs);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("离线缓存").setView(scrollContent(box)).setNeutralButton("刷新",null).setPositiveButton("清理缓存",null).setNegativeButton("关闭",null).create();
+        renderAudioCacheEntries(dialog,capacity,songs);
+        save.setOnClickListener(view->{
+            if(playbackService==null){status.setVisibility(View.VISIBLE);status.setText("请先打开一首在线歌曲");return;}
+            save.setEnabled(false);status.setVisibility(View.VISIBLE);status.setText("正在缓存当前歌曲…");
+            playbackService.cacheCurrentSong((ok,message)->runOnUiThread(()->{
+                if(isDestroyed()||!dialog.isShowing())return;
+                save.setEnabled(true);status.setText(message);
+                if(ok)renderAudioCacheEntries(dialog,capacity,songs);
+            }));
+        });
+        dialog.setOnShowListener(value->{dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view->{renderAudioCacheEntries(dialog,capacity,songs);status.setText(audioCache.busy()?"正在缓存音频…":prefs.getString("cache_status",""));status.setVisibility(status.getText().length()==0?View.GONE:View.VISIBLE);});dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view->new AlertDialog.Builder(this).setTitle("清理离线缓存").setMessage("将删除已缓存的音频，并停止正在播放的缓存歌曲。歌单和收藏会保留。").setNegativeButton("取消",null).setPositiveButton("清理",(confirm,which)->{stopCachedPlayback();audioCache.clear();prefs.edit().remove("cache_status").apply();dialog.dismiss();showAudioCache();}).show());});dialog.show();return dialog;
+    }
+    private void renderAudioCacheEntries(AlertDialog dialog,TextView capacity,LinearLayout songs){
+        ArrayList<AudioCache.Entry> entries=audioCache.list();
+        capacity.setText(entries.size()+" 份缓存 · "+cacheSize(audioCache.bytes())+" / 512 MB");
+        songs.removeAllViews();
+        if(entries.isEmpty())songs.addView(text("暂无完整缓存。歌曲保存完成后会显示在这里。",14,Color.LTGRAY));
         for(AudioCache.Entry entry:entries){
             String quality=AudioQuality.label(entry.quality);
             LinearLayout row=new LinearLayout(this);
@@ -230,9 +249,8 @@ public class MainActivity extends Activity {
             remove.setContentDescription("删除离线缓存："+entry.title+" · "+quality);
             remove.setOnClickListener(view->confirmCacheRemoval(dialog,entry));
             row.addView(remove,new LinearLayout.LayoutParams(dp(64),dp(48)));
-            box.addView(row,new LinearLayout.LayoutParams(-1,-2));
+            songs.addView(row,new LinearLayout.LayoutParams(-1,-2));
         }
-        dialog.setOnShowListener(value->{dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view->{dialog.dismiss();showAudioCache();});dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view->new AlertDialog.Builder(this).setTitle("清理离线缓存").setMessage("将删除已缓存的音频，并停止正在播放的缓存歌曲。歌单和收藏会保留。").setNegativeButton("取消",null).setPositiveButton("清理",(confirm,which)->{stopCachedPlayback();audioCache.clear();prefs.edit().remove("cache_status").apply();dialog.dismiss();showAudioCache();}).show());});dialog.show();return dialog;
     }
     private void confirmCacheRemoval(AlertDialog picker,AudioCache.Entry entry){
         new AlertDialog.Builder(this).setTitle("删除这份离线缓存？")

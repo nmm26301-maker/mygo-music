@@ -105,7 +105,28 @@ public class PlaybackService extends Service {
             main.post(()->{if(closed||request!=generation){result.delete();return;}if(stored!=null){result.delete();prepare(request,Uri.fromFile(stored),new HashMap<>(),true);}else{decodedFile=result;prepare(request,Uri.fromFile(result),new HashMap<>(),false);}});
         }catch(Exception error){if(converted!=null)converted.delete();main.post(()->{if(!closed&&request==generation){if(wasCached)cache.remove(original,selectedQuality);fail(error.getMessage());}});}});
     }
-    private void recordAndCache(){refillRadio();if(trackReported||index<0||index>=queue.size())return;trackReported=true;String original=queue.get(index).optString("uri"),title=queue.get(index).optString("title","歌曲");ArrayList<String> recent=new ArrayList<>();String old=prefs.getString("recent","");if(!old.isEmpty())recent.addAll(Arrays.asList(old.split("\n")));recent.remove(original);recent.add(0,original);while(recent.size()>30)recent.remove(recent.size()-1);prefs.edit().putString("recent",String.join("\n",recent)).apply();Uri uri=Uri.parse(original);if((currentCached&&!sourceResolved)||!"plugin".equals(uri.getScheme()))return;if(!qualityReload)try{plugins.export(uri.getAuthority(),"played",new JSONObject().put("id",uri.getQueryParameter("id")),(ok,raw)->{});}catch(Exception ignored){}if(!liveSource&&!currentCached&&prefs.getBoolean("auto_cache",true)&&(stream.startsWith("https://")||stream.startsWith("http://"))){AudioCache.Callback done=(ok,message)->prefs.edit().putString("cache_status",message).apply();if(streamKind.equals("hls")||stream.toLowerCase(Locale.ROOT).contains(".m3u8"))cache.storeHls(original,title,activeQuality,stream,headers,audioInfo,done);else cache.store(original,title,activeQuality,stream,headers,audioInfo,done);}}
+    private void recordAndCache(){refillRadio();if(trackReported||index<0||index>=queue.size())return;trackReported=true;String original=queue.get(index).optString("uri");ArrayList<String> recent=new ArrayList<>();String old=prefs.getString("recent","");if(!old.isEmpty())recent.addAll(Arrays.asList(old.split("\n")));recent.remove(original);recent.add(0,original);while(recent.size()>30)recent.remove(recent.size()-1);prefs.edit().putString("recent",String.join("\n",recent)).apply();Uri uri=Uri.parse(original);if((currentCached&&!sourceResolved)||!"plugin".equals(uri.getScheme()))return;if(!qualityReload)try{plugins.export(uri.getAuthority(),"played",new JSONObject().put("id",uri.getQueryParameter("id")),(ok,raw)->{});}catch(Exception ignored){}if(!liveSource&&!currentCached&&prefs.getBoolean("auto_cache",true)&&hasHttpStream())storeCurrentStream((ok,message)->{});}
+
+    void cacheCurrentSong(AudioCache.Callback callback){
+        if(closed||index<0||index>=queue.size()||!ready){callback.done(false,"请先打开一首在线歌曲，等待音频就绪");return;}
+        if(currentCached){callback.done(true,"已有缓存");return;}
+        if(liveSource){callback.done(false,"直播音频无法保存为完整离线歌曲");return;}
+        if(remote.active()||!hasHttpStream()||!"plugin".equals(Uri.parse(queue.get(index).optString("uri")).getScheme())){
+            callback.done(false,"当前播放的音频不支持离线缓存");return;
+        }
+        storeCurrentStream(callback);
+    }
+    private boolean hasHttpStream(){return stream.startsWith("https://")||stream.startsWith("http://");}
+    private void storeCurrentStream(AudioCache.Callback callback){
+        JSONObject item=queue.get(index);
+        String track=item.optString("uri"),title=item.optString("title","歌曲");
+        AudioCache.Callback done=(ok,message)->{
+            prefs.edit().putString("cache_status",message).apply();
+            callback.done(ok,message);
+        };
+        if(HlsPlayback.matches(Uri.parse(stream),streamKind))cache.storeHls(track,title,activeQuality,stream,headers,audioInfo,done);
+        else cache.store(track,title,activeQuality,stream,headers,audioInfo,done);
+    }
     private void clearRadio(){radioRevision++;radioSource="";radioId="";radioFailure="";radioFetching=false;radioWaiting=false;}
     private void selectRadio(int start){clearRadio();if(start<0||start>=queue.size())return;JSONObject item=queue.get(start);String station=item.optString("stationId");Uri uri=Uri.parse(item.optString("uri"));if(!station.isEmpty()&&"plugin".equals(uri.getScheme())){radioId=station;radioSource=uri.getAuthority();}}
     private void refillRadio(){
