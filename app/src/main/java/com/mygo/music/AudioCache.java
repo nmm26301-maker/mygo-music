@@ -29,7 +29,15 @@ final class AudioCache implements Closeable {
     private static String key(String track,String quality){try{byte[] digest=MessageDigest.getInstance("SHA-256").digest((track+"\n"+quality).getBytes(java.nio.charset.StandardCharsets.UTF_8));StringBuilder value=new StringBuilder();for(byte b:digest)value.append(String.format(Locale.ROOT,"%02x",b&255));return value.toString();}catch(Exception error){throw new IllegalStateException(error);}}
     private Entry existing(String key){Entry entry=entries.get(key);if(entry!=null&&(!entry.file.isFile()||entry.file.length()!=entry.bytes)){removeEntry(entry);return null;}return entry;}
     synchronized File find(String track,String quality){Entry entry=existing(key(track,quality));if(entry==null)return null;entry.used=System.currentTimeMillis();try{writeMetadata(entry);}catch(Exception ignored){}return entry.file;}
-    synchronized ArrayList<Entry> list(){ArrayList<Entry> result=new ArrayList<>(entries.values());Collections.sort(result,(a,b)->Long.compare(b.used,a.used));return result;}
+    synchronized ArrayList<Entry> list(){
+        ArrayList<Entry> result=new ArrayList<>();
+        for(String key:new ArrayList<>(entries.keySet())){
+            Entry entry=existing(key);
+            if(entry!=null)result.add(entry);
+        }
+        result.sort((a,b)->Long.compare(b.used,a.used));
+        return result;
+    }
     synchronized long bytes(){long total=0;for(Entry entry:entries.values())total+=entry.bytes;return total;}
     synchronized void setLimit(long bytes){limit=Math.max(1,bytes);trim(null);}
     synchronized boolean busy(){return !pending.isEmpty();}
@@ -87,6 +95,13 @@ final class AudioCache implements Closeable {
     private void removeEntry(Entry entry){entries.remove(entry.key);entry.file.delete();new File(root,entry.key+".json").delete();}
     private void trim(String keep){ArrayList<Entry> sorted=new ArrayList<>(entries.values());Collections.sort(sorted,(a,b)->Long.compare(a.used,b.used));for(Entry entry:sorted){if(bytes()<=limit&&entries.size()<=512)break;if(!entry.key.equals(keep)&&!entry.key.equals(pinned)&&!entry.key.equals(switchPinned))removeEntry(entry);}}
     synchronized void remove(String track,String quality){Entry entry=entries.get(key(track,quality));if(entry!=null)removeEntry(entry);}
+    synchronized void removeSaved(Entry entry)throws IOException{
+        if(existing(entry.key)!=entry)throw new IOException("这份缓存已变化，请刷新后再试");
+        if(entry.key.equals(pinned)||entry.key.equals(switchPinned))throw new IOException("这份缓存正在使用，请切换歌曲或音质后再删除");
+        if(!entry.file.delete()&&entry.file.exists())throw new IOException("无法删除这份缓存，请稍后再试");
+        entries.remove(entry.key);
+        new File(root,entry.key+".json").delete();
+    }
     synchronized void clear(){generation++;pending.clear();pinned="";switchPinned="";entries.clear();File[] files=root.listFiles();if(files!=null)for(File file:files)file.delete();}
     @Override public synchronized void close(){closed=true;generation++;worker.shutdownNow();}
 }

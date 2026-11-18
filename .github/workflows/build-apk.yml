@@ -1,7 +1,7 @@
 name: Build MyGo Music APK
 on:
   push:
-    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118 ]
+    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118 ]
   workflow_dispatch:
 permissions:
   contents: read
@@ -263,7 +263,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 44119462794 --name mygo-music-android-release --dir tests/baseline-v547
-      - name: Verify upgrades from signed v5.6.0, v5.35.0, v5.38.0, v5.39.0, v5.40.0, v5.41.0, v5.42.0, v5.43.0, v5.44.0, v5.45.0, v5.46.0 and v5.47.0 on Android
+      - name: Download delivered signed v5.48.0 baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 44207544286 --name mygo-music-android-release --dir tests/baseline-v548
+      - name: Verify upgrades from signed v5.6.0, v5.35.0, v5.38.0, v5.39.0, v5.40.0, v5.41.0, v5.42.0, v5.43.0, v5.44.0, v5.45.0, v5.46.0, v5.47.0 and v5.48.0 on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -274,82 +278,89 @@ jobs:
             adb uninstall com.mygo.music || true
             adb install tests/baseline-v5.6.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v538/mygo-music-v5.38.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v535/mygo-music-v5.35.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v539/mygo-music-v5.39.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v540/mygo-music-v5.40.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v541/mygo-music-v5.41.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v542/mygo-music-v5.42.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v543/mygo-music-v5.43.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v544/mygo-music-v5.44.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v545/mygo-music-v5.45.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v546/mygo-music-v5.46.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb uninstall com.mygo.music
             adb install tests/baseline-v547/mygo-music-v5.47.0.apk
             adb shell am start -W -n com.mygo.music/.MainActivity
             adb shell am force-stop com.mygo.music
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=98'
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
+            adb shell am start -W -n com.mygo.music/.MainActivity
+            adb uninstall com.mygo.music
+            adb install tests/baseline-v548/mygo-music-v5.48.0.apk
+            adb shell am start -W -n com.mygo.music/.MainActivity
+            adb shell am force-stop com.mygo.music
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell dumpsys package com.mygo.music | grep 'versionCode=99'
             adb shell am start -W -n com.mygo.music/.MainActivity
       - name: Refresh corresponding sources with the final source audit
         run: python3 tests/build-native-audio.py

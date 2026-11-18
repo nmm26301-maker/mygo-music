@@ -219,8 +219,32 @@ public class MainActivity extends Activity {
         String status=audioCache.busy()?"正在缓存音频…":prefs.getString("cache_status","");if(!status.isEmpty())box.addView(text(status,13,Color.LTGRAY));
         if(entries.isEmpty())box.addView(text("暂无完整缓存，联网播放歌曲并等待缓存完成后会显示在这里。",14,Color.LTGRAY));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("离线缓存").setView(scrollContent(box)).setNeutralButton("刷新",null).setPositiveButton("清理缓存",null).setNegativeButton("关闭",null).create();
-        for(AudioCache.Entry entry:entries){Button song=landscapeButton(entry.title+" · "+AudioQuality.label(entry.quality)+" · "+cacheSize(entry.bytes));song.setContentDescription("播放离线缓存："+entry.key);box.addView(song,new LinearLayout.LayoutParams(-1,dp(48)));song.setOnClickListener(view->{if(startOfflineQueue(entries,entry.key,0))dialog.dismiss();});}
+        for(AudioCache.Entry entry:entries){
+            String quality=AudioQuality.label(entry.quality);
+            LinearLayout row=new LinearLayout(this);
+            Button song=landscapeButton(entry.title+" · "+quality+" · "+cacheSize(entry.bytes));
+            song.setContentDescription("播放离线缓存："+entry.key);
+            song.setOnClickListener(view->{if(startOfflineQueue(audioCache.list(),entry.key,0))dialog.dismiss();});
+            row.addView(song,new LinearLayout.LayoutParams(0,dp(48),1));
+            Button remove=landscapeButton("删除");
+            remove.setContentDescription("删除离线缓存："+entry.title+" · "+quality);
+            remove.setOnClickListener(view->confirmCacheRemoval(dialog,entry));
+            row.addView(remove,new LinearLayout.LayoutParams(dp(64),dp(48)));
+            box.addView(row,new LinearLayout.LayoutParams(-1,-2));
+        }
         dialog.setOnShowListener(value->{dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view->{dialog.dismiss();showAudioCache();});dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view->new AlertDialog.Builder(this).setTitle("清理离线缓存").setMessage("将删除已缓存的音频，并停止正在播放的缓存歌曲。歌单和收藏会保留。").setNegativeButton("取消",null).setPositiveButton("清理",(confirm,which)->{stopCachedPlayback();audioCache.clear();prefs.edit().remove("cache_status").apply();dialog.dismiss();showAudioCache();}).show());});dialog.show();return dialog;
+    }
+    private void confirmCacheRemoval(AlertDialog picker,AudioCache.Entry entry){
+        new AlertDialog.Builder(this).setTitle("删除这份离线缓存？")
+            .setMessage(entry.title+" · "+AudioQuality.label(entry.quality))
+            .setNegativeButton("取消",null)
+            .setPositiveButton("删除",(dialog,which)->{
+                try{audioCache.removeSaved(entry);}
+                catch(IOException error){Toast.makeText(this,error.getMessage(),Toast.LENGTH_LONG).show();return;}
+                if(playbackService!=null)playbackService.removeOfflineCacheEntry(entry.track,entry.quality);
+                prefs.edit().remove("cache_status").apply();
+                picker.dismiss();showAudioCache();
+            }).show();
     }
     private boolean startOfflineQueue(ArrayList<AudioCache.Entry> entries,String selectedKey,int position){
         try{JSONArray queue=new JSONArray();int selected=-1;for(AudioCache.Entry entry:entries){if(entry.key.equals(selectedKey))selected=queue.length();queue.put(new JSONObject().put("uri",entry.track).put("title",entry.title).put("track",trackMetadata.get(entry.track)).put("cacheOnly",true).put("cachedQuality",entry.quality));}

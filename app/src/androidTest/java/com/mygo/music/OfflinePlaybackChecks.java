@@ -25,6 +25,54 @@ final class OfflinePlaybackChecks {
     MainActivity launch(){return (MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
     PlaybackService service(MainActivity activity)throws Exception{PlaybackService[] result={null};helper.await(()->{result[0]=(PlaybackService)field(activity,"playbackService");return result[0]!=null;},"offline service missing");return result[0];}
     void store(AudioCache cache,String uri,String title,String quality,String url)throws Exception{CountDownLatch done=new CountDownLatch(1);boolean[] success={false};cache.store(uri,title,quality,url,new HashMap<>(),(ok,message)->{success[0]=ok;done.countDown();});check(done.await(15,TimeUnit.SECONDS)&&success[0],"offline fixture transfer failed");}
+    void selectRemoval(AlertDialog picker,AudioCache.Entry entry)throws Exception{
+        ui(()->{
+            View remove=described(picker.getWindow().getDecorView(),"删除离线缓存："+entry.title+" · "+AudioQuality.label(entry.quality));
+            check(remove!=null&&remove.performClick(),"cache delete control was missing");
+        });
+        long until=SystemClock.elapsedRealtime()+7000;
+        while(SystemClock.elapsedRealtime()<until){
+            if(SourcePlaylistUiChecks.node(test,"删除这份离线缓存？")!=null)return;
+            SystemClock.sleep(50);
+        }
+        throw new AssertionError("cache deletion confirmation was missing");
+    }
+    void verifyCacheRemoval(MainActivity activity,AudioCache cache,String a,String b)throws Exception{
+        AudioCache.Entry playing=cache.list().stream().filter(entry->entry.track.equals(a)&&entry.quality.equals("high")).findFirst().get();
+        AudioCache.Entry removed=cache.list().stream().filter(entry->entry.track.equals(a)&&entry.quality.equals("lossless")).findFirst().get();
+        AudioCache.Entry missing=cache.list().stream().filter(entry->entry.track.equals(b)).findFirst().get();
+        PlaybackService.Snapshot before=service.snapshot();
+        check(before.uri.equals(a)&&before.requestedQuality.equals("high"),"wrong quality for removal regression");
+        AlertDialog[] picker={null};
+        ui(()->picker[0]=(AlertDialog)invoke(activity,"showAudioCache",new Class<?>[]{}));
+        selectRemoval(picker[0],removed);
+        SourcePlaylistUiChecks.click(test,"取消");
+        helper.await(()->picker[0].getWindow().getDecorView().hasWindowFocus(),"cancel did not return to cache list");
+        check(removed.file.isFile()&&cache.list().size()==3,"cancel deleted a cache entry");
+        selectRemoval(picker[0],playing);
+        SourcePlaylistUiChecks.click(test,"删除");
+        helper.await(()->picker[0].getWindow().getDecorView().hasWindowFocus(),"playing cache confirmation did not close");
+        check(playing.file.isFile(),"deletion removed an in-use cache");
+        selectRemoval(picker[0],removed);
+        SourcePlaylistUiChecks.click(test,"删除");
+        helper.await(()->!picker[0].isShowing()&&service.queueSnapshot().length()==2,"removed cache remained in offline queue");
+        PlaybackService.Snapshot after=service.snapshot();
+        check(after.player==before.player&&after.generation==before.generation&&after.playing,"deleting another quality restarted playback");
+        check(!removed.file.exists()&&playing.file.isFile()&&missing.file.isFile(),"delete did not target only the selected quality");
+        try(AudioCache reloaded=new AudioCache(context)){
+            check(reloaded.list().size()==2&&reloaded.find(a,"lossless")==null,"deleted cache returned after reloading index");
+        }
+        check(missing.file.delete(),"could not simulate a missing cache file");
+        check(cache.list().size()==1&&cache.bytes()==playing.bytes,"expired file remained in list or capacity total");
+        test.getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);
+        helper.await(activity::hasWindowFocus,"close refreshed cache list");
+        ui(()->{
+            AlertDialog refreshed=(AlertDialog)invoke(activity,"showAudioCache",new Class<?>[]{});
+            check(described(refreshed.getWindow().getDecorView(),"播放离线缓存："+missing.key)==null,"missing file still showed a playable row");
+            refreshed.dismiss();
+        });
+        System.out.println("MYGO_CACHE_REMOVAL_OK: cancel, in-use protection, exact quality deletion, live queue, same native player, index reload, missing file and capacity");
+    }
     void run()throws Exception{
         String id="offline-workflow",a="plugin://"+id+"?id=a",b="plugin://"+id+"?id=b",raw="{\"lines\":[{\"start\":0,\"end\":9000,\"translation\":\"Saved translation\",\"words\":[{\"text\":\"离线歌词仍然亮起\",\"start\":1000,\"end\":8000}]}]}";
         check(LyricsTimeline.parse(JSONObject.quote("[00:01.00]插件字符串歌词")).timed,"JSON-encoded source LRC lost timing");check(LyricsTimeline.parse(JSONObject.quote(raw)).wordTimed,"JSON-encoded source word timings lost");check(LyricsTimeline.parse(JSONObject.quote("")).lines.isEmpty(),"encoded empty lyric became visible quote characters");
@@ -55,6 +103,7 @@ final class OfflinePlaybackChecks {
             ui(()->{((HashMap<String,String>)field(activity[0],"pluginTrackRefs")).put(resumeUri,id+"\n"+android.net.Uri.parse(resumeUri).getQueryParameter("id"));invoke(activity[0],"showLyrics",new Class<?>[]{});invoke(activity[0],"loadStageLyrics",new Class<?>[]{boolean.class},true);});helper.await(()->data.getString("lyricCalls","0").equals("1")&&((LyricsStageDialog)field(activity[0],"lyricsStage")).stage.timeline().wordTimed,"failed refresh did not restore saved lyrics");
             data.edit().putString("empty","true").commit();ui(()->invoke(activity[0],"loadStageLyrics",new Class<?>[]{boolean.class},true));helper.await(()->data.getString("lyricCalls","0").equals("2")&&((LyricsStageDialog)field(activity[0],"lyricsStage")).stage.timeline().wordTimed,"empty refresh wiped saved timed lyrics");
             ui(()->{((LyricsStageDialog)field(activity[0],"lyricsStage")).dismiss();invoke(activity[0],"startOfflineQueue",new Class<?>[]{ArrayList.class,String.class,int.class},entries,selectedKey,0);});helper.await(()->service.snapshot().playing&&service.snapshot().offlineOnly,"offline queue did not reopen");
+            verifyCacheRemoval(activity[0],cache,a,b);
             ui(()->{cache.clear();service.next();});helper.await(()->!service.snapshot().loading&&!service.snapshot().error.isEmpty(),"expired offline cache silently fell back to network");check(data.getString("streamCalls","0").equals("0"),"missing cached file called provider stream");
             System.out.println("MYGO_OFFLINE_WORKFLOW_OK: actual cache picker; stopped server; separate offline queue; same track in two cached qualities; per-entry next/shuffle/completion/repeat; no stream/played/lyric source calls; unchanged online quality preference; native seek and empty-service resume; cached source word timings; safe failed/empty refresh; missing file never falls back online");
         }finally{ui(()->{service.clearQueue();if(activity[0]!=null)activity[0].finish();});cache.clear();helper.cleanup(id);SharedPreferences.Editor edit=prefs.edit().clear();for(Map.Entry<String,?> entry:original.entrySet()){Object value=entry.getValue();String key=entry.getKey();if(value instanceof String)edit.putString(key,(String)value);else if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);else if(value instanceof Integer)edit.putInt(key,(Integer)value);else if(value instanceof Long)edit.putLong(key,(Long)value);else if(value instanceof Float)edit.putFloat(key,(Float)value);else if(value instanceof Set)edit.putStringSet(key,(Set<String>)value);}edit.commit();}

@@ -126,6 +126,12 @@ public class PlaybackService extends Service {
     }
     void moveQueue(int from,int to){if(from<0||to<0||from>=queue.size()||to>=queue.size()||from==to)return;clearRadio();queueRevision++;JSONObject current=index>=0?queue.get(index):null;JSONObject moving=queue.remove(from);queue.add(to,moving);index=queue.indexOf(current);if(remote.active())resolve(index,position(),wanted);else publish();}
     void removeQueue(int at){if(at<0||at>=queue.size())return;clearRadio();queueRevision++;boolean selected=at==index;queue.remove(at);if(queue.isEmpty()){stopPlayback();index=-1;publish();return;}if(at<index)index--;if(selected)resolve(Math.min(at,queue.size()-1),0,wanted);else if(remote.active())resolve(index,position(),wanted);else publish();}
+    void removeOfflineCacheEntry(String track,String quality){
+        for(int i=queue.size()-1;i>=0;i--){
+            JSONObject item=queue.get(i);
+            if(item.optBoolean("cacheOnly")&&track.equals(item.optString("uri"))&&quality.equals(item.optString("cachedQuality")))removeQueue(i);
+        }
+    }
     void clearQueue(){queueRevision++;stopPlayback();queue.clear();index=-1;publish();}
     void pause(){remoteCompletion.pause();pauseInternal(true);}
     private void pauseInternal(boolean clearResume){if(closed)return;if(liveSource){livePausedAt=SystemClock.elapsedRealtime();if(liveAacPlayback!=null)liveAacPlayback.setPaused(true);}if(clearResume)resumeAfterFocus=false;wanted=false;if(remote.active())remote.pause();else if(ready&&player!=null)try{player.pause();}catch(Exception ignored){}if(clearResume&&!remote.active())abandonFocus();publish();}
