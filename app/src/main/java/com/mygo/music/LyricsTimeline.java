@@ -80,15 +80,14 @@ final class LyricsTimeline {
                     String value=parsed.isEmpty()?line.optString("text",""):text.toString();
                     if(!value.trim().isEmpty()){Line entry=new Line(start,end,value,line.optString("translation",""),parsed);entry.romanization=line.optString("romanization",line.optString("romaji",""));lines.add(entry);}
                 }
-                if(!lines.isEmpty()){LyricsTimeline result=new LyricsTimeline(lines,true);attachTranslation(result,root.optString("translation",""));attachRomanization(result,root.optString("romanization",root.optString("romaji",root.optString("romalrc",""))));return result;}
+                if(!lines.isEmpty())return attachAuxiliaryLyrics(new LyricsTimeline(lines,true),root);
             }
             String lrc=root.optString("lrc","");if(lrc.isEmpty())lrc=root.optString("syncedLyrics","");
             if(lrc.isEmpty())lrc=root.optString("plainLyrics","");
-            LyricsTimeline result=parseLrc(lrc);attachTranslation(result,root.optString("translation",""));attachRomanization(result,root.optString("romanization",root.optString("romaji",root.optString("romalrc",""))));return result;
+            return attachAuxiliaryLyrics(parseLrc(lrc),root);
         }
         return parseLrc(raw);
     }
-    private static void attachRomanization(LyricsTimeline target,String raw){if(raw==null||raw.trim().isEmpty())return;LyricsTimeline extra=parseLrc(raw);for(Line line:target.lines){if(!line.romanization.isEmpty())continue;for(Line roman:extra.lines)if(Math.abs(roman.start-line.start)<=120){line.romanization=roman.text;break;}}}
     private static long time(long value){return Math.max(0,Math.min(MAX_TIME,value));}
     /** Same fallback as upstream internal/lyrics: CJK characters, other words by length, 85% singing. */
     private static List<Word> spread(String text,long start,long end){
@@ -143,16 +142,33 @@ final class LyricsTimeline {
         for(String row:plain){if(lines.size()==5000)break;lines.add(new Line(0,0,row,"",new ArrayList<>()));}
         return new LyricsTimeline(lines,false);
     }
-    private static void attachTranslation(LyricsTimeline result,String raw) {
-        if(raw.isEmpty())return;
-        LyricsTimeline translated=parseLrc(raw);
-        for(int i=0;i<result.lines.size();i++) {
-            Line line=result.lines.get(i);if(!line.translation.isEmpty())continue;
-            int at=translated.timed?translated.active(line.start):i;
-            if(at>=0&&at<translated.lines.size()) {
-                Line candidate=translated.lines.get(at);
-                if(!translated.timed||Math.abs(line.start-candidate.start)<80)line.translation=candidate.text;
-            }
+    private static LyricsTimeline attachAuxiliaryLyrics(LyricsTimeline target,JSONObject root){
+        attachAuxiliary(target,root.optString("translation",""),true,80);
+        attachAuxiliary(target,root.optString("romanization",root.optString("romaji",root.optString("romalrc",""))),false,120);
+        return target;
+    }
+    private static void attachAuxiliary(LyricsTimeline target,String raw,boolean translation,long tolerance){
+        if(raw.trim().isEmpty()||target.lines.isEmpty())return;
+        LyricsTimeline auxiliary=parseLrc(raw);
+        for(int i=0;i<target.lines.size();i++){
+            Line line=target.lines.get(i);
+            if(!(translation?line.translation:line.romanization).isEmpty())continue;
+            Line match=target.timed&&auxiliary.timed?auxiliary.nearest(line.start,tolerance)
+                    :i<auxiliary.lines.size()?auxiliary.lines.get(i):null;
+            if(match==null)continue;
+            if(translation)line.translation=match.text;
+            else line.romanization=match.text;
         }
+    }
+    private Line nearest(long start,long tolerance){
+        int low=0,high=lines.size();
+        while(low<high){
+            int mid=(low+high)>>>1;
+            if(lines.get(mid).start<start)low=mid+1;else high=mid;
+        }
+        Line before=low>0?lines.get(low-1):null;
+        Line after=low<lines.size()?lines.get(low):null;
+        Line match=before!=null&&(after==null||start-before.start<=after.start-start)?before:after;
+        return match!=null&&Math.abs(match.start-start)<=tolerance?match:null;
     }
 }

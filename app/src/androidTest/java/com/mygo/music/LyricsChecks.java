@@ -73,6 +73,16 @@ final class LyricsChecks {
         check(parsed.lines.size()==2&&parsed.lines.get(0).start==1250&&parsed.lines.get(1).start==9250,"offset or repeated LRC timestamp lost");check(parsed.lines.get(1).words.get(1).start==10250&&parsed.lines.get(1).words.get(1).end==11250,"enhanced LRC real word timestamps lost");
         parsed=LyricsTimeline.parse("[00:00]一起听音乐\n[00:04]下一行");check(parsed.wordTimed&&parsed.estimatedWordTiming&&parsed.lines.get(0).words.size()==5,"upstream CJK LRC fallback missing");check(parsed.lines.get(0).words.get(4).end==3400,"upstream 85 percent singing span changed");
         parsed=LyricsTimeline.parse(new JSONObject().put("lrc","[00:01]原文\n[00:03]下一行").put("translation","[00:01]译文\n[00:03]第二句译文").toString());check(parsed.lines.get(0).translation.equals("译文")&&parsed.lines.get(1).translation.equals("第二句译文"),"translation timestamps lost");
+        parsed=LyricsTimeline.parse(new JSONObject()
+            .put("lrc","[00:01]第一行\n[00:03]第二行\n[00:05]第三行")
+            .put("translation","[00:00.940]较远\n[00:01.040]最近\n[00:02.950]提前\n[00:03.050]延后\n[00:05.081]超出范围")
+            .put("romanization","[00:01.120]di yi hang\n[00:03.050]di er hang\n[00:05.121]too late").toString());
+        check(parsed.lines.get(0).translation.equals("最近")&&parsed.lines.get(1).translation.equals("提前")&&parsed.lines.get(2).translation.isEmpty(),"translation did not choose the closest bounded timestamp or stable tie");
+        check(parsed.lines.get(0).romanization.equals("di yi hang")&&parsed.lines.get(1).romanization.equals("di er hang")&&parsed.lines.get(2).romanization.isEmpty(),"romanization ignored delayed or out-of-range timestamps");
+        parsed=LyricsTimeline.parse(new JSONObject().put("lrc","[00:00]第一行\n[00:04]第二行\n[00:08]第三行")
+            .put("romanization","di yi hang\ndi er hang").put("translation","first line\nsecond line").toString());
+        check(parsed.lines.get(0).romanization.equals("di yi hang")&&parsed.lines.get(1).romanization.equals("di er hang")&&parsed.lines.get(2).romanization.isEmpty(),"untimed romanization did not follow line order");
+        check(parsed.lines.get(1).translation.equals("second line")&&parsed.lines.get(2).translation.isEmpty(),"untimed translations did not follow line order");
         String supplementary=new String(Character.toChars(0x20000));parsed=LyricsTimeline.parse("[00:00]"+supplementary+"好\n[00:02]结束");check(parsed.lines.get(0).words.get(0).to==2&&parsed.lines.get(0).words.get(1).from==2,"UTF16 glyph boundary split a supplementary character");
         check(!LyricsTimeline.parse("没有时间轴\n文本歌词").timed&&LyricsTimeline.parse("null").lines.isEmpty(),"plain/missing lyrics mislabeled as timed");
         boolean rejected=false;try{LyricsTimeline.parse(new String(new char[LyricsTimeline.MAX_INPUT+1]).replace('\0','字'));}catch(JSONException expected){rejected=true;}check(rejected,"unbounded lyric input accepted");
@@ -91,7 +101,10 @@ final class LyricsChecks {
     private void sourceRefresh(MainActivity activity,LyricsStageDialog page,String uri)throws Exception{
         String id="lyrics-export-fixture";PluginManager manager=(PluginManager)field(activity,"pluginManager");
         ByteArrayOutputStream data=new ByteArrayOutputStream();
-        String source="export function lyrics(){return "+fixture()+";}";
+        JSONObject payload=new JSONObject(fixture())
+            .put("translation","[00:00]Should not override the source phrase\n[00:07.055]Follow the sound")
+            .put("romanization","[00:00.090]rang yin yue\n[00:07.100]gen zhe sheng yin");
+        String source="export function lyrics(){return "+payload+";}";
         try(java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(data)){
             zip.putNextEntry(new java.util.zip.ZipEntry("plugin.json"));zip.write(("{\"id\":\""+id+"\",\"main\":\"index.js\"}").getBytes("UTF-8"));zip.closeEntry();
             zip.putNextEntry(new java.util.zip.ZipEntry("index.js"));zip.write(source.getBytes("UTF-8"));zip.closeEntry();
@@ -107,7 +120,14 @@ final class LyricsChecks {
             await(()->page.stage.timeline().estimatedWordTiming,"cached LRC did not use the original approximate word fallback");
             test.runOnMainSync(()->{try{Method refresh=MainActivity.class.getDeclaredMethod("loadStageLyrics",boolean.class);refresh.setAccessible(true);refresh.invoke(activity,true);}catch(Exception error){throw new RuntimeException(error);}});
             await(()->page.stage.timeline().wordTimed&&!page.stage.timeline().estimatedWordTiming&&page.stage.timeline().lines.get(0).text.equals("让音乐慢慢亮起"),"real plugin lyric export did not replace cached line-only lyrics");
+            test.runOnMainSync(()->{
+                LyricsTimeline timeline=page.stage.timeline();
+                check(timeline.lines.get(0).translation.equals("A source-provided timed phrase"),"auxiliary translation overwrote inline source text");
+                check(timeline.lines.get(1).translation.equals("Follow the sound")&&timeline.lines.get(1).romanization.equals("gen zhe sheng yin"),"delayed auxiliary lyrics did not reach the native player page");
+                check(timeline.lines.get(1).start==7000&&timeline.lines.get(1).words.get(0).end==12000,"auxiliary lyrics changed source timing");
+            });
             test.runOnMainSync(()->{try{String saved=((Map<String,String>)field(activity,"localLyrics")).get(uri);check(new JSONObject(saved).getJSONArray("lines").getJSONObject(0).getJSONArray("words").getJSONObject(0).getLong("end")==5000,"plugin word timing was flattened when saving lyrics");}catch(Exception error){throw new RuntimeException(error);}});
+            System.out.println("MYGO_LYRIC_ALIGNMENT_OK: nearest bounded timestamps, untimed row pairing, inline priority, source word clock, native plugin lyrics page");
         }finally{PluginArchive.delete(new File(context.getFilesDir(),"plugins/"+id));}
     }
     @SuppressWarnings("unchecked") private void servicePage()throws Exception{
