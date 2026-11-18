@@ -67,9 +67,10 @@ jobs:
       - name: Prepare pinned upstream market packages for tests
         run: python3 tests/prepare-market-audit.py
       - name: Prepare original provider and HLS fixtures
+        timeout-minutes: 20
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y --no-install-recommends ffmpeg
           python3 tests/prepare-port-fixtures.py
           python3 tests/prepare-live-aac.py
           python3 tests/prepare-provider-fixes.py
@@ -94,6 +95,7 @@ jobs:
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w com.mygo.music.test/com.mygo.music.PluginInstrumentation | tee plugin-test-results.txt
             adb logcat -d > android-logcat.txt
+            adb pull /sdcard/Android/data/com.mygo.music/files/qa/main-stalls main-stalls || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/qq-official-login.png qq-official-login.png || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/login-repair login-repair || true
             adb pull /sdcard/Android/data/com.mygo.music/files/qa/source-browser.png source-browser.png || true
@@ -150,12 +152,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: android-plugin-test-results
+          name: android-plugin-test-results-${{ github.run_attempt }}
           path: |
             plugin-test-results.txt
             theme-restart-prepare.txt
             theme-restart-verify.txt
             android-logcat.txt
+            main-stalls/
             market-test-results.txt
             market-audit.json
             roamdial-live-results.txt
