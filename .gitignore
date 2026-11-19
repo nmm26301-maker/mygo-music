@@ -30,3 +30,11 @@ app/src/main/assets/third-party/LAME-LGPL-2.0.txt
 # Generated regression control, excluded from the release.
 app/src/androidTest/java/com/mygo/music/BaselineAudioCache.java
 app/src/androidTest/assets/cache-regression-proof.json
+
+# Keep Android release signing material outside Git.
+*.keystore
+*.jks
+*.p12
+*.pk8
+*.keystore.b64
+*.jks.b64

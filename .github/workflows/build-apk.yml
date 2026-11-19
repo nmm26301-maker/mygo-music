@@ -1,8 +1,13 @@
 name: Build MyGo Music APK
 on:
   push:
-    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118, codex/manual-cache-20261118, codex/decoded-cache-20261118, codex/offline-lyrics-20261118, codex/library-lyrics-20261118 ]
+    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118, codex/manual-cache-20261118, codex/decoded-cache-20261118, codex/offline-lyrics-20261118, codex/library-lyrics-20261118, codex/secure-release-20261119, codex/plugin-playback-check-20261119 ]
   workflow_dispatch:
+    inputs:
+      fresh_install_release:
+        description: Build with the new key for fresh installs
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -202,221 +207,64 @@ jobs:
             .plugin-tools-cache/build.log
       - name: Include per-source Android check results in the release
         run: cp market-audit.json app/src/main/assets/plugin-audit.json
-      - name: Decode stable release signing key
-        run: |
-          test -s signing/mygo-release.keystore.b64
-          base64 -d signing/mygo-release.keystore.b64 > signing/mygo-release.keystore
-      - name: Build signed release APK
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-          gradle --no-daemon assembleRelease
-      - name: Verify APK integrity and stable signature
-        run: |
-          APK=app/build/outputs/apk/release/app-release.apk
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
-          unzip -t "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
-          keytool -printcert -jarfile "$APK" | grep -F "AC:76:D9:1E:E0:8F:81:53:76:44:50:24:49:4B:FB:D7:23:A3:E5:9C:BB:20:A1:40:26:DA:97:F6:64:7D:B7:5A"
-      - name: Download previously delivered signed v5.35.0 for upgrade verification
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43675095511 --name mygo-music-android-release --dir tests/baseline-v535
-      - name: Download previously delivered signed v5.38.0 for upgrade verification
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43786015134 --name mygo-music-android-release --dir tests/baseline-v538
-      - name: Download previously delivered signed v5.39.0 for upgrade verification
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43790521013 --name mygo-music-android-release --dir tests/baseline-v539
-      - name: Download previously delivered signed v5.40.0 for upgrade verification
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43808177227 --name mygo-music-android-release --dir tests/baseline-v540
-      - name: Download signed v5.41.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43835038431 --name mygo-music-android-release --dir tests/baseline-v541
-      - name: Download signed v5.42.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43843087997 --name mygo-music-android-release --dir tests/baseline-v542
-      - name: Download signed v5.43.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43883067274 --name mygo-music-android-release --dir tests/baseline-v543
-      - name: Download signed v5.44.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 43907584972 --name mygo-music-android-release --dir tests/baseline-v544
-      - name: Download delivered signed v5.45.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44046572465 --name mygo-music-android-release --dir tests/baseline-v545
-      - name: Download delivered signed v5.46.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44111007970 --name mygo-music-android-release --dir tests/baseline-v546
-      - name: Download delivered signed v5.47.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44119462794 --name mygo-music-android-release --dir tests/baseline-v547
-      - name: Download delivered signed v5.48.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44207544286 --name mygo-music-android-release --dir tests/baseline-v548
-      - name: Download delivered signed v5.49.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44213322488 --name mygo-music-android-release --dir tests/baseline-v549
-      - name: Download delivered signed v5.50.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44239878737 --name mygo-music-android-release --dir tests/baseline-v550
-      - name: Download delivered signed v5.51.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44248871363 --name mygo-music-android-release --dir tests/baseline-v551
-      - name: Download delivered signed v5.52.0 baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download 44269372381 --name mygo-music-android-release --dir tests/baseline-v552
-      - name: Verify upgrades from signed v5.6.0, v5.35.0, v5.38.0, v5.39.0, v5.40.0, v5.41.0, v5.42.0, v5.43.0, v5.44.0, v5.45.0, v5.46.0, v5.47.0, v5.48.0, v5.49.0, v5.50.0, v5.51.0 and v5.52.0 on Android
+      - name: Create disposable APKs to test signing-key rotation
+        run: bash tests/prepare-signing-rotation.sh
+      - name: Verify rotation and retained app data on Android 13
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: |
-            adb uninstall com.mygo.music || true
-            adb install tests/baseline-v5.6.apk
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v538/mygo-music-v5.38.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v535/mygo-music-v5.35.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v539/mygo-music-v5.39.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v540/mygo-music-v5.40.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v541/mygo-music-v5.41.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v542/mygo-music-v5.42.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v543/mygo-music-v5.43.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v544/mygo-music-v5.44.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v545/mygo-music-v5.45.0.apk
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v546/mygo-music-v5.46.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v547/mygo-music-v5.47.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v548/mygo-music-v5.48.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v549/mygo-music-v5.49.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v550/mygo-music-v5.50.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v551/mygo-music-v5.51.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb uninstall com.mygo.music
-            adb install tests/baseline-v552/mygo-music-v5.52.0.apk
-            adb shell am start -W -n com.mygo.music/.MainActivity
-            adb shell am force-stop com.mygo.music
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell dumpsys package com.mygo.music | grep 'versionCode=103'
-            adb shell am start -W -n com.mygo.music/.MainActivity
+          script: bash tests/verify-signing-rotation.sh
+      - name: Assemble unsigned release APK
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+        run: gradle --no-daemon assembleRelease
       - name: Refresh corresponding sources with the final source audit
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
         run: python3 tests/build-native-audio.py
       - name: Include exact native plugin sources and licenses
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
         run: python3 tests/package-plugin-sources.py
-      - name: Prepare direct install files
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+        with:
+          name: mygo-music-unsigned-release-input
+          path: |
+            app/build/outputs/apk/release/app-release-unsigned.apk
+            app/build/outputs/release/*-sources.zip
+          if-no-files-found: error
+
+  sign-fresh-install:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: android-release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: mygo-music-unsigned-release-input
+          path: unsigned-input
+      - name: Install APK signing tools
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0"
+      - name: Sign with the protected production key
+        env:
+          MYGO_RELEASE_KEYSTORE_B64: ${{ secrets.MYGO_RELEASE_KEYSTORE_B64 }}
+          MYGO_RELEASE_STORE_PASSWORD: ${{ secrets.MYGO_RELEASE_STORE_PASSWORD }}
+          MYGO_RELEASE_KEY_PASSWORD: ${{ secrets.MYGO_RELEASE_KEY_PASSWORD }}
+          MYGO_RELEASE_KEY_ALIAS: ${{ vars.MYGO_RELEASE_KEY_ALIAS }}
+          MYGO_RELEASE_CERT_SHA256: ${{ vars.MYGO_RELEASE_CERT_SHA256 }}
         run: |
           VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)
-          mkdir -p app/build/outputs/release
-          cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/release/mygo-music-v${VERSION}.apk"
-          (cd app/build/outputs/apk/release && zip -j "../../release/mygo-music-android-v${VERSION}-install.zip" app-release.apk)
+          APK="release/mygo-music-v${VERSION}-fresh-install.apk"
+          bash tests/sign-release.sh unsigned-input/apk/release/app-release-unsigned.apk "$APK"
+          cp unsigned-input/release/*-sources.zip release/
       - uses: actions/upload-artifact@v4
         with:
-          name: mygo-music-android-release
-          path: app/build/outputs/release/*
+          name: mygo-music-android-fresh-install-release
+          path: release/*
+          if-no-files-found: error

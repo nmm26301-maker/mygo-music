@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+signer="${ANDROID_HOME:?}/build-tools/35.0.0/apksigner"
+target="$RUNNER_TEMP/mygo-signing-test"
+mkdir -p "$target"
+keys=$(mktemp -d)
+trap 'rm -rf "$keys"' EXIT
+export MYGO_TEST_KEY_PASSWORD
+MYGO_TEST_KEY_PASSWORD=$(openssl rand -hex 24)
+for key in original rotated; do
+    keytool -genkeypair -alias rotation-test -dname "CN=Disposable Android Test $key" \
+        -keyalg RSA -keysize 2048 -validity 30 -storetype PKCS12 \
+        -keystore "$keys/$key.p12" -storepass:env MYGO_TEST_KEY_PASSWORD
+done
+original=(--ks "$keys/original.p12" --ks-key-alias rotation-test --ks-pass env:MYGO_TEST_KEY_PASSWORD)
+rotated=(--ks "$keys/rotated.p12" --ks-key-alias rotation-test --ks-pass env:MYGO_TEST_KEY_PASSWORD)
+"$signer" rotate --out "$keys/lineage" --old-signer "${original[@]}" --set-rollback false --new-signer "${rotated[@]}"
+input=app/build/outputs/apk/debug/app-debug.apk
+"$signer" sign "${original[@]}" --out "$target/original.apk" "$input"
+"$signer" sign --lineage "$keys/lineage" --rotation-min-sdk-version 33 \
+    "${original[@]}" --next-signer "${rotated[@]}" --out "$target/rotated.apk" "$input"
+
+for apk in original rotated; do
+    "$signer" verify --min-sdk-version 33 --max-sdk-version 33 --print-certs "$target/$apk.apk" \
+        | awk -F': ' '/certificate SHA-256 digest/ {print $2}' > "$keys/$apk.sha256"
+    test "$(wc -l < "$keys/$apk.sha256")" -eq 1
+done
+if cmp -s "$keys/original.sha256" "$keys/rotated.sha256"; then
+    echo "Android 13 still observes the original signer" >&2
+    exit 1
+fi
