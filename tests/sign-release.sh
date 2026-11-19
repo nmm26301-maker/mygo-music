@@ -26,9 +26,20 @@ args=(--ks "$scratch/release.keystore" --ks-pass env:MYGO_RELEASE_STORE_PASSWORD
 if [[ -n "${MYGO_RELEASE_KEY_PASSWORD:-}" ]]; then
     args+=(--key-pass env:MYGO_RELEASE_KEY_PASSWORD)
 fi
-"$signer" sign "${args[@]}" --out "$scratch/signed.apk" "$scratch/aligned.apk"
+case ${3:-fresh-install} in
+    fresh-install)
+        "$signer" sign "${args[@]}" --out "$scratch/signed.apk" "$scratch/aligned.apk"
+        ;;
+    android13-upgrade)
+        : "${MYGO_RELEASE_LINEAGE_B64:?missing approved production upgrade lineage}"
+        printf '%s' "$MYGO_RELEASE_LINEAGE_B64" | base64 --decode > "$scratch/release.lineage"
+        bash tests/sign-android13-upgrade.sh "$scratch/aligned.apk" "$scratch/signed.apk" \
+            "$scratch/release.lineage" "$retired" "$expected" "${args[@]}"
+        ;;
+    *) echo 'Unknown Android build mode.' >&2; exit 1 ;;
+esac
 certs=$("$signer" verify --verbose --print-certs "$scratch/signed.apk")
-actual=$(printf '%s\n' "$certs" | awk -F': ' '/certificate SHA-256 digest/ {print tolower($2)}')
+actual=$(printf '%s\n' "$certs" | awk -F': ' '/^Signer #[0-9]+ certificate SHA-256 digest:/ {print tolower($2)}')
 if [[ "$actual" != "$expected" ]]; then
     echo 'The signed APK certificate does not match the approved fingerprint.' >&2
     exit 1

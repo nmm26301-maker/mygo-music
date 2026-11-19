@@ -1,11 +1,15 @@
 name: Build MyGo Music APK
 on:
   push:
-    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118, codex/manual-cache-20261118, codex/decoded-cache-20261118, codex/offline-lyrics-20261118, codex/library-lyrics-20261118, codex/secure-release-20261119, codex/plugin-playback-check-20261119, codex/mygo-validation-20261119, codex/mygo-signing-playback-20261119* ]
+    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118, codex/manual-cache-20261118, codex/decoded-cache-20261118, codex/offline-lyrics-20261118, codex/library-lyrics-20261118, codex/secure-release-20261119, codex/plugin-playback-check-20261119, codex/mygo-validation-20261119, codex/mygo-signing-playback-20261119*, codex/mygo-upgrade-library-20261119* ]
   workflow_dispatch:
     inputs:
       fresh_install_release:
         description: Build with the new key for fresh installs
+        type: boolean
+        default: false
+      android13_upgrade_release:
+        description: Build an Android 13+ upgrade with the approved signing lineage
         type: boolean
         default: false
 permissions:
@@ -79,7 +83,12 @@ jobs:
           python3 tests/prepare-cache-regression.py
           gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Create disposable APKs to test signing-key rotation
-        run: bash tests/prepare-signing-rotation.sh
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/mygo-sdk23-debug.apk"
+          gradle --no-daemon -PmygoApi33Upgrade=true assembleDebug
+          mv app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/mygo-sdk33-debug.apk"
+          cp "$RUNNER_TEMP/mygo-sdk23-debug.apk" app/build/outputs/apk/debug/app-debug.apk
+          bash tests/prepare-signing-rotation.sh "$RUNNER_TEMP/mygo-sdk33-debug.apk"
       - name: Verify selected plugin playback and signing rotation on Android 13
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -250,16 +259,24 @@ jobs:
       - name: Include per-source Android check results in the release
         run: cp market-audit.json app/src/main/assets/plugin-audit.json
       - name: Assemble unsigned release APK
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
-        run: gradle --no-daemon assembleRelease
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.fresh_install_release || inputs.android13_upgrade_release) }}
+        env:
+          UPGRADE: ${{ inputs.android13_upgrade_release }}
+          FRESH: ${{ inputs.fresh_install_release }}
+        run: |
+          if [[ "$UPGRADE" == true && "$FRESH" == true ]]; then
+            echo 'Select exactly one production release type.' >&2
+            exit 1
+          fi
+          gradle --no-daemon -PmygoApi33Upgrade="$UPGRADE" assembleRelease
       - name: Refresh corresponding sources with the final source audit
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.fresh_install_release || inputs.android13_upgrade_release) }}
         run: python3 tests/build-native-audio.py
       - name: Include exact native plugin sources and licenses
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.fresh_install_release || inputs.android13_upgrade_release) }}
         run: python3 tests/package-plugin-sources.py
       - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.fresh_install_release || inputs.android13_upgrade_release) }}
         with:
           name: mygo-music-unsigned-release-input
           path: |
@@ -267,11 +284,13 @@ jobs:
             app/build/outputs/release/*-sources.zip
           if-no-files-found: error
 
-  sign-fresh-install:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fresh_install_release }}
+  sign-production:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.fresh_install_release || inputs.android13_upgrade_release) }}
     needs: build
     runs-on: ubuntu-latest
     environment: android-release
+    env:
+      RELEASE_MODE: ${{ inputs.android13_upgrade_release && 'android13-upgrade' || 'fresh-install' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -290,14 +309,32 @@ jobs:
           MYGO_RELEASE_KEY_PASSWORD: ${{ secrets.MYGO_RELEASE_KEY_PASSWORD }}
           MYGO_RELEASE_KEY_ALIAS: ${{ vars.MYGO_RELEASE_KEY_ALIAS }}
           MYGO_RELEASE_CERT_SHA256: ${{ vars.MYGO_RELEASE_CERT_SHA256 }}
+          MYGO_RELEASE_LINEAGE_B64: ${{ secrets.MYGO_RELEASE_LINEAGE_B64 }}
         run: |
           VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)
-          APK="release/mygo-music-v${VERSION}-fresh-install.apk"
-          bash tests/sign-release.sh unsigned-input/apk/release/app-release-unsigned.apk "$APK"
+          APK="release/mygo-music-v${VERSION}-$RELEASE_MODE.apk"
+          bash tests/sign-release.sh unsigned-input/apk/release/app-release-unsigned.apk "$APK" "$RELEASE_MODE"
           zip -j "${APK%.apk}-backup.zip" "$APK"
           cp unsigned-input/release/*-sources.zip release/
+      - name: Fetch and verify the delivered 5.53.0 baseline
+        if: ${{ inputs.android13_upgrade_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 44302811247 --name mygo-music-android-release --dir "$RUNNER_TEMP/mygo-baseline"
+          cd "$RUNNER_TEMP/mygo-baseline"
+          echo '191541167a0433cdacea969c20387cce87e75dc2833ca20d2274be29e59e2c5d  mygo-music-v5.53.0.apk' | sha256sum -c
+      - name: Test coverage and data preservation from the delivered APK
+        if: ${{ inputs.android13_upgrade_release }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash tests/verify-upgrade-data.sh "$RUNNER_TEMP/mygo-baseline/mygo-music-v5.53.0.apk" release/*-android13-upgrade.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: mygo-music-android-fresh-install-release
+          name: mygo-music-android-${{ env.RELEASE_MODE }}-release
           path: release/*
           if-no-files-found: error

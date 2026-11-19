@@ -1,7 +1,9 @@
 plugins { id 'com.android.application' }
 
+def apkMinimumSdk = providers.gradleProperty('mygoApi33Upgrade').orNull == 'true' ? 33 : 23
+
 android { namespace 'com.mygo.music'; compileSdk 35
-    defaultConfig { applicationId 'com.mygo.music'; minSdk 23; targetSdk 35; versionCode 104; versionName '5.54.0'; testInstrumentationRunner 'com.mygo.music.PluginInstrumentation' }
+    defaultConfig { applicationId 'com.mygo.music'; minSdk apkMinimumSdk; targetSdk 35; versionCode 105; versionName '5.55.0'; testInstrumentationRunner 'com.mygo.music.PluginInstrumentation' }
     packaging { jniLibs { useLegacyPackaging = true } }
     buildTypes { release { minifyEnabled false } }
 }

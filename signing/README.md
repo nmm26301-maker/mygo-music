@@ -6,4 +6,6 @@ Create a protected GitHub Actions environment named `android-release`. Restrict 
 
 A manual run on main with `fresh_install_release` produces an APK for fresh installs. The signing step requires the pinned certificate and rejects the retired certificate. Keep that build separate from any upgrade for existing installations.
 
-A production update of existing installations requires an approved signing lineage and a migration test using the delivered APK and representative app data. The disposable-key test does not attest to the production lineage. Test older Android versions separately before offering them an update.
+For an existing installation on Android 13 or newer, use the `android13_upgrade_release` option. Provide the approved proof of rotation as `MYGO_RELEASE_LINEAGE_B64` in the protected release environment. Production CI uses only the new private key. The proof must link the delivered 5.53.0 certificate to the pinned replacement and allow the previous signer only to retain installed data. The workflow publishes the upgrade only after verifying the delivered baseline checksum, installing the new APK over that baseline on Android 13, and checking that seeded local data survives.
+
+The normal workflow tests the same upgrade-signing path with two one-use keys. Neither production signatures nor a physical phone are represented by that test. The fresh-install mode supports the general app minimum SDK. The Android 13 upgrade mode enforces SDK 33 in its manifest.
