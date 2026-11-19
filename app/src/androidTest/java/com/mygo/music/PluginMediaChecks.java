@@ -30,7 +30,7 @@ final class PluginMediaChecks {
         JSONArray rules=new JSONArray().put(new JSONObject().put("hosts",new JSONArray().put("{setting:server}")).put("kinds",new JSONArray().put("image").put("audio")).put("headers",new JSONObject().put("Cookie","token={storage:token}").put("X-Rule","manifest").put("User-Agent","fixture-manifest")));
         manifest.put("requestHeaders",rules);
         try(Server server=new Server();Server redirected=new Server()){
-            String script="export function search(){return {tracks:[{id:'protected',name:'Protected audio'}]};}export function save({value}){host.storage.set('token',value);}export function read(){return host.storage.get('token');}export function stream(){return {url:'"+server.base()+"/audio',headers:{'user-agent':'fixture-explicit'}};}";
+            String script="export function search(){return {tracks:[{id:'blocked',name:'First result'},{id:'protected',name:'Protected audio'}]};}export function save({value}){host.storage.set('token',value);}export function read(){return host.storage.get('token');}export function stream(){return {url:'"+server.base()+"/audio',headers:{'user-agent':'fixture-explicit'}};}";
             install(manager,firstRepo,manifest,script,true);PluginManager.PluginInfo a=info(manager,firstRepo);
             context.getSharedPreferences("library",0).edit().putBoolean("plugin_network_"+a.id,true).commit();context.getSharedPreferences("plugin_settings_"+a.id,0).edit().putString("server",server.base()).commit();
             call(manager,a.id,"save",new JSONObject().put("value","alpha"));
@@ -46,8 +46,41 @@ final class PluginMediaChecks {
             activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));MainActivity current=activity;java.lang.reflect.Field field=MainActivity.class.getDeclaredField("playbackService");field.setAccessible(true);PlaybackService[] bound={null};await(()->{bound[0]=(PlaybackService)field.get(current);return bound[0]!=null;},"media test could not bind playback service");service=bound[0];PlaybackService player=service;
             test.runOnMainSync(()->{try{PlaybackService.startQueue(current,new JSONArray().put(new JSONObject().put("uri","plugin://"+a.id+"?id=test").put("title","Protected audio")),0,0,80,false,false,"high");}catch(Exception failure){throw new RuntimeException(failure);}});await(()->player.snapshot().playing,"manifest audio headers did not reach native background playback");check(server.audioAuthenticated&&server.explicitAgent,"protected audio lost token or explicit user-agent");
             ImageView[] view={null};test.runOnMainSync(()->{try{view[0]=new ImageView(current);java.lang.reflect.Method load=MainActivity.class.getDeclaredMethod("loadGridArtwork",ImageView.class,String.class,String.class);load.setAccessible(true);load.invoke(current,view[0],server.base()+"/cover",a.id);}catch(Exception failure){throw new RuntimeException(failure);}});await(()->view[0].getDrawable() instanceof BitmapDrawable,"protected cover did not load through the real artwork loader");check(server.coverAuthenticated,"cover request lost its saved account");
-            PluginCheckDialog[] diagnostic={null};CountDownLatch selected=new CountDownLatch(1);test.runOnMainSync(()->{diagnostic[0]=new PluginCheckDialog(current,manager,a,()->{},()->{},song->{if(song.optString("id").equals("protected"))selected.countDown();});diagnostic[0].show();});test.waitForIdleSync();test.runOnMainSync(()->{try{java.lang.reflect.Field dialogField=PluginCheckDialog.class.getDeclaredField("dialog");dialogField.setAccessible(true);((android.app.AlertDialog)dialogField.get(diagnostic[0])).getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();}catch(Exception failure){throw new RuntimeException(failure);}});
-            java.lang.reflect.Field listenField=PluginCheckDialog.class.getDeclaredField("listen");listenField.setAccessible(true);await(()->((android.widget.Button)listenField.get(diagnostic[0])).isEnabled(),"installed-source diagnostic did not verify authenticated search and audio");test.runOnMainSync(()->{try{((android.widget.Button)listenField.get(diagnostic[0])).performClick();}catch(Exception failure){throw new RuntimeException(failure);}});check(selected.await(2,TimeUnit.SECONDS),"diagnostic listen button lost the verified source track");
+            PluginCheckDialog[] diagnostic={null};
+            CountDownLatch selected=new CountDownLatch(1);
+            OfflinePlaybackChecks dialogActions=new OfflinePlaybackChecks(test);
+            dialogActions.ui(()->{
+                diagnostic[0]=new PluginCheckDialog(current,manager,a,()->{},()->{},song->{
+                    try {
+                        if(song.optString("id").equals("protected"))selected.countDown();
+                        OfflinePlaybackChecks.invoke(current,"playPluginTrack",
+                            new Class<?>[]{PluginManager.PluginInfo.class,JSONObject.class},a,song);
+                    } catch(Exception error) { throw new IllegalStateException(error); }
+                },player::snapshot);
+                diagnostic[0].show();
+            });
+            test.waitForIdleSync();
+            dialogActions.ui(()->{
+                ((android.widget.EditText)FullPortChecks.field(diagnostic[0],"query")).setText("Protected audio");
+                ((android.app.AlertDialog)FullPortChecks.field(diagnostic[0],"dialog"))
+                    .getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();
+            });
+            await(()->((android.widget.Button)FullPortChecks.field(diagnostic[0],"listen")).isEnabled(),
+                "installed-source diagnostic did not return searchable tracks");
+            dialogActions.ui(()->{
+                android.widget.Spinner songs=(android.widget.Spinner)FullPortChecks.field(diagnostic[0],"songs");
+                check(songs.getCount()==2,"diagnostic did not offer both search results");
+                songs.setSelection(1);
+            });
+            test.waitForIdleSync();
+            dialogActions.ui(()->((android.widget.Button)FullPortChecks.field(diagnostic[0],"listen")).performClick());
+            check(selected.await(2,TimeUnit.SECONDS),"diagnostic did not play the selected second result");
+            await(()->((android.widget.TextView)FullPortChecks.field(diagnostic[0],"status"))
+                .getText().toString().contains("进度已推进"),"diagnostic did not verify the actual playback clock");
+            check(player.snapshot().uri.equals("plugin://"+a.id+"?id=protected")&&server.audioAuthenticated,
+                "diagnostic used a different track or lost the active account");
+            dialogActions.ui(()->((android.app.AlertDialog)FullPortChecks.field(diagnostic[0],"dialog")).dismiss());
+            System.out.println("MYGO_PLUGIN_SELECTED_PLAYBACK_OK");
         }finally{
             MainActivity last=activity;PlaybackService player=service;test.runOnMainSync(()->{if(player!=null)player.stopPlayback();if(last!=null)last.finish();manager.close();});
             for(PluginManager.PluginInfo item:manager.list())if(item.repository.equals(firstRepo)||item.repository.equals(secondRepo)){PluginArchive.delete(new File(item.directory));context.getSharedPreferences("library",0).edit().remove("plugin_network_"+item.id).remove("plugin_enabled_"+item.id).commit();context.getSharedPreferences("plugin_data_"+item.id,0).edit().clear().commit();context.getSharedPreferences("plugin_settings_"+item.id,0).edit().clear().commit();}
