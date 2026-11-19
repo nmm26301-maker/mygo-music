@@ -23,11 +23,13 @@ input=app/build/outputs/apk/debug/app-debug.apk
     "${original[@]}" --next-signer "${rotated[@]}" --out "$target/rotated.apk" "$input"
 
 for apk in original rotated; do
+    expected=$(keytool -exportcert -keystore "$keys/$apk.p12" -alias rotation-test \
+        -storepass:env MYGO_TEST_KEY_PASSWORD | sha256sum | awk '{print $1}')
     "$signer" verify --min-sdk-version 33 --max-sdk-version 33 --print-certs "$target/$apk.apk" \
-        | awk -F': ' '/certificate SHA-256 digest/ {print $2}' > "$keys/$apk.sha256"
-    test "$(wc -l < "$keys/$apk.sha256")" -eq 1
+        | awk -F': ' '/certificate SHA-256 digest/ {print tolower($2)}' > "$keys/$apk.sha256"
+    if ! grep -Fxq "$expected" "$keys/$apk.sha256"; then
+        echo "Signing report for $apk did not contain the expected disposable certificate." >&2
+        cat "$keys/$apk.sha256" >&2
+        exit 1
+    fi
 done
-if cmp -s "$keys/original.sha256" "$keys/rotated.sha256"; then
-    echo "Android 13 still observes the original signer" >&2
-    exit 1
-fi
