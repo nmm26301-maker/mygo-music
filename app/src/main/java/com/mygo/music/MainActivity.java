@@ -127,7 +127,10 @@ public class MainActivity extends Activity {
         libraryContent.addView(sourceScroll,new FrameLayout.LayoutParams(-1,-1));
         localMusicGrid=new LocalMusicGrid(this,tracks,names,new LocalMusicGrid.Host(){
             public void artwork(ImageView image,Uri uri){loadGridArtwork(image,covers.get(uri.toString()),artworkSource(uri));}
-            public void play(int index){playIndex(index);}
+            public void play(Uri uri){
+                int index=tracks.indexOf(uri);
+                if(index>=0)playIndex(index);
+            }
         });
         libraryContent.addView(localMusicGrid,new FrameLayout.LayoutParams(-1,-1));
         main.addView(libraryContent,new LinearLayout.LayoutParams(-1,0,1));

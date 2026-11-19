@@ -25,7 +25,7 @@ import java.util.Locale;
 final class LocalMusicGrid extends LinearLayout {
     interface Host {
         void artwork(ImageView view, Uri uri);
-        void play(int index);
+        void play(Uri uri);
     }
 
     final GridView grid;
@@ -34,7 +34,7 @@ final class LocalMusicGrid extends LinearLayout {
     private final List<Uri> tracks;
     private final List<String> names;
     private final Host host;
-    private final ArrayList<Integer> visible = new ArrayList<>();
+    private List<Song> visible = java.util.Collections.emptyList();
     private final SongAdapter songs = new SongAdapter();
 
     LocalMusicGrid(Context context, List<Uri> tracks, List<String> names, Host host) {
@@ -73,7 +73,7 @@ final class LocalMusicGrid extends LinearLayout {
         content.addView(empty, new FrameLayout.LayoutParams(-1, -1));
         grid.setEmptyView(empty);
         grid.setAdapter(songs);
-        grid.setOnItemClickListener((parent, view, position, id) -> host.play(songs.getItem(position)));
+        grid.setOnItemClickListener((parent, view, position, id) -> host.play(songs.getItem(position).uri));
         filter.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -87,11 +87,14 @@ final class LocalMusicGrid extends LinearLayout {
     void refresh() {
         String query = filter.getText().toString().trim().toLowerCase(Locale.ROOT);
         String[] terms = query.isEmpty() ? new String[0] : query.split("\\s+");
-        visible.clear();
+        ArrayList<Song> matches = new ArrayList<>();
         for (int i = 0, count = Math.min(tracks.size(), names.size()); i < count; i++) {
-            String name = names.get(i).toLowerCase(Locale.ROOT);
-            if (matches(name, terms)) visible.add(i);
+            String title = names.get(i);
+            if (matches(title.toLowerCase(Locale.ROOT), terms)) {
+                matches.add(new Song(tracks.get(i), title));
+            }
         }
+        visible = matches;
         empty.setText(query.isEmpty() ? "暂无歌曲，先添加本地音乐或从音乐源播放" : "没有符合条件的歌曲");
         songs.notifyDataSetChanged();
     }
@@ -110,18 +113,28 @@ final class LocalMusicGrid extends LinearLayout {
         return result;
     }
 
+    private static final class Song {
+        final Uri uri;
+        final String title;
+
+        Song(Uri uri, String title) {
+            this.uri = uri;
+            this.title = title;
+        }
+    }
+
     private final class SongAdapter extends BaseAdapter {
         @Override public int getCount() { return visible.size(); }
-        @Override public Integer getItem(int position) { return visible.get(position); }
-        @Override public long getItemId(int position) { return getItem(position); }
+        @Override public Song getItem(int position) { return visible.get(position); }
+        @Override public long getItemId(int position) { return position; }
 
         @Override public View getView(int position, View convertView, ViewGroup parent) {
             SongCard card = convertView instanceof SongCard ? (SongCard) convertView : new SongCard();
-            int index = getItem(position);
-            card.title.setText(names.get(index));
+            Song song = getItem(position);
+            card.title.setText(song.title);
             card.cover.setTag(null);
             card.cover.setImageResource(R.drawable.ic_launcher);
-            host.artwork(card.cover, tracks.get(index));
+            host.artwork(card.cover, song.uri);
             return card;
         }
     }

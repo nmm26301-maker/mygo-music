@@ -69,7 +69,20 @@ final class LocalMusicGridChecks {
                 local.filter.setText("");
                 OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 85, "clearing filter lost library entries");
             });
-            System.out.println("MYGO_LOCAL_GRID_OK: 85 songs, final song scroll, artist/title filtering and native playback");
+            actions.ui(() -> {
+                List<Uri> tracks = (List<Uri>)FullPortChecks.field(activity, "tracks");
+                List<String> names = (List<String>)FullPortChecks.field(activity, "names");
+                tracks.subList(1, tracks.size()).clear();
+                names.subList(1, names.size()).clear();
+                View stale = local.grid.getAdapter().getView(84, null, local.grid);
+                OfflinePlaybackChecks.check(stale != null, "pending layout could not render the old view safely");
+                local.grid.performItemClick(stale, 84, local.grid.getItemIdAtPosition(84));
+                OfflinePlaybackChecks.check(playback.snapshot().uri.equals(expected.toString()),
+                    "a click on a removed local track switched playback");
+                local.refresh();
+                OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 1, "grid did not update after the library shrank");
+            });
+            System.out.println("MYGO_LOCAL_GRID_OK: long-list scroll, artist/title filtering, native playback and stable rows during library shrink");
         } finally {
             actions.ui(() -> {
                 playback.clearQueue();
