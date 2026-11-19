@@ -74,21 +74,10 @@ jobs:
         run: python3 tests/prepare-typescript.py
       - name: Prepare pinned upstream market packages for tests
         run: python3 tests/prepare-market-audit.py
-      - name: Prepare original provider and HLS fixtures
-        timeout-minutes: 20
+      - name: Assemble targeted Android tests from local fixtures
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg
-          python3 tests/prepare-port-fixtures.py
-          python3 tests/prepare-live-aac.py
-          python3 tests/prepare-provider-fixes.py
-          python3 tests/prepare-bilibili-he.py
           python3 tests/prepare-cache-regression.py
-          python3 tests/probe-ximalaya-public.py
-          node tests/prepare-lyric-motion.cjs
-          node --test tests/bilibili-playback.test.mjs tests/ximalaya-response.test.mjs tests/kugou-playback.test.mjs tests/qq-web-login.test.mjs tests/plugin-fetch-stream.test.mjs
-      - name: Build Android runtime tests
-        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
+          gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Create disposable APKs to test signing-key rotation
         run: bash tests/prepare-signing-rotation.sh
       - name: Verify selected plugin playback and signing rotation on Android 13
@@ -118,6 +107,21 @@ jobs:
             selected-playback-results.txt
             selected-playback-logcat.txt
             signing-rotation-results.txt
+      - name: Prepare original provider and HLS fixtures
+        timeout-minutes: 20
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          python3 tests/prepare-port-fixtures.py
+          python3 tests/prepare-live-aac.py
+          python3 tests/prepare-provider-fixes.py
+          python3 tests/prepare-bilibili-he.py
+          python3 tests/prepare-cache-regression.py
+          python3 tests/probe-ximalaya-public.py
+          node tests/prepare-lyric-motion.cjs
+          node --test tests/bilibili-playback.test.mjs tests/ximalaya-response.test.mjs tests/kugou-playback.test.mjs tests/qq-web-login.test.mjs tests/plugin-fetch-stream.test.mjs
+      - name: Build Android runtime tests
+        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Execute actual WebView plugin tests on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
