@@ -14,4 +14,6 @@ tools="${ANDROID_HOME:?}/build-tools/35.0.0"
     END { exit !found }
 ' || { echo 'An Android 13 upgrade APK must require SDK 33 in its manifest.' >&2; exit 1; }
 "$tools/apksigner" lineage --in "$lineage" --print-certs -v | python3 tests/check-signing-lineage.py "$old" "$new"
-"$tools/apksigner" sign --lineage "$lineage" --rotation-min-sdk-version 28 "$@" --out "$output" "$input"
+"$tools/apksigner" sign --lineage "$lineage" --rotation-min-sdk-version 28 \
+    --v1-signing-enabled false --v2-signing-enabled false --v3-signing-enabled true \
+    --v4-signing-enabled false "$@" --out "$output" "$input"
