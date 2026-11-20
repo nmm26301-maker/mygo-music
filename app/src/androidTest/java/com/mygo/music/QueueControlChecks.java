@@ -77,12 +77,20 @@ final class QueueControlChecks {
         event.recycle();
     }
     private void menuClick(String label) throws Exception {
-        android.view.accessibility.AccessibilityNodeInfo item = SourcePlaylistUiChecks.node(actions.test, label);
-        check(item != null, "queue menu item missing: " + label);
+        android.view.accessibility.AccessibilityNodeInfo[] item = {null};
         Rect bounds = new Rect();
-        item.getBoundsInScreen(bounds);
-        check(item.isVisibleToUser() && bounds.width() > 0 && bounds.height() > 0,
-            "queue menu item is outside its visible window: " + label + " " + bounds);
+        try {
+            actions.helper.await(() -> {
+                item[0] = SourcePlaylistUiChecks.node(actions.test, label);
+                if (item[0] == null || !item[0].isVisibleToUser()) return false;
+                item[0].getBoundsInScreen(bounds);
+                return bounds.width() > 0 && bounds.height() > 0;
+            }, "queue menu item did not become visible: " + label);
+        } catch (AssertionError error) {
+            throw new AssertionError("queue menu did not settle: " + label + "; UI="
+                + SourcePlaylistUiChecks.uiText(actions.test.getUiAutomation().getRootInActiveWindow())
+                + "; queue=" + service.queueSnapshot(), error);
+        }
         long down = SystemClock.uptimeMillis();
         input(MotionEvent.ACTION_DOWN, bounds.centerX(), bounds.centerY(), down);
         SystemClock.sleep(60);
