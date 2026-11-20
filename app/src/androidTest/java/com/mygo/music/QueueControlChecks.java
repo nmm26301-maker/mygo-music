@@ -76,6 +76,19 @@ final class QueueControlChecks {
         actions.test.getUiAutomation().injectInputEvent(event, true);
         event.recycle();
     }
+    private void menuClick(String label) throws Exception {
+        android.view.accessibility.AccessibilityNodeInfo item = SourcePlaylistUiChecks.node(actions.test, label);
+        check(item != null, "queue menu item missing: " + label);
+        Rect bounds = new Rect();
+        item.getBoundsInScreen(bounds);
+        check(item.isVisibleToUser() && bounds.width() > 0 && bounds.height() > 0,
+            "queue menu item is outside its visible window: " + label + " " + bounds);
+        long down = SystemClock.uptimeMillis();
+        input(MotionEvent.ACTION_DOWN, bounds.centerX(), bounds.centerY(), down);
+        SystemClock.sleep(60);
+        input(MotionEvent.ACTION_UP, bounds.centerX(), bounds.centerY(), down);
+        actions.test.waitForIdleSync();
+    }
     private void drag(boolean replaceDuringDrag) throws Exception {
         frame();
         ViewGroup first = row(0), second = row(1);
@@ -159,13 +172,13 @@ final class QueueControlChecks {
             MediaPlayer replacement = service.snapshot().player;
             long replacementGeneration = service.snapshot().generation;
             int callbacks = selections[0];
-            SourcePlaylistUiChecks.click(actions.test, "从队列移除");
+            menuClick("从队列移除");
             actions.helper.await(() -> dialog.getWindow().getDecorView().hasWindowFocus(), "stale menu did not close");
             unchanged(base.toString(), replacement, replacementGeneration, callbacks);
             frame();
             ViewGroup freshMenu = row(0);
             actions.ui(freshMenu::performLongClick);
-            SourcePlaylistUiChecks.click(actions.test, "下移一首");
+            menuClick("下移一首");
             actions.helper.await(() -> service.queueSnapshot().getJSONObject(0).getString("title").equals("Queue B"),
                 "fresh context menu did not move the selected entry");
             actions.ui(() -> check(service.snapshot().player == replacement, "valid menu move restarted current audio"));
