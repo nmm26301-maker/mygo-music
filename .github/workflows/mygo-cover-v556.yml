@@ -1,0 +1,160 @@
+name: Build and verify MyGo 5.56 Android 13 cover
+on:
+  push:
+    branches: [ codex/mygo-cover-556-verify ]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Install Android SDK
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Build Android plugin launcher for all supported ABIs
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager "ndk;27.2.12479018"
+          TOOLCHAIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for SPEC in "arm64-v8a:aarch64-linux-android" "armeabi-v7a:armv7a-linux-androideabi" "x86_64:x86_64-linux-android" "x86:i686-linux-android"; do
+            ABI="${SPEC%%:*}"
+            TARGET="${SPEC#*:}"
+            mkdir -p "app/src/main/jniLibs/$ABI"
+            "$TOOLCHAIN/${TARGET}23-clang" -O2 -fPIE -pie -Wl,-z,relro,-z,now,-z,max-page-size=16384 app/src/main/cpp/plugin-launcher.c -o "app/src/main/jniLibs/$ABI/libmygo-launcher.so"
+          done
+      - uses: actions/cache@v4
+        id: native-audio-cache
+        with:
+          path: .native-audio-cache
+          key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
+      - name: Build pinned Android audio decoder and corresponding source archive
+        run: python3 tests/build-native-audio.py
+      - uses: actions/cache/save@v4
+        if: steps.native-audio-cache.outputs.cache-hit != 'true'
+        with:
+          path: .native-audio-cache
+          key: android-native-audio-${{ hashFiles('tests/build-native-audio.py') }}
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/cache@v4
+        id: plugin-tools-cache
+        with:
+          path: .plugin-tools-cache
+          key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json', 'app/src/main/cpp/plugin-python.c') }}
+      - name: Build verified native plugin tools
+        run: python3 tests/build-plugin-tools.py
+      - uses: actions/cache/save@v4
+        if: steps.plugin-tools-cache.outputs.cache-hit != 'true'
+        with:
+          path: .plugin-tools-cache
+          key: android-plugin-tools-${{ hashFiles('tests/build-plugin-tools.py', 'tests/native-tools-pins.json', 'app/src/main/cpp/plugin-python.c') }}
+      - name: Restore the audit produced by the tested application commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh run view 44669475053 --json headSha,conclusion --jq '.headSha + ":" + .conclusion')" = e97c2f9966dd6d0f8f5e82c0732eaab94231287a:success
+          gh run download 44669475053 --name android-plugin-test-results-1 --dir "$RUNNER_TEMP/mygo-audit"
+          python3 -m json.tool "$RUNNER_TEMP/mygo-audit/market-audit.json" >/dev/null
+          cp "$RUNNER_TEMP/mygo-audit/market-audit.json" app/src/main/assets/plugin-audit.json
+      - name: Build original-package Android 13 APK
+        run: |
+          gradle --no-daemon -PmygoApi33Upgrade=true assembleRelease
+          python3 tests/build-native-audio.py
+          python3 tests/package-plugin-sources.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android13-cover-unsigned-input
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android13-cover-corresponding-sources
+          path: app/build/outputs/release/*-sources.zip
+          if-no-files-found: error
+  sign-and-verify:
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: android13-cover-unsigned-input
+          path: unsigned-input
+      - name: Install signing tools and download the delivered APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0"
+          gh run download 44302811247 --name mygo-music-android-release --dir "$RUNNER_TEMP/mygo-baseline"
+      - name: Sign the cover APK with the replacement key
+        run: |
+          cat > "$RUNNER_TEMP/mygo-recipient.pem" <<'MYGO_PUBLIC_RECIPIENT'
+          -----BEGIN CERTIFICATE-----
+          MIIEQTCCAqmgAwIBAgIUeODRuxaO/Cs1q5RumhwvDdXwNIkwDQYJKoZIhvcNAQEL
+          BQAwMDEuMCwGA1UEAwwlTXlHbyBBbmRyb2lkIHJlbGVhc2Ugc2lnbmluZyB0cmFu
+          c2ZlcjAeFw0yNjExMjAwNDUwMjZaFw0yNzExMjAwNDUwMjZaMDAxLjAsBgNVBAMM
+          JU15R28gQW5kcm9pZCByZWxlYXNlIHNpZ25pbmcgdHJhbnNmZXIwggGiMA0GCSqG
+          SIb3DQEBAQUAA4IBjwAwggGKAoIBgQDRP97IRi7wr0bFmGemfUTPi/we6HWPyIJG
+          +0EjC3luZL/vU69KLW4QasP8bRxXPc6EaOKLXwUNmPWLEIkc+NK6Pt0pbWlVSq7W
+          axmmHNIOhQ5F308ebvtB02HS7/MRHAm7cQdR+PLZIchtAnN8THY/ni0xDtQqnCa4
+          +Ha1II4RAnDt0kcVYl/tTEbSErlgAdCiHvBpDgMkC5idAb5nZXIerhlk/RxjhRSo
+          rP+TQH4dVM5nVyVXnbG31uYrBHWTwxMAiMeNonNhrjyXJZtNRtPSpV6HOBWKTgrM
+          Aukut6zKT89b7IH26pDowczmtbaBOh0BA+8/x6CuNp7bl8ybogvZCB52zolZMS4d
+          gPhFdor8Ph8KriEwPHKb4AILcs7nvNalH0hE2VialWr8ijV4JAKU3s7IHss/I6au
+          ylEg4aZ28lEQ0XRe2HzoNW3QRVVb4yqlKGziBvEM31C2YS/x/BwKdeW3uWn8ft5D
+          W/Ncc0j0oYvlSFLY7T+uQqB7vhXm+b0CAwEAAaNTMFEwHQYDVR0OBBYEFIffXzyL
+          rrDpURaG20fQFiN2zwh2MB8GA1UdIwQYMBaAFIffXzyLrrDpURaG20fQFiN2zwh2
+          MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggGBAIr7algjLkAKqW2i
+          DARcgRtlkFgYtM0sJu5cdp6BNEXCsfxagcmNxHHQH/Vb4BhMupdUQwhtg+iGVWkD
+          CKp94Ux6YaUcLsUKKE/qj62ygBKYfTIHt5Wn/+0dCFN5olh6zIVcaqnvadwY1rm5
+          ASM5VZPohlZnm9ZqRLMfjSbbmF0ADYRv6TfbgLAUj4Mwa2KaAQqAYwq0boUhPqkp
+          hrHqeuwlif986kgEIQiwTKdJ7Djw0IVDlEnGyWOqEAvwCWgip+p6wUcKrbqjKVHK
+          XmL7YwDc79zUdPEIWTtzTPPWN23hULV7MaS6wBhJOlLofxkJFNLIyZirEHWsPI3R
+          PO2jlLg3CMOe9SF9tY0OiWs5bqpYs4IYqqHxH7ICoC/CtbW44T/jQ9nFNqZO167n
+          1E6KRvM9HSU2uIQ+HwNseL/tixtb/o7KaGOO7pxVzNZwKERlLe+cvJdW/Ut13jPv
+          2VdoRexK62m8h99eq9d2+oXLogaN6LfLUYdg2opG8CPopBTwAA==
+          -----END CERTIFICATE-----
+          MYGO_PUBLIC_RECIPIENT
+          bash tests/sign-v556-cover-once.sh unsigned-input/app-release-unsigned.apk \
+            "$RUNNER_TEMP/mygo-baseline/mygo-music-v5.53.0.apk" "$RUNNER_TEMP/mygo-recipient.pem"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mygo-cover-sealed-signing-transfer
+          path: sealed/mygo-release-signing.cms
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enable KVM for Android 13 verification
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify real in-place upgrade from the delivered 5.53.0 APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            bash tests/verify-upgrade-data.sh "$RUNNER_TEMP/mygo-baseline/mygo-music-v5.53.0.apk" cover/mygo-music-v5.56.0-android13-cover.apk
+            adb shell dumpsys package com.mygo.music | grep -F 'versionName=5.56.0'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mygo-music-android13-cover-v5.56.0
+          path: cover/mygo-music-v5.56.0-android13-cover.apk
+          if-no-files-found: error
