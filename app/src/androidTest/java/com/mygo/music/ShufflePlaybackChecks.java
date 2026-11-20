@@ -85,7 +85,14 @@ final class ShufflePlaybackChecks {
             actions.ui(() -> { expected[0] = (service.snapshot().index + 1) % service.queueSnapshot().length(); service.next(); });
             playing(service);
             actions.ui(() -> check(service.snapshot().index == expected[0], "turning off shuffle broke sequential playback"));
-            System.out.println("MYGO_SHUFFLE_PLAYBACK_OK: real native cycles, previous/forward history, reorder without restart, deletion, natural completion and sequential mode");
+            actions.ui(() -> {
+                service.clearQueue();
+                service.setModes(true, false);
+                service.enqueue(queue.getJSONObject(0), false);
+                service.previous();
+            });
+            check(playing(service).equals(queue.getJSONObject(0).getString("uri")), "cleared queue retained a stale previous entry");
+            System.out.println("MYGO_SHUFFLE_PLAYBACK_OK: real native cycles, previous/forward history, reorder without restart, deletion, natural completion, sequential mode and clear/enqueue/previous");
         } finally {
             actions.ui(() -> { service.stopPlayback(); service.setModes(oldShuffle, oldRepeat); activity.finish(); });
             for (File file : files) file.delete();

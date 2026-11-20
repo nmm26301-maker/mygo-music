@@ -51,8 +51,10 @@ public final class ShuffleOrderChecks {
             check(edited.contains(added), "newly enqueued entry was never played");
             queue.clear();
             check(order.next(queue) == null, "empty queue retained a next entry");
+            check(order.previous(queue) == null, "empty queue retained a previous entry");
             Object single = new Object();
             queue.add(single);
+            check(order.previous(queue) == single, "new entry after clearing queue retained stale history");
             order.reset(queue, single);
             check(order.previous(queue) == single && order.next(queue) == single, "single-entry queue failed");
             Object duplicateA = new Object(), duplicateB = new Object();

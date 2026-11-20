@@ -62,7 +62,11 @@ final class ShuffleOrder<T> {
 
     T previous(List<T> queue) {
         sync(queue);
-        if (back.isEmpty()) return current;
+        if (back.isEmpty()) {
+            if (!queue.contains(current)) current = queue.isEmpty() ? null : queue.get(0);
+            remaining.remove(current);
+            return current;
+        }
         if (queue.contains(current)) forward.add(current);
         current = back.remove(back.size() - 1);
         remaining.remove(current);
