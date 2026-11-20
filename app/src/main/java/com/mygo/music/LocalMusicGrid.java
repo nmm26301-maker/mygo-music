@@ -65,6 +65,9 @@ final class LocalMusicGrid extends LinearLayout {
         grid.setVerticalSpacing(dp(6));
         grid.setContentDescription("本地音乐列表");
         content.addView(grid, new FrameLayout.LayoutParams(-1, -1));
+        grid.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
+            if (cardHeight(b - t) != cardHeight(oldB - oldT)) songs.notifyDataSetChanged();
+        });
 
         empty = new TextView(context);
         empty.setTextColor(Color.LTGRAY);
@@ -108,6 +111,10 @@ final class LocalMusicGrid extends LinearLayout {
 
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
+    private int cardHeight(int viewport) {
+        return viewport > 0 && viewport < dp(124) ? Math.min(viewport, dp(46)) : dp(118);
+    }
+
     private GradientDrawable background(int red, int green, int blue) {
         GradientDrawable result = new GradientDrawable();
         result.setColor(Color.rgb(red, green, blue));
@@ -134,6 +141,7 @@ final class LocalMusicGrid extends LinearLayout {
             SongCard card = convertView instanceof SongCard ? (SongCard) convertView : new SongCard();
             Song song = getItem(position);
             card.uri = song.uri;
+            card.resize(cardHeight(grid.getHeight()));
             card.title.setText(song.title);
             card.cover.setTag(null);
             card.cover.setImageResource(R.drawable.ic_launcher);
@@ -146,17 +154,15 @@ final class LocalMusicGrid extends LinearLayout {
         final TextView title;
         final ImageView cover;
         Uri uri;
+        private int height;
 
         SongCard() {
             super(LocalMusicGrid.this.getContext());
-            setOrientation(VERTICAL);
-            setLayoutParams(new AbsListView.LayoutParams(-1, dp(118)));
-            setPadding(dp(6), dp(6), dp(6), dp(6));
             setBackground(background(37, 33, 42));
 
             cover = new ImageView(getContext());
             cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            addView(cover, new LayoutParams(-1, 0, 1));
+            addView(cover);
 
             title = new TextView(getContext());
             title.setTextColor(Color.WHITE);
@@ -164,7 +170,21 @@ final class LocalMusicGrid extends LinearLayout {
             title.setMaxLines(2);
             title.setEllipsize(TextUtils.TruncateAt.END);
             title.setGravity(Gravity.CENTER_VERTICAL);
-            addView(title, new LayoutParams(-1, dp(34)));
+            addView(title);
+        }
+
+        void resize(int height) {
+            if (this.height == height) return;
+            this.height = height;
+            boolean compact = height < dp(118);
+            setLayoutParams(new AbsListView.LayoutParams(-1, height));
+            setOrientation(compact ? HORIZONTAL : VERTICAL);
+            setGravity(Gravity.CENTER_VERTICAL);
+            setPadding(dp(6), dp(compact ? 3 : 6), dp(6), dp(compact ? 3 : 6));
+            LayoutParams coverParams = compact ? new LayoutParams(dp(30), dp(30)) : new LayoutParams(-1, 0, 1);
+            coverParams.rightMargin = compact ? dp(5) : 0;
+            cover.setLayoutParams(coverParams);
+            title.setLayoutParams(compact ? new LayoutParams(0, -1, 1) : new LayoutParams(-1, dp(34)));
         }
     }
 }

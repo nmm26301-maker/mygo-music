@@ -187,7 +187,7 @@ public class MainActivity extends Activity {
     private String artworkSource(Uri uri){return "plugin".equals(uri.getScheme())?uri.getAuthority():"";}
     private void refreshLandscapeGrid(){
         if(localMusicGrid==null||(sourceBrowser!=null&&sourceBrowser.active()))return;
-        if(landscapeShortcuts!=null)landscapeShortcuts.setVisibility(View.VISIBLE);
+        if(landscapeShortcuts!=null)landscapeShortcuts.setVisibility(getResources().getConfiguration().screenHeightDp<300?View.GONE:View.VISIBLE);
         sourceScroll.setVisibility(View.GONE);
         localMusicGrid.setVisibility(View.VISIBLE);
         localMusicGrid.refresh();
