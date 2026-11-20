@@ -76,21 +76,23 @@ final class QueueControlChecks {
         actions.test.getUiAutomation().injectInputEvent(event, true);
         event.recycle();
     }
-    private void menuClick(String label) throws Exception {
-        android.view.accessibility.AccessibilityNodeInfo[] item = {null};
-        Rect bounds = new Rect();
-        try {
-            actions.helper.await(() -> {
-                item[0] = SourcePlaylistUiChecks.node(actions.test, label);
-                if (item[0] == null || !item[0].isVisibleToUser()) return false;
-                item[0].getBoundsInScreen(bounds);
-                return bounds.width() > 0 && bounds.height() > 0;
-            }, "queue menu item did not become visible: " + label);
-        } catch (AssertionError error) {
-            throw new AssertionError("queue menu did not settle: " + label + "; UI="
-                + SourcePlaylistUiChecks.uiText(actions.test.getUiAutomation().getRootInActiveWindow())
-                + "; queue=" + service.queueSnapshot(), error);
+    private void menuReady(String label, Rect bounds) throws Exception {
+        long until = SystemClock.elapsedRealtime() + 18000;
+        while (SystemClock.elapsedRealtime() < until) {
+            android.view.accessibility.AccessibilityNodeInfo item = SourcePlaylistUiChecks.node(actions.test, label);
+            if (item != null && item.isVisibleToUser()) {
+                item.getBoundsInScreen(bounds);
+                if (bounds.width() > 0 && bounds.height() > 0) return;
+            }
+            SystemClock.sleep(40);
         }
+        throw new AssertionError("queue menu did not settle: " + label + "; UI="
+            + SourcePlaylistUiChecks.uiText(actions.test.getUiAutomation().getRootInActiveWindow())
+            + "; queue=" + service.queueSnapshot());
+    }
+    private void menuClick(String label) throws Exception {
+        Rect bounds = new Rect();
+        menuReady(label, bounds);
         long down = SystemClock.uptimeMillis();
         input(MotionEvent.ACTION_DOWN, bounds.centerX(), bounds.centerY(), down);
         SystemClock.sleep(60);
@@ -174,8 +176,7 @@ final class QueueControlChecks {
             frame();
             ViewGroup menu = row(0);
             actions.ui(menu::performLongClick);
-            actions.helper.await(() -> SourcePlaylistUiChecks.node(actions.test, "从队列移除") != null,
-                "queue context menu did not open");
+            menuReady("从队列移除", new Rect());
             start(base); // Identical JSON, different queue lifetime.
             MediaPlayer replacement = service.snapshot().player;
             long replacementGeneration = service.snapshot().generation;
