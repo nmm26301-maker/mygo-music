@@ -30,7 +30,7 @@ final class LyricsMotionChecks {
     void run()throws Exception{
         try(InputStream in=test.getContext().getAssets().open("lyric-motion-policy.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[1024];int n;while((n=in.read(b))!=-1)out.write(b,0,n);JSONArray cases=new JSONArray(out.toString("UTF-8"));for(int i=0;i<cases.length();i++){JSONObject expected=cases.getJSONObject(i);long interval=expected.getLong("interval");check(Math.abs(expected.getDouble("stiffness")-LyricsExpressiveMotion.stiffness(interval))<.00001,"native stiffness differs from pinned original AMLL policy");check(Math.abs(expected.getDouble("damping")-LyricsExpressiveMotion.damping(interval))<.00001,"native damping differs from pinned original AMLL policy");}}
         check(LyricsExpressiveMotion.remaining(0,800)==1&&LyricsExpressiveMotion.remaining(1500,800)==0,"spring does not start and settle");check(LyricsExpressiveMotion.wave(100,0,900,0)==0&&LyricsExpressiveMotion.wave(500,0,2000,0)>0,"word duration threshold changed");
-        test.runOnMainSync(()->{try{pixels();softShaders();}catch(Exception failure){throw new RuntimeException(failure);}});controls();
+        OffscreenLyricsChecks.run(()->{pixels();softShaders();return null;});controls();
         System.out.println("MYGO_LYRIC_MOTION_OK: pinned original AMLL policy matches native values; fourteen distinct presets, meteor trail, page entrance, ripple and dual-line handoff; spring row cascade and duration wave pixels, paused/rewind equality, real timing, quiet mode, plain lyrics, actual menus and persisted choices");
     }
     void pixels()throws Exception{

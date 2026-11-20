@@ -24,7 +24,7 @@ final class LyricsAppearanceChecks {
     private static Bitmap draw(View view){Bitmap bitmap=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));return bitmap;}
     private static int difference(Bitmap a,Bitmap b){int count=0;for(int y=0;y<a.getHeight();y+=2)for(int x=0;x<a.getWidth();x+=2)if(a.getPixel(x,y)!=b.getPixel(x,y))count++;return count;}
     private static void write(Bitmap bitmap,File file)throws Exception{try(FileOutputStream out=new FileOutputStream(file)){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();}
-    void run()throws Exception{test.runOnMainSync(()->{try{pixels();}catch(Exception failure){throw new RuntimeException(failure);}});controls();}
+    void run()throws Exception{OffscreenLyricsChecks.run(()->{pixels();return null;});controls();}
     private void pixels()throws Exception{
         Clock clock=new Clock();LyricsStageView view=new LyricsStageView(context,clock);view.layout(0,0,1280,640);view.setTimeline(LyricsTimeline.parse(fixture()));File folder=new File(context.getExternalFilesDir(null),"qa/lyric-styles");folder.mkdirs();
         Set<Integer> fingerprints=new HashSet<>();

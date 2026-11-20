@@ -35,7 +35,7 @@ final class LyricsChecks {
     }
     private void characterMotion()throws Exception{
         check(LyricsCharacterMotion.clusters("A\u0301👨‍👩‍👧‍👦𠀀").size()==3,"character motion split an accent, emoji joiner sequence or surrogate pair");
-        test.runOnMainSync(()->{try{
+        OffscreenLyricsChecks.run(()->{
             Clock clock=new Clock();LyricsStageView view=new LyricsStageView(context,clock);view.layout(0,0,640,320);
             String data=new JSONObject().put("lines",new JSONArray().put(new JSONObject().put("start",0).put("end",6000).put("words",new JSONArray()
                 .put(new JSONObject().put("text","唱 ").put("start",1000).put("end",1500))
@@ -54,7 +54,8 @@ final class LyricsChecks {
             for(int i=0;i<100;i++){clock.position=450+i*40;Bitmap frame=draw(view);try(FileOutputStream out=new FileOutputStream(new File(frames,String.format(Locale.US,"frame-%03d.png",i)))){frame.compress(Bitmap.CompressFormat.PNG,100,out);}frame.recycle();}
             view.setTimeline(LyricsTimeline.parse(fixture()));clock.position=1500;Bitmap start=draw(view);clock.position=4500;Bitmap end=draw(view);check(bright(end)>bright(start)*2,"multi-character source word did not reveal characters over its real time range");start.recycle();end.recycle();
             view.layout(0,0,280,320);String wrapped="每一个字都随着歌声轻轻弹起再慢慢落下";view.setTimeline(LyricsTimeline.parse(new JSONObject().put("lines",new JSONArray().put(new JSONObject().put("start",0).put("end",7000).put("words",new JSONArray().put(new JSONObject().put("text",wrapped).put("start",1000).put("end",6000))))).toString()));clock.position=1600;start=draw(view);clock.position=5800;end=draw(view);check(bright(end)>bright(start)*3,"character pop stopped highlighting after a visual line wrap");start.recycle();end.recycle();
-        }catch(Exception error){throw new RuntimeException(error);}});
+            return null;
+        });
     }
     private void timing(){
         SharedPreferences prefs=context.getSharedPreferences("lyrics_timing_test",0);prefs.edit().clear().commit();
