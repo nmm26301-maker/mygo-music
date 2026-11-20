@@ -32,8 +32,11 @@ final class QueueControlChecks {
             && service.snapshot().position > 30, "queue control did not reach actual native audio: " + title);
     }
     private void start(JSONArray queue) throws Exception {
+        start(queue, 0);
+    }
+    private void start(JSONArray queue, int index) throws Exception {
         long previous = service.snapshot().generation;
-        actions.ui(() -> PlaybackService.startQueue(activity, queue, 0, 0, 62, false, false, "high"));
+        actions.ui(() -> PlaybackService.startQueue(activity, queue, index, 0, 62, false, false, "high"));
         actions.helper.await(() -> service.snapshot().generation != previous && service.snapshot().playing
             && service.snapshot().position > 30, "queue replacement did not start native audio");
     }
@@ -214,6 +217,47 @@ final class QueueControlChecks {
             && !prefs.contains("last_cache_quality"), "cleared queue retained a saved playback position");
     }
 
+    private void checkLongQueue() throws Exception {
+        JSONArray many = new JSONArray();
+        for (int i = 0; i < 24; i++) {
+            many.put(new JSONObject(base.getJSONObject(i % base.length()).toString()).put("title", "Long queue " + i));
+        }
+        start(many, 12);
+        actions.ui(() -> {
+            NowPlayingChecks.invoke(activity, "showQueue");
+            dialog = (AlertDialog) FullPortChecks.field(activity, "playbackQueueDialog");
+            view = (ThemeQueueView) FullPortChecks.field(activity, "playbackQueueView");
+            list = (ListView) FullPortChecks.field(view, "list");
+        });
+        ViewGroup currentRow = row(12);
+        actions.ui(() -> {
+            check("当前歌曲：Long queue 12".contentEquals(currentRow.getChildAt(1).getContentDescription()),
+                "opened long queue did not mark the selected entry");
+            list.setSelectionFromTop(0, 0);
+        });
+        actions.helper.await(() -> list.getFirstVisiblePosition() == 0, "unable to browse beginning of long queue");
+        actions.ui(service::next);
+        playing("Long queue 13");
+        actions.ui(() -> check(list.getFirstVisiblePosition() == 0,
+            "a playback update moved the queue while browsing"));
+        MediaPlayer original = service.snapshot().player;
+        long generation = service.snapshot().generation;
+        actions.ui(() -> {
+            Button locate = (Button) FullPortChecks.field(view, "locate");
+            check(locate.isShown() && locate.isEnabled() && locate.performClick(),
+                "locate current song control was unavailable");
+        });
+        ViewGroup located = row(13);
+        actions.ui(() -> {
+            check("当前歌曲：Long queue 13".contentEquals(located.getChildAt(1).getContentDescription()),
+                "locate used the old current position");
+            check(service.snapshot().player == original && service.snapshot().generation == generation
+                && service.snapshot().playing, "locating a song interrupted playback");
+            dialog.dismiss();
+        });
+        System.out.println("MYGO_QUEUE_LOCATE_OK: live long queue opens at current entry, keeps manual position on next, and locates the new entry without interrupting audio");
+    }
+
     void run() throws Exception {
         android.content.SharedPreferences prefs = actions.context.getSharedPreferences("library", 0);
         boolean oldShuffle = prefs.getBoolean("shuffle", false), oldRepeat = prefs.getBoolean("repeat", false);
@@ -336,6 +380,7 @@ final class QueueControlChecks {
             actions.ui(() -> check(service.snapshot().player == dragging && service.snapshot().generation == draggingGeneration,
                 "native drag replaced the shared player"));
             checkActivityQueue();
+            checkLongQueue();
             start(base);
             System.out.println("MYGO_QUEUE_CONTROLS_OK: actual retained row play/remove/list click rejection after adapter refresh, fresh native selection, index-only update, identical-JSON menu lifetime, normal menu move, same-URI offline quality identity, cleared rows, obsolete native drag rejection and fresh native drag without player restart");
         } finally {
