@@ -324,6 +324,12 @@ jobs:
           gh run download 44302811247 --name mygo-music-android-release --dir "$RUNNER_TEMP/mygo-baseline"
           cd "$RUNNER_TEMP/mygo-baseline"
           echo '191541167a0433cdacea969c20387cce87e75dc2833ca20d2274be29e59e2c5d  mygo-music-v5.53.0.apk' | sha256sum -c
+      - name: Enable KVM for the release verification emulator
+        if: ${{ inputs.android13_upgrade_release }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Test coverage and data preservation from the delivered APK
         if: ${{ inputs.android13_upgrade_release }}
         uses: reactivecircus/android-emulator-runner@v2
