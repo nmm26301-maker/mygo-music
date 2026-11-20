@@ -1,9 +1,21 @@
 plugins { id 'com.android.application' }
 
 def apkMinimumSdk = providers.gradleProperty('mygoApi33Upgrade').orNull == 'true' ? 33 : 23
+def parallelPreview = providers.gradleProperty('mygoParallelPreview').orNull == 'true'
+def pluginScheme = parallelPreview ? 'mygo-music-preview' : 'mygo-music'
 
 android { namespace 'com.mygo.music'; compileSdk 35
-    defaultConfig { applicationId 'com.mygo.music'; minSdk apkMinimumSdk; targetSdk 35; versionCode 105; versionName '5.55.0'; testInstrumentationRunner 'com.mygo.music.PluginInstrumentation' }
+    defaultConfig {
+        applicationId(parallelPreview ? 'com.mygo.music.preview' : 'com.mygo.music')
+        minSdk apkMinimumSdk
+        targetSdk 35
+        versionCode 106
+        versionName '5.56.0'
+        testInstrumentationRunner 'com.mygo.music.PluginInstrumentation'
+        manifestPlaceholders = [mygoLabel: parallelPreview ? 'MyGo Music 体验版' : 'MyGo Music']
+        resValue 'string', 'plugin_link_scheme', pluginScheme
+        if (parallelPreview) ndk { abiFilters 'arm64-v8a', 'x86_64' }
+    }
     packaging { jniLibs { useLegacyPackaging = true } }
     buildTypes { release { minifyEnabled false } }
 }

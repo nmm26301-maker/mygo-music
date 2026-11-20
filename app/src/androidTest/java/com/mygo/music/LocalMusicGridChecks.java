@@ -70,7 +70,10 @@ final class LocalMusicGridChecks {
             actions.ui(() -> {
                 local.filter.setText("no music matches");
                 OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 0, "no-match filter retained items");
-                local.filter.setText("");
+                OfflinePlaybackChecks.check(local.clearFilter.isShown() && local.clearFilter.performClick(),
+                    "the empty results view could not be reset with the visible clear control");
+                OfflinePlaybackChecks.check(local.filter.getText().length() == 0 && !local.clearFilter.isShown(),
+                    "clearing local search did not reset the filter field and clear control");
                 OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 85, "clearing filter lost library entries");
             });
             actions.ui(() -> {

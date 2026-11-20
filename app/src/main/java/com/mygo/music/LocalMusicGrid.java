@@ -10,8 +10,11 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
@@ -30,6 +33,7 @@ final class LocalMusicGrid extends LinearLayout {
 
     final GridView grid;
     final EditText filter;
+    final Button clearFilter;
     private final TextView empty;
     private final List<Uri> tracks;
     private final List<String> names;
@@ -43,17 +47,40 @@ final class LocalMusicGrid extends LinearLayout {
         this.names = names;
         this.host = host;
         setOrientation(VERTICAL);
+        LinearLayout searchRow = new LinearLayout(context);
+        searchRow.setBackground(background(39, 36, 44));
+        LayoutParams searchParams = new LayoutParams(-1, dp(36));
+        searchParams.bottomMargin = dp(6);
+        addView(searchRow, searchParams);
+
         filter = new EditText(context);
         filter.setSingleLine(true);
+        filter.setImeOptions(EditorInfo.IME_ACTION_DONE);
         filter.setTextSize(14);
         filter.setTextColor(Color.WHITE);
         filter.setHintTextColor(Color.rgb(170, 165, 175));
         filter.setHint("筛选本地音乐的歌名或歌手");
         filter.setPadding(dp(10), 0, dp(10), 0);
-        filter.setBackground(background(39, 36, 44));
-        LayoutParams filterParams = new LayoutParams(-1, dp(36));
-        filterParams.bottomMargin = dp(6);
-        addView(filter, filterParams);
+        filter.setBackgroundColor(Color.TRANSPARENT);
+        searchRow.addView(filter, new LayoutParams(0, -1, 1));
+        filter.setOnEditorActionListener((view, action, event) -> {
+            if (action != EditorInfo.IME_ACTION_DONE) return false;
+            hideFilterKeyboard();
+            return true;
+        });
+        clearFilter = new Button(context);
+        clearFilter.setText("清除");
+        clearFilter.setContentDescription("清除本地音乐筛选");
+        clearFilter.setTextSize(12);
+        clearFilter.setTextColor(Color.WHITE);
+        clearFilter.setPadding(0, 0, 0, 0);
+        clearFilter.setBackgroundColor(Color.TRANSPARENT);
+        clearFilter.setVisibility(GONE);
+        searchRow.addView(clearFilter, new LayoutParams(dp(52), -1));
+        clearFilter.setOnClickListener(view -> {
+            filter.setText("");
+            hideFilterKeyboard();
+        });
 
         FrameLayout content = new FrameLayout(context);
         addView(content, new LayoutParams(-1, 0, 1));
@@ -82,11 +109,18 @@ final class LocalMusicGrid extends LinearLayout {
         filter.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                clearFilter.setVisibility(s.length() > 0 ? VISIBLE : GONE);
                 refresh();
                 grid.setSelection(0);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
+    }
+
+    private void hideFilterKeyboard() {
+        InputMethodManager input = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (input != null) input.hideSoftInputFromWindow(filter.getWindowToken(), 0);
+        filter.clearFocus();
     }
 
     void refresh() {
