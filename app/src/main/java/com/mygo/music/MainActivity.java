@@ -540,7 +540,7 @@ public class MainActivity extends Activity {
     private void showActiveQueue(){
         FrameLayout content=new FrameLayout(this);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("播放队列").setView(content)
-            .setNegativeButton("关闭",null).create();
+            .setNeutralButton("清空队列",null).setNegativeButton("关闭",null).create();
         ThemeQueueView view=new ThemeQueueView(this,playerHost(),dialog::dismiss);
         view.setBackgroundColor(Color.rgb(35,31,40));
         int height=Math.min(dp(380),Math.max(dp(144),getResources().getDisplayMetrics().heightPixels/2));
@@ -554,6 +554,32 @@ public class MainActivity extends Activity {
             }
         });
         dialog.show();
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->confirmClearQueue(dialog));
+    }
+
+    private void confirmClearQueue(AlertDialog queueDialog){
+        PlaybackService shownService=playbackService;
+        if(shownService==null)return;
+        PlaybackService.Snapshot shown=shownService.snapshot();
+        if(shown.queueSize==0)return;
+        new AlertDialog.Builder(this).setTitle("清空播放队列")
+            .setMessage("将停止当前播放并移除队列中的所有歌曲。歌单和离线缓存会保留。")
+            .setNegativeButton("取消",null)
+            .setPositiveButton("清空",(d,w)->{
+                if(playbackService!=shownService||playbackQueueDialog!=queueDialog
+                    ||shownService.snapshot().queueRevision!=shown.queueRevision){
+                    Toast.makeText(this,"队列已更新，请重新确认",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                shownService.clearQueue();
+            }).show();
+    }
+
+    private void refreshOpenQueue(PlaybackService.Snapshot state){
+        if(playbackQueueView==null)return;
+        playbackQueueView.refresh(false);
+        Button clear=playbackQueueDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+        if(clear!=null)clear.setEnabled(state.queueSize>0);
     }
 
     private void showLibraryQueue(){
@@ -718,7 +744,32 @@ public class MainActivity extends Activity {
     private void previous(){if(playbackService!=null&&!playbackService.snapshot().uri.isEmpty()){playbackService.previous();return;}if(tracks.isEmpty())return;int i=current<=0?tracks.size()-1:current-1;playIndex(i);}
     private void updateProgress(){handler.postDelayed(()->{if(progress!=null&&playbackSnapshot!=null)progress.setSecondaryProgress(Math.max(0,Math.min(100,playbackSnapshot.buffered))*10);if(current>=0&&durationMs()>0){progress.setProgress((int)(positionMs()*1000.0/durationMs()));if(timeLabel!=null)timeLabel.setText(fmt(positionMs())+" / "+fmt(durationMs()));}updateProgress();},500);}
     private String fmt(int ms){return String.format(Locale.getDefault(),"%02d:%02d",ms/60000,(ms/1000)%60);}
-    private void onPlaybackChanged(PlaybackService.Snapshot state){if(isDestroyed())return;playbackSnapshot=state;refreshQualityDialog();player=state.player;playerReady=state.ready&&state.player!=null;playingUri=state.stream.isEmpty()?null:Uri.parse(state.stream);playingHeaders=new HashMap<>(state.headers);shuffle=state.shuffle;repeat=state.repeat;if(volume!=null)volume.setProgress(state.volume);if(!state.uri.isEmpty()){Uri track=Uri.parse(state.uri);int selected=tracks.indexOf(track);if(selected<0){addRemote(track,state.title,"");selected=tracks.indexOf(track);}current=selected;pendingTrack=selected;if(nowPlaying!=null)nowPlaying.setText(state.title);if(state.ready){resumeIndex=-1;resumePosition=0;if(lastStartedGeneration!=state.generation){lastStartedGeneration=state.generation;if(state.track!=null){trackMetadata.put(track.toString(),state.track);String image=SourceBrowser.artwork(state.track);if(!image.isEmpty())covers.put(track.toString(),image);if(!state.source.isEmpty())pluginTrackRefs.put(track.toString(),state.source+"\n"+Uri.parse(state.uri).getQueryParameter("id"));saveTrackMetadata();saveCovers();}loadCover(track);updateLike();if(!state.stream.startsWith("file:"))onSourceTrackStarted(track);recentUris.clear();loadRecent();}}}if(playbackQueueView!=null)playbackQueueView.refresh(false);if(nowPlayingDialog!=null)nowPlayingDialog.sessionChanged();if(themedPlayer!=null)themedPlayer.sessionChanged();if(lyricsStage!=null&&!state.uri.equals(lyricsStage.trackUri)){if(state.uri.isEmpty()){lyricsRequest++;lyricsStage.setTrack("","尚未选择歌曲");lyricsStage.setMessage("请先播放一首歌曲");}else loadStageLyrics(false);}if(playButton!=null)playButton.setText(state.loading?"准备中":state.playing?"暂停":resumeIndex>=0?"继续":"播放");updateModeLabels();if(!state.qualityIssue.isEmpty()&&state.qualityIssueId!=lastQualityIssue){lastQualityIssue=state.qualityIssueId;PlaybackService failedQualityService=playbackService;showSourceError(state.source,state.qualityIssue,"音质切换失败，继续原音质",()->{if(playbackService!=failedQualityService||failedQualityService==null||!failedQualityService.retryQuality(state))Toast.makeText(this,"播放状态已变化，请操作当前音质",Toast.LENGTH_SHORT).show();});}if(!state.error.isEmpty()&&state.errorId!=lastPlaybackError){lastPlaybackError=state.errorId;PlaybackService failedService=playbackService;if(state.offlineOnly)showPluginError(state.error);else if(!state.source.isEmpty())showSourcePlaybackError(state.source,state.error,()->{if(playbackService!=failedService||failedService==null||!failedService.retryFailed(state))Toast.makeText(this,"播放状态已变化，请操作当前歌曲",Toast.LENGTH_SHORT).show();});else showPluginError(state.error);}}
+    private void resetPlayerSelection(){
+        ++playRequest;
+        current=-1;
+        pendingTrack=-1;
+        resumeIndex=-1;
+        resumePosition=0;
+        coverRequest="";
+        if(nowPlaying!=null)nowPlaying.setText("尚未选择歌曲");
+        if(coverArt!=null){
+            coverArt.setTag(null);
+            coverArt.setImageResource(R.drawable.ic_launcher);
+        }
+        if(progress!=null){
+            progress.setProgress(0);
+            progress.setSecondaryProgress(0);
+        }
+        if(timeLabel!=null)timeLabel.setText("00:00 / 00:00");
+        updateLike();
+    }
+
+    private void onPlaybackChanged(PlaybackService.Snapshot state){if(isDestroyed())return;playbackSnapshot=state;player=state.player;playerReady=state.ready&&state.player!=null;playingUri=state.stream.isEmpty()?null:Uri.parse(state.stream);playingHeaders=new HashMap<>(state.headers);shuffle=state.shuffle;repeat=state.repeat;if(volume!=null)volume.setProgress(state.volume);if(!state.uri.isEmpty()){Uri track=Uri.parse(state.uri);int selected=tracks.indexOf(track);if(selected<0){addRemote(track,state.title,"");selected=tracks.indexOf(track);}current=selected;pendingTrack=selected;if(nowPlaying!=null)nowPlaying.setText(state.title);if(state.ready){resumeIndex=-1;resumePosition=0;if(lastStartedGeneration!=state.generation){lastStartedGeneration=state.generation;if(state.track!=null){trackMetadata.put(track.toString(),state.track);String image=SourceBrowser.artwork(state.track);if(!image.isEmpty())covers.put(track.toString(),image);if(!state.source.isEmpty())pluginTrackRefs.put(track.toString(),state.source+"\n"+Uri.parse(state.uri).getQueryParameter("id"));saveTrackMetadata();saveCovers();}loadCover(track);updateLike();if(!state.stream.startsWith("file:"))onSourceTrackStarted(track);recentUris.clear();loadRecent();}}}else if(state.queueSize==0&&(current>=0||resumeIndex>=0)&&prefs.getString("last_uri","").isEmpty()){
+        resetPlayerSelection();
+        }
+        refreshQualityDialog();
+        refreshOpenQueue(state);
+        if(nowPlayingDialog!=null)nowPlayingDialog.sessionChanged();if(themedPlayer!=null)themedPlayer.sessionChanged();if(lyricsStage!=null&&!state.uri.equals(lyricsStage.trackUri)){if(state.uri.isEmpty()){lyricsRequest++;lyricsStage.setTrack("","尚未选择歌曲");lyricsStage.setMessage("请先播放一首歌曲");}else loadStageLyrics(false);}if(playButton!=null)playButton.setText(state.loading?"准备中":state.playing?"暂停":resumeIndex>=0?"继续":"播放");updateModeLabels();if(!state.qualityIssue.isEmpty()&&state.qualityIssueId!=lastQualityIssue){lastQualityIssue=state.qualityIssueId;PlaybackService failedQualityService=playbackService;showSourceError(state.source,state.qualityIssue,"音质切换失败，继续原音质",()->{if(playbackService!=failedQualityService||failedQualityService==null||!failedQualityService.retryQuality(state))Toast.makeText(this,"播放状态已变化，请操作当前音质",Toast.LENGTH_SHORT).show();});}if(!state.error.isEmpty()&&state.errorId!=lastPlaybackError){lastPlaybackError=state.errorId;PlaybackService failedService=playbackService;if(state.offlineOnly)showPluginError(state.error);else if(!state.source.isEmpty())showSourcePlaybackError(state.source,state.error,()->{if(playbackService!=failedService||failedService==null||!failedService.retryFailed(state))Toast.makeText(this,"播放状态已变化，请操作当前歌曲",Toast.LENGTH_SHORT).show();});else showPluginError(state.error);}}
     private void updateModeLabels(){if(shuffleButton!=null)shuffleButton.setText(shuffle?"随机开":"随机");if(repeatButton!=null)repeatButton.setText(repeat?"循环开":"循环");}
     @Override public void onBackPressed(){if(sourceBrowser!=null&&sourceBrowser.active()){if(!sourceBrowser.back())showLocalLibrary();return;}super.onBackPressed();}
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);if(isFinishing()||isDestroyed()||libraryRoot==null)return;boolean portrait=configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT;int direction=portrait?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL;if(libraryRoot.getOrientation()!=direction){View oldNavigation=libraryRoot.getChildAt(0);ViewGroup oldParent=(ViewGroup)librarySide.getParent();if(oldParent!=null)oldParent.removeView(librarySide);libraryRoot.removeView(oldNavigation);libraryRoot.setOrientation(direction);librarySide.setOrientation(portrait?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);for(int i=0;i<librarySide.getChildCount();i++){View child=librarySide.getChildAt(i);if(child instanceof Button)child.setLayoutParams(new LinearLayout.LayoutParams(portrait?dp(116):-1,dp(portrait?48:42)));else child.setVisibility(portrait?View.GONE:View.VISIBLE);}if(portrait){HorizontalScrollView navigation=new HorizontalScrollView(this);navigation.setHorizontalScrollBarEnabled(false);navigation.addView(librarySide);libraryRoot.addView(navigation,0,new LinearLayout.LayoutParams(-1,dp(56)));libraryMain.setLayoutParams(new LinearLayout.LayoutParams(-1,0,1));}else{ScrollView navigation=new ScrollView(this);navigation.addView(librarySide);libraryRoot.addView(navigation,0,new LinearLayout.LayoutParams(dp(156),-1));libraryMain.setLayoutParams(new LinearLayout.LayoutParams(0,-1,1));}libraryMain.setPadding(portrait?0:dp(14),0,0,0);miniPrevious.setVisibility(portrait?View.GONE:View.VISIBLE);miniNext.setVisibility(portrait?View.GONE:View.VISIBLE);}if(themedPlayer!=null){themedPlayer.body.requestLayout();themedPlayer.refresh();}}

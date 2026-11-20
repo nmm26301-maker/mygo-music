@@ -95,7 +95,12 @@ final class OfflinePlaybackChecks {
             check(data.getString("lyricCalls","0").equals("0"),"offline refresh called source lyrics");
             ui(()->{String uri=service.snapshot().uri;((HashMap<String,String>)field(activity[0],"localLyrics")).remove(uri);invoke(activity[0],"loadStageLyrics",new Class<?>[]{boolean.class},true);LyricsStageDialog stage=(LyricsStageDialog)field(activity[0],"lyricsStage");check(stage.stage.timeline().lines.isEmpty()&&((String)field(stage.stage,"message")).contains("尚未保存"),"missing offline lyric did not explain how to get lyrics");((HashMap<String,String>)field(activity[0],"localLyrics")).put(uri,raw);invoke(activity[0],"saveLocalLyrics",new Class<?>[]{});stage.dismiss();service.pause();service.seek(3200);});
             helper.await(()->Math.abs(service.snapshot().position-3200)<200,"offline seek failed");String resumeUri=service.snapshot().uri,resumeQuality=service.snapshot().requestedQuality;
-            ui(()->{service.clearQueue();activity[0].finish();});test.waitForIdleSync();activity[0]=launch();service=service(activity[0]);ui(()->invoke(activity[0],"toggle",new Class<?>[]{}));helper.await(()->service.snapshot().playing&&service.snapshot().uri.equals(resumeUri)&&service.snapshot().requestedQuality.equals(resumeQuality)&&service.snapshot().position>=3000,"empty-service restore lost offline mode, cached tier or position");
+            PlaybackService stopped=service;
+            ui(()->{stopped.stopPlayback();activity[0].finish();});
+            helper.await(()->Boolean.TRUE.equals(field(stopped,"closed")),"stopped playback service did not shut down after unbinding");
+            activity[0]=launch();service=service(activity[0]);
+            check(service!=stopped&&service.snapshot().queueSize==0,"cold resume did not use a new empty service");
+            ui(()->invoke(activity[0],"toggle",new Class<?>[]{}));helper.await(()->service.snapshot().playing&&service.snapshot().uri.equals(resumeUri)&&service.snapshot().requestedQuality.equals(resumeQuality)&&service.snapshot().position>=3000,"empty-service restore lost offline mode, cached tier or position");
             ui(()->{check(service.snapshot().offlineOnly&&service.queueSnapshot().length()==3,"cold resume rebuilt global library queue");try{service.enqueue(new JSONObject().put("uri","https://example.com/uncached"),false);throw new AssertionError("online row entered offline queue");}catch(IOException expected){} });
             check(data.getString("streamCalls","0").equals("0")&&data.getString("playedCalls","0").equals("0")&&data.getString("lyricCalls","0").equals("0"),"offline workflow invoked source exports");
             // Online refresh failure and empty response must retain the last usable timed lyric.

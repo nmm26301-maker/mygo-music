@@ -159,11 +159,59 @@ final class QueueControlChecks {
             dialog = (AlertDialog) FullPortChecks.field(activity, "playbackQueueDialog");
             view = (ThemeQueueView) FullPortChecks.field(activity, "playbackQueueView");
             list = (ListView) FullPortChecks.field(view, "list");
-            service.clearQueue();
-            check(dialog.isShowing() && list.getAdapter().getCount() == 0,
-                "main queue still showed songs after it was cleared");
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).performClick();
         });
-        System.out.println("MYGO_ACTIVITY_QUEUE_OK: real main queue entry shared by the classic player, automatic reorder and clear, rejected retained row callbacks and valid playback");
+        menuReady("清空", new Rect());
+        actions.ui(() -> service.moveQueue(0, 1));
+        menuClick("清空");
+        actions.helper.await(() -> dialog.getWindow().getDecorView().hasWindowFocus(),
+            "obsolete confirmation did not close");
+        actions.ui(() -> {
+            check(service.queueSnapshot().length() == 3 && service.snapshot().playing,
+                "obsolete confirmation cleared the updated queue");
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).performClick();
+        });
+        menuClick("取消");
+        actions.helper.await(() -> dialog.getWindow().getDecorView().hasWindowFocus(),
+            "cancel did not return to the queue");
+        actions.ui(() -> {
+            check(service.queueSnapshot().length() == 3, "cancelling cleared the queue");
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).performClick();
+        });
+        menuClick("清空");
+        actions.helper.await(() -> list.getAdapter().getCount() == 0, "main queue did not refresh after confirmed clear");
+        actions.ui(() -> {
+            check(dialog.isShowing() && !dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled(),
+                "empty queue should remain visible with clear disabled");
+            checkClearedSelection();
+            dialog.dismiss();
+        });
+        start(new JSONArray().put(base.getJSONObject(2)));
+        actions.ui(() -> {
+            service.removeQueue(0);
+            checkClearedSelection();
+            NowPlayingChecks.invoke(activity, "restoreSession");
+            check(((Integer) FullPortChecks.field(activity, "resumeIndex")) < 0,
+                "deleted final entry was restored from preferences");
+        });
+        System.out.println("MYGO_ACTIVITY_QUEUE_OK: live refresh, obsolete row rejection and valid playback");
+        System.out.println("MYGO_CLEAR_QUEUE_OK: stale and cancelled confirmation, confirmed clear, last entry removal and no stale playback or resume data");
+    }
+
+    private void checkClearedSelection() throws Exception {
+        PlaybackService.Snapshot state = service.snapshot();
+        check(state.queueSize == 0 && state.index == -1 && state.uri.isEmpty() && state.stream.isEmpty()
+            && state.position == 0 && state.player == null, "cleared queue retained playback state");
+        TextView title = (TextView) FullPortChecks.field(activity, "nowPlaying");
+        Button play = (Button) FullPortChecks.field(activity, "playButton");
+        check("尚未选择歌曲".contentEquals(title.getText()) && "播放".contentEquals(play.getText()),
+            "mini player retained the previous song");
+        check(((Integer) FullPortChecks.field(activity, "current")) < 0
+            && ((Integer) FullPortChecks.field(activity, "pendingTrack")) < 0,
+            "cleared queue retained the selected library row");
+        android.content.SharedPreferences prefs = actions.context.getSharedPreferences("library", 0);
+        check(!prefs.contains("last_uri") && !prefs.contains("last_pos") && !prefs.contains("last_offline")
+            && !prefs.contains("last_cache_quality"), "cleared queue retained a saved playback position");
     }
 
     void run() throws Exception {

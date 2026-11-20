@@ -172,14 +172,43 @@ public class PlaybackService extends Service {
         if(queue.size()>=500)throw new IOException("播放队列已达到 500 首，请先移除部分歌曲");String uri=value.optString("uri");if(uri.isEmpty())throw new IOException("歌曲缺少地址");clearRadio();queueRevision++;JSONObject item=new JSONObject(value.toString());if(queue.isEmpty()){queue.add(item);index=0;initialPosition=0;}else queue.add(next?Math.max(0,index+1):queue.size(),item);if(next)requestedNext.add(item);publish();
     }
     void moveQueue(int from,int to){if(from<0||to<0||from>=queue.size()||to>=queue.size()||from==to)return;clearRadio();queueRevision++;JSONObject current=index>=0?queue.get(index):null;JSONObject moving=queue.remove(from);queue.add(to,moving);index=queue.indexOf(current);if(remote.active())resolve(index,position(),wanted);else publish();}
-    void removeQueue(int at){if(at<0||at>=queue.size())return;clearRadio();queueRevision++;boolean selected=at==index;requestedNext.remove(queue.remove(at));if(queue.isEmpty()){stopPlayback();index=-1;publish();return;}if(at<index)index--;if(selected)resolve(Math.min(at,queue.size()-1),0,wanted);else if(remote.active())resolve(index,position(),wanted);else publish();}
+    void removeQueue(int at){
+        if(at<0||at>=queue.size())return;
+        if(queue.size()==1){clearQueue();return;}
+        clearRadio();
+        queueRevision++;
+        boolean selected=at==index;
+        requestedNext.remove(queue.remove(at));
+        if(at<index)index--;
+        if(selected)resolve(Math.min(at,queue.size()-1),0,wanted);
+        else if(remote.active())resolve(index,position(),wanted);
+        else publish();
+    }
     void removeOfflineCacheEntry(String track,String quality){
         for(int i=queue.size()-1;i>=0;i--){
             JSONObject item=queue.get(i);
             if(item.optBoolean("cacheOnly")&&track.equals(item.optString("uri"))&&quality.equals(item.optString("cachedQuality")))removeQueue(i);
         }
     }
-    void clearQueue(){queueRevision++;stopPlayback();queue.clear();requestedNext.clear();index=-1;publish();}
+    void clearQueue(){
+        if(closed)return;
+        queueRevision++;
+        queue.clear();
+        requestedNext.clear();
+        shuffleOrder.reset(queue,null);
+        index=-1;
+        initialPosition=0;
+        error="";
+        failedQuality="";
+        stream="";
+        streamKind="";
+        headers.clear();
+        currentCached=false;
+        audioInfo=new JSONObject();
+        prefs.edit().remove("last_uri").remove("last_pos").remove("last_offline")
+            .remove("last_cache_quality").apply();
+        stopSession();
+    }
     void pause(){remoteCompletion.pause();pauseInternal(true);}
     private void pauseInternal(boolean clearResume){if(closed)return;if(liveSource){livePausedAt=SystemClock.elapsedRealtime();if(liveAacPlayback!=null)liveAacPlayback.setPaused(true);}if(clearResume)resumeAfterFocus=false;wanted=false;if(remote.active())remote.pause();else if(ready&&player!=null)try{player.pause();}catch(Exception ignored){}if(clearResume&&!remote.active())abandonFocus();publish();}
     // Retry the failed session in place. A login callback may outlive a skip, stop or replacement queue.
@@ -242,7 +271,34 @@ public class PlaybackService extends Service {
     void playQueueIndex(int target){if(!closed&&target>=0&&target<queue.size())resolve(target,0,true);}
     void next(){if(closed)return;if(queue.isEmpty())return;requestedNext.retainAll(queue);if(!requestedNext.isEmpty()){JSONObject selected=requestedNext.remove(requestedNext.size()-1);resolve(queue.indexOf(selected),0,true);return;}if(!radioId.isEmpty()&&index+1>=queue.size()){radioWaiting=true;loading=true;wanted=true;publish();if(!radioFailure.isEmpty()){String failure=radioFailure;radioFailure="";fail(failure);}else refillRadio();return;}JSONObject selected=shuffle?shuffleOrder.next(queue):null;resolve(shuffle?queue.indexOf(selected):(index+1)%queue.size(),0,true);}
     void previous(){if(closed)return;if(queue.isEmpty())return;JSONObject selected=shuffle?shuffleOrder.previous(queue):null;resolve(shuffle?queue.indexOf(selected):index<=0?queue.size()-1:index-1,0,true);}
-    void stopPlayback(){if(closed)return;clearSleepTimer();cancelQualitySwitch();qualityIssue="";remoteCompletion.reset();clearRadio();initialPosition=position();persist();++generation;wanted=false;loading=false;resumeAfterFocus=false;remote.clear(true);releasePlayer();cache.pin(null);abandonFocus();session.setActive(false);foreground=false;stopForeground(true);publish();session.release();createSession();stopSelf();}
+    void stopPlayback(){
+        if(closed)return;
+        initialPosition=position();
+        persist();
+        stopSession();
+    }
+    private void stopSession(){
+        clearSleepTimer();
+        cancelQualitySwitch();
+        qualityIssue="";
+        remoteCompletion.reset();
+        clearRadio();
+        ++generation;
+        wanted=false;
+        loading=false;
+        resumeAfterFocus=false;
+        remote.clear(true);
+        releasePlayer();
+        cache.pin(null);
+        abandonFocus();
+        session.setActive(false);
+        foreground=false;
+        stopForeground(true);
+        publish();
+        session.release();
+        createSession();
+        stopSelf();
+    }
     void setSleepTimer(long millis,boolean afterTrack){clearSleepTimer();if(afterTrack&&index>=0&&index<queue.size())sleepEndTrack=queue.get(index).optString("uri");else if(millis>0){long delay=Math.min(12*60*60*1000L,millis);sleepDeadline=SystemClock.elapsedRealtime()+delay;main.postDelayed(sleepTask,delay);}publish();}
     private void clearSleepTimer(){main.removeCallbacks(sleepTask);sleepDeadline=0;sleepEndTrack="";}
     private void checkSleepTimer(){if(closed||sleepDeadline==0)return;long left=sleepDeadline-SystemClock.elapsedRealtime();if(left>0){main.postDelayed(sleepTask,left);return;}clearSleepTimer();pause();}
