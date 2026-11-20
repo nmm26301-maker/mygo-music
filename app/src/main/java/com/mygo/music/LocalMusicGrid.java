@@ -73,7 +73,9 @@ final class LocalMusicGrid extends LinearLayout {
         content.addView(empty, new FrameLayout.LayoutParams(-1, -1));
         grid.setEmptyView(empty);
         grid.setAdapter(songs);
-        grid.setOnItemClickListener((parent, view, position, id) -> host.play(songs.getItem(position).uri));
+        grid.setOnItemClickListener((parent, view, position, id) -> {
+            if (view instanceof SongCard) host.play(((SongCard) view).uri);
+        });
         filter.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -131,6 +133,7 @@ final class LocalMusicGrid extends LinearLayout {
         @Override public View getView(int position, View convertView, ViewGroup parent) {
             SongCard card = convertView instanceof SongCard ? (SongCard) convertView : new SongCard();
             Song song = getItem(position);
+            card.uri = song.uri;
             card.title.setText(song.title);
             card.cover.setTag(null);
             card.cover.setImageResource(R.drawable.ic_launcher);
@@ -142,6 +145,7 @@ final class LocalMusicGrid extends LinearLayout {
     private final class SongCard extends LinearLayout {
         final TextView title;
         final ImageView cover;
+        Uri uri;
 
         SongCard() {
             super(LocalMusicGrid.this.getContext());

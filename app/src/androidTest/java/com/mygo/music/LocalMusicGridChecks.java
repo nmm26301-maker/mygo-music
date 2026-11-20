@@ -45,10 +45,13 @@ final class LocalMusicGridChecks {
                 names.add("星海夜色  ·  测试女歌手");
                 OfflinePlaybackChecks.invoke(activity, "showLocalLibrary", new Class<?>[]{});
                 OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 85, "library results were truncated");
-                local.grid.setSelection(84);
             });
-            actions.helper.await(() -> local.grid.getLastVisiblePosition() == 84,
-                "last library song could not be brought into view");
+            actions.helper.await(() -> local.grid.isShown() && local.grid.getHeight() > 0
+                && local.grid.getChildCount() > 0, "local library never completed its initial layout");
+            actions.ui(() -> local.grid.smoothScrollToPosition(84));
+            actions.helper.await(() -> local.grid.getLastVisiblePosition() == 84
+                && local.grid.getChildAt(84 - local.grid.getFirstVisiblePosition()) != null,
+                "last library song could not be scrolled into view");
             actions.ui(() -> {
                 local.filter.setText("女歌手 星海");
                 OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 1,
@@ -81,6 +84,9 @@ final class LocalMusicGridChecks {
                     "a click on a removed local track switched playback");
                 local.refresh();
                 OfflinePlaybackChecks.check(local.grid.getAdapter().getCount() == 1, "grid did not update after the library shrank");
+                local.grid.performItemClick(stale, 0, local.grid.getItemIdAtPosition(0));
+                OfflinePlaybackChecks.check(playback.snapshot().uri.equals(expected.toString()),
+                    "an outdated card played the track at its new adapter position");
             });
             System.out.println("MYGO_LOCAL_GRID_OK: long-list scroll, artist/title filtering, native playback and stable rows during library shrink");
         } finally {
