@@ -120,6 +120,52 @@ final class QueueControlChecks {
         SystemClock.sleep(400);
         actions.test.waitForIdleSync();
     }
+    private void checkActivityQueue() throws Exception {
+        start(base);
+        actions.ui(() -> {
+            dialog.dismiss();
+            NowPlayingChecks.invoke(activity, "showQueue");
+            dialog = (AlertDialog) FullPortChecks.field(activity, "playbackQueueDialog");
+            view = (ThemeQueueView) FullPortChecks.field(activity, "playbackQueueView");
+            check(dialog != null && dialog.isShowing() && view != null,
+                "the main queue entry did not open the shared queue controls");
+            list = (ListView) FullPortChecks.field(view, "list");
+        });
+        ViewGroup oldRow = row(0);
+        MediaPlayer original = service.snapshot().player;
+        long generation = service.snapshot().generation;
+        actions.ui(() -> {
+            service.moveQueue(1, 0);
+            JSONObject first = (JSONObject) list.getAdapter().getItem(0);
+            check("Queue B".equals(first.optString("title")), "main queue did not refresh when reordered");
+            oldRow.getChildAt(2).performClick();
+            oldRow.getChildAt(1).performClick();
+            check(service.queueSnapshot().length() == 3 && service.snapshot().player == original
+                && service.snapshot().generation == generation && dialog.isShowing(),
+                "stale main queue row changed playback or closed the dialog");
+        });
+        ViewGroup[] fresh = {null};
+        actions.helper.await(() -> {
+            ViewGroup candidate = (ViewGroup) list.getChildAt(0);
+            if (candidate != null && candidate != oldRow
+                && "Queue B".contentEquals(((TextView) candidate.getChildAt(1)).getText())) fresh[0] = candidate;
+            return fresh[0] != null;
+        }, "main queue did not draw the reordered songs");
+        actions.ui(() -> fresh[0].getChildAt(1).performClick());
+        playing("Queue B");
+        actions.ui(() -> check(!dialog.isShowing(), "main queue did not close after a valid selection"));
+        actions.ui(() -> {
+            NowPlayingChecks.invoke(activity, "showQueue");
+            dialog = (AlertDialog) FullPortChecks.field(activity, "playbackQueueDialog");
+            view = (ThemeQueueView) FullPortChecks.field(activity, "playbackQueueView");
+            list = (ListView) FullPortChecks.field(view, "list");
+            service.clearQueue();
+            check(dialog.isShowing() && list.getAdapter().getCount() == 0,
+                "main queue still showed songs after it was cleared");
+        });
+        System.out.println("MYGO_ACTIVITY_QUEUE_OK: real main queue entry shared by the classic player, automatic reorder and clear, rejected retained row callbacks and valid playback");
+    }
+
     void run() throws Exception {
         android.content.SharedPreferences prefs = actions.context.getSharedPreferences("library", 0);
         boolean oldShuffle = prefs.getBoolean("shuffle", false), oldRepeat = prefs.getBoolean("repeat", false);
@@ -241,6 +287,8 @@ final class QueueControlChecks {
                 "fresh native drag stopped working after rejecting an obsolete drag");
             actions.ui(() -> check(service.snapshot().player == dragging && service.snapshot().generation == draggingGeneration,
                 "native drag replaced the shared player"));
+            checkActivityQueue();
+            start(base);
             System.out.println("MYGO_QUEUE_CONTROLS_OK: actual retained row play/remove/list click rejection after adapter refresh, fresh native selection, index-only update, identical-JSON menu lifetime, normal menu move, same-URI offline quality identity, cleared rows, obsolete native drag rejection and fresh native drag without player restart");
         } finally {
             actions.ui(() -> { if (dialog != null) dialog.dismiss(); service.stopPlayback(); service.setModes(oldShuffle, oldRepeat); activity.finish(); });
