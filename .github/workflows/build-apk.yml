@@ -1,7 +1,7 @@
 name: Build MyGo Music APK
 on:
   push:
-    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118, codex/manual-cache-20261118, codex/decoded-cache-20261118, codex/offline-lyrics-20261118, codex/library-lyrics-20261118, codex/secure-release-20261119, codex/plugin-playback-check-20261119, codex/mygo-validation-20261119, codex/mygo-signing-playback-20261119*, codex/mygo-upgrade-library-20261119*, codex/mygo-installable-preview-* ]
+    branches: [ main, codex/player-themes-20261115, codex/player-completion-20261115, codex/live-aac-20261116, codex/fmp4-aac-20261116, codex/hls-cache-20261117, codex/bilibili-mirrors-20261117, codex/bilibili-he-aac-20261117, codex/cache-consistency-20261118, codex/cache-management-20261118, codex/manual-cache-20261118, codex/decoded-cache-20261118, codex/offline-lyrics-20261118, codex/library-lyrics-20261118, codex/secure-release-20261119, codex/plugin-playback-check-20261119, codex/mygo-validation-20261119, codex/mygo-signing-playback-20261119*, codex/mygo-upgrade-library-20261119*, codex/mygo-installable-preview-*, codex/mygo-playback-* ]
   workflow_dispatch:
     inputs:
       fresh_install_release:
@@ -332,15 +332,15 @@ jobs:
           if-no-files-found: error
 
       - name: Assemble Android 13 continuation for the existing package
-        if: ${{ startsWith(github.ref, 'refs/heads/codex/mygo-upgrade-library-20261119-shuffle') }}
+        if: ${{ (startsWith(github.ref, 'refs/heads/codex/mygo-upgrade-library-20261119-shuffle') || startsWith(github.ref, 'refs/heads/codex/mygo-playback-')) }}
         run: |
           gradle --no-daemon -PmygoApi33Upgrade=true assembleRelease
           python3 tests/build-native-audio.py
           python3 tests/package-plugin-sources.py
       - uses: actions/upload-artifact@v4
-        if: ${{ startsWith(github.ref, 'refs/heads/codex/mygo-upgrade-library-20261119-shuffle') }}
+        if: ${{ (startsWith(github.ref, 'refs/heads/codex/mygo-upgrade-library-20261119-shuffle') || startsWith(github.ref, 'refs/heads/codex/mygo-playback-')) }}
         with:
-          name: mygo-music-v5.57-unsigned-continuation
+          name: mygo-music-unsigned-continuation
           path: |
             app/build/outputs/apk/release/app-release-unsigned.apk
             app/build/outputs/release/*-sources.zip
