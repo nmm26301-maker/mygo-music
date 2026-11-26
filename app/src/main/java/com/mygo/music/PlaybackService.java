@@ -25,6 +25,7 @@ public class PlaybackService extends Service {
     private final ArrayList<JSONObject> requestedNext=new ArrayList<>();private final ShuffleOrder<JSONObject> shuffleOrder=new ShuffleOrder<>();private ArrayList<JSONObject> queue=new ArrayList<>();private int index=-1,percent=80,initialPosition;private volatile long generation=System.nanoTime(),errorId=System.nanoTime();
     private boolean ready,loading,wanted,shuffle,repeat,foreground,resumeAfterFocus,ducked,closed,trackReported,currentCached;private String error="",quality=AudioQuality.DEFAULT,stream="",streamKind="";
     private final java.util.concurrent.ExecutorService mediaWorkers=java.util.concurrent.Executors.newFixedThreadPool(2);
+    private PluginMedia.PlaybackProbe playbackProbe;
     private final Set<AudioCache.Entry> pendingCacheLyrics=new HashSet<>();
     private String radioSource="",radioId="",radioFailure="";private long radioRevision;private boolean radioFetching,radioWaiting;
     private final PlaybackTone tone=new PlaybackTone(()->main.post(()->{if(!closed){applyVolume();publish();}}));
@@ -74,8 +75,46 @@ public class PlaybackService extends Service {
         PluginManager.PluginInfo selected=null;for(PluginManager.PluginInfo info:plugins.list())if(info.enabled&&info.id.equals(uri.getAuthority())){selected=info;break;}if(selected==null){fail("插件未启用，且歌曲尚未完整缓存");return;}final PluginManager.PluginInfo source=selected;
         if("remote".equals(source.playback)){abandonFocus();JSONArray ids=new JSONArray();int start=0;for(int i=0;i<queue.size();i++){Uri song=Uri.parse(queue.get(i).optString("uri"));if("plugin".equals(song.getScheme())&&source.id.equals(song.getAuthority())){if(i==index)start=ids.length();ids.put(song.getQueryParameter("id"));}}remoteVolume=new VolumeProvider(VolumeProvider.VOLUME_CONTROL_ABSOLUTE,100,percent){@Override public void onSetVolumeTo(int value){setVolume(value);}@Override public void onAdjustVolume(int direction){setVolume(percent+direction*5);}};session.setPlaybackToRemote(remoteVolume);remote.play(source.id,ids,start,initialPosition,(ok,raw)->{if(closed||request!=generation)return;if(!ok){fail(raw);return;}loading=false;ready=true;if(!wanted)remote.pause();publish();});return;}
         try{plugins.export(source.id,"stream",new JSONObject().put("id",uri.getQueryParameter("id")).put("quality",quality),(ok,raw)->{if(closed||request!=generation)return;if(!ok){fail(raw);return;}try{JSONObject result=new JSONObject(raw);audioInfo=AudioQuality.info(result);sourceResolved=true;streamKind=result.optString("type");if(streamKind.isEmpty())streamKind=result.optString("codec");String address=result.optString("url");if(!address.startsWith("https://")&&!address.startsWith("http://"))throw new IOException("插件未返回音频地址");HashMap<String,String> values=plugins.mediaHeaders(source.id,address,"audio",result.optJSONObject("headers"));
-            // Resolve redirects without forwarding session headers to another origin.
-            mediaWorkers.execute(()->{try{String finalAddress;HashMap<String,String> finalHeaders;boolean live;try(PluginMedia.Connection connection=PluginMedia.open(address,values,true)){finalAddress=connection.http.getURL().toString();finalHeaders=new HashMap<>(connection.headers);live=LiveAacPlayback.matches(connection.http);}main.post(()->{if(request==generation&&!closed){liveSource=live;if(live)initialPosition=0;if(!live&&streamKind.equalsIgnoreCase("alac"))decode(request,Uri.parse(finalAddress),finalHeaders,false);else prepare(request,Uri.parse(finalAddress),finalHeaders,false);}});}catch(Exception error){main.post(()->{if(request==generation&&!closed)fail(error.getMessage());});}});}catch(Exception exception){fail(exception.getMessage());}});}catch(Exception exception){fail(exception.getMessage());}
+            probePlayback(request,address,values);
+        }catch(Exception exception){fail(exception.getMessage());}});}catch(Exception exception){fail(exception.getMessage());}
+    }
+
+    private void probePlayback(long request,String address,HashMap<String,String> values){
+        PluginMedia.PlaybackProbe probe=new PluginMedia.PlaybackProbe();
+        playbackProbe=probe;
+        mediaWorkers.execute(()->{
+            try{
+                String finalAddress;
+                HashMap<String,String> finalHeaders;
+                boolean live;
+                try(PluginMedia.Connection connection=probe.open(address,values)){
+                    finalAddress=connection.http.getURL().toString();
+                    finalHeaders=new HashMap<>(connection.headers);
+                    live=LiveAacPlayback.matches(connection.http);
+                }
+                main.post(()->{
+                    if(!finishPlaybackProbe(request,probe))return;
+                    liveSource=live;
+                    if(live)initialPosition=0;
+                    if(!live&&streamKind.equalsIgnoreCase("alac"))decode(request,Uri.parse(finalAddress),finalHeaders,false);
+                    else prepare(request,Uri.parse(finalAddress),finalHeaders,false);
+                });
+            }catch(Exception error){
+                main.post(()->{if(finishPlaybackProbe(request,probe))fail(error.getMessage());});
+            }
+        });
+    }
+
+    private boolean finishPlaybackProbe(long request,PluginMedia.PlaybackProbe probe){
+        if(closed||request!=generation||playbackProbe!=probe)return false;
+        playbackProbe=null;
+        return true;
+    }
+
+    private void cancelPlaybackProbe(){
+        if(playbackProbe==null)return;
+        playbackProbe.cancel();
+        playbackProbe=null;
     }
     private void prepare(long request,Uri address,HashMap<String,String> values,boolean cached){try{if(request!=generation||closed)return;stream=address.toString();currentCached=cached;headers=new HashMap<>(values);if(!PluginMedia.contains(headers,"User-Agent"))headers.put("User-Agent","MyGoMusic/5.11");cache.pin(cached?new File(address.getPath()):null);MediaPlayer created=new MediaPlayer();player=created;created.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());created.setWakeMode(getApplicationContext(),PowerManager.PARTIAL_WAKE_LOCK);if("http".equals(address.getScheme())||"https".equals(address.getScheme())){HashMap<String,String> playerHeaders=PluginMedia.progressiveHeaders(headers);playerHeaders.put("android-allow-cross-domain-redirect","0");Uri playable=address;if(!cached&&liveSource){liveAacPlayback=new LiveAacPlayback(address.toString(),headers);playable=Uri.parse(liveAacPlayback.address());playerHeaders.clear();}else if(!cached&&HlsPlayback.matches(address,streamKind)){String source=index>=0&&index<queue.size()?Uri.parse(queue.get(index).optString("uri")).getAuthority():"";hlsPlayback=new HlsPlayback(plugins,source==null?"":source,address.toString(),headers);playable=hlsPlayback.address;playerHeaders.clear();}created.setDataSource(this,playable,playerHeaders);}else created.setDataSource(this,address);
         created.setOnPreparedListener(mp->{if(closed||request!=generation||player!=mp)return;cancelPrepareTimeout();ready=true;loading=false;if(liveSource&&liveAacPlayback!=null)try{audioInfo.put("sourceCodec","aac").put("sourceSampleRate",liveAacPlayback.sampleRate());}catch(Exception ignored){}if(cached||"file".equals(address.getScheme()))buffered=100;applyVolume();if(initialPosition>0)mp.seekTo(Math.min(initialPosition,Math.max(0,mp.getDuration()-1)));if(wanted&&requestFocus()){mp.start();applySavedSpeed(mp);}else wanted=false;if(liveAacPlayback!=null)liveAacPlayback.setPaused(!wanted);if(safePlaying()){armClockGuard();recordAndCache();}publish();});
@@ -308,7 +347,7 @@ public class PlaybackService extends Service {
     void refreshVolume(){applyVolume();publish();}
     private void applyVolume(){if(ready&&player!=null)loudness.apply(player,percent,ducked,prefs.getBoolean("normalize",true),audioInfo,tone.apply(player,prefs));}
     private void cancelPrepareTimeout(){if(prepareTimeout!=null){main.removeCallbacks(prepareTimeout);prepareTimeout=null;}}
-    private void releasePlayer(){AudioAnalysis.reset();speedTarget=null;appliedSpeed=1;buffering=false;buffered=0;cancelClockGuard();cancelPrepareTimeout();if(hlsPlayback!=null){hlsPlayback.close();hlsPlayback=null;}if(liveAacPlayback!=null){liveAacPlayback.close();liveAacPlayback=null;}liveSource=false;livePausedAt=0;ready=false;tone.close();loudness.close();if(decodedFile!=null){decodedFile.delete();decodedFile=null;}if(player!=null){player.setOnPreparedListener(null);player.setOnCompletionListener(null);player.setOnErrorListener(null);player.setOnBufferingUpdateListener(null);player.setOnInfoListener(null);player.release();player=null;}}
+    private void releasePlayer(){cancelPlaybackProbe();AudioAnalysis.reset();speedTarget=null;appliedSpeed=1;buffering=false;buffered=0;cancelClockGuard();cancelPrepareTimeout();if(hlsPlayback!=null){hlsPlayback.close();hlsPlayback=null;}if(liveAacPlayback!=null){liveAacPlayback.close();liveAacPlayback=null;}liveSource=false;livePausedAt=0;ready=false;tone.close();loudness.close();if(decodedFile!=null){decodedFile.delete();decodedFile=null;}if(player!=null){player.setOnPreparedListener(null);player.setOnCompletionListener(null);player.setOnErrorListener(null);player.setOnBufferingUpdateListener(null);player.setOnInfoListener(null);player.release();player=null;}}
     private void fail(String message){if(closed)return;clearSleepTimer();cancelQualitySwitch();qualityIssue="";error=message==null||message.isEmpty()?"播放失败":message;errorId++;wanted=false;loading=false;resumeAfterFocus=false;remote.clear(true);releasePlayer();cache.pin(null);abandonFocus();publish();}
     private void persist(){Snapshot value=snapshot();if(!value.uri.isEmpty())prefs.edit().putString("last_uri",value.uri).putInt("last_pos",value.position).putBoolean("last_offline",value.offlineOnly).putString("last_cache_quality",value.offlineOnly?quality:"").apply();}
     private void publish(){if(closed)return;Snapshot value=snapshot();AudioAnalysis.transport(value.playing&&!value.buffering&&value.volume>0,value.remote);persist();updateMediaState();if(foreground)getSystemService(NotificationManager.class).notify(notificationId,notification());for(Iterator<WeakReference<Listener>> iterator=listeners.iterator();iterator.hasNext();){Listener listener=iterator.next().get();if(listener==null)iterator.remove();else listener.changed(value);}}

@@ -9,6 +9,8 @@ import java.nio.charset.StandardCharsets;
 
 import java.util.*;
 import java.util.regex.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Android implementation of the upstream requestHeaders protocol, internal/plugin/headers.go.
  * Protocol and validation reference: egoist/mygo-music, AGPL-3.0. No extra JS dependencies. */
@@ -93,20 +95,55 @@ final class PluginMedia {
         if(total<=0||end!=total-1||length>=0&&length!=total)throw new IOException("音频分段未覆盖完整文件");
         return total;
     }
+    private static final ExecutorService probeCleanup=Executors.newFixedThreadPool(2, action->{
+        Thread thread=new Thread(action,"mygo-audio-probe-cleanup");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    /** Tracks the disposable header request for one playback selection. */
+    static final class PlaybackProbe {
+        private volatile boolean cancelled;
+        private volatile HttpURLConnection connection;
+
+        Connection open(String address,Map<String,String> headers)throws Exception{
+            return PluginMedia.open(address,headers,true,false,this);
+        }
+
+        void cancel(){
+            cancelled=true;
+            HttpURLConnection active=connection;
+            if(active!=null)probeCleanup.execute(()->{
+                try{active.disconnect();}catch(RuntimeException ignored){}
+            });
+        }
+
+        private void check()throws IOException{
+            if(cancelled)throw new IOException("音频探测已取消");
+        }
+    }
+
     /** Follow redirects ourselves: a token cannot follow a change of host, port or scheme. */
     static Connection open(String address,Map<String,String> values,boolean probe)throws Exception{
         return open(address,values,probe,false);
     }
     private static Connection open(String address,Map<String,String> values,boolean probe,boolean fullAudio)throws Exception{
+        return open(address,values,probe,fullAudio,null);
+    }
+
+    private static Connection open(String address,Map<String,String> values,boolean probe,boolean fullAudio,PlaybackProbe playback)throws Exception{
         URL current=new URL(address);HashMap<String,String> headers=new HashMap<>(values);
         for(int redirects=0;redirects<=8;redirects++){
+            if(playback!=null)playback.check();
             if(!Arrays.asList("https","http").contains(current.getProtocol()))throw new IOException("资源重定向协议无效");
             HttpURLConnection connection=(HttpURLConnection)current.openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(fullAudio?12000:10000);connection.setReadTimeout(fullAudio?20000:12000);
             try{
                 for(Map.Entry<String,String> entry:headers.entrySet())connection.setRequestProperty(entry.getKey(),entry.getValue());
                 if(probe)connection.setRequestProperty("Range","bytes=0-0");
                 else if(fullAudio){connection.setRequestProperty("Range","bytes=0-");connection.setRequestProperty("Accept-Encoding","identity");}
+                if(playback!=null){playback.connection=connection;playback.check();}
                 int status=connection.getResponseCode();
+                if(playback!=null)playback.check();
                 if(Arrays.asList(301,302,303,307,308).contains(status)){
                     String location=connection.getHeaderField("Location");if(location==null)throw new IOException("资源重定向缺少地址");URL next=new URL(current,location);
                     if(!sameOrigin(current,next))headers.clear();current=next;connection.disconnect();continue;
